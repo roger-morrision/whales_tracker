@@ -513,7 +513,7 @@ export function MultiWalletModal() {
                   </div>
                 </button>
               ))}
-              <button className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5">+ Add wallet</button>
+              <button onClick={() => useMoby.getState().setWalletOpen(true)} className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5">+ Add wallet</button>
             </div>
           </motion.div>
         </motion.div>

@@ -11,7 +11,7 @@ import {
   ArrowDownRight,
   Wallet,
 } from "lucide-react";
-import { TRADERS, fmtUsd, fmtNum, fmtAgo, fmtPct, type Trader, type WhaleFlow } from "@/lib/moby-data";
+import { TRADERS, TOKENS, fmtUsd, fmtNum, fmtAgo, fmtPct, type Trader, type WhaleFlow } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Chip, SectionHeader } from "./primitives";
 import { WalletLink } from "./wallet-link";
@@ -251,7 +251,7 @@ function FlowCard({ flow }: { flow: WhaleFlow }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <button onClick={() => openToken(flow.tokenSymbol === "WIF" ? "wif" : flow.tokenSymbol === "SOL" ? "sol" : flow.tokenSymbol === "JUP" ? "jup" : flow.tokenSymbol === "BONK" ? "bonk" : flow.tokenSymbol === "POPCAT" ? "popcat" : flow.tokenSymbol === "JTO" ? "jto" : flow.tokenSymbol === "DRIFT" ? "drift" : flow.tokenSymbol === "IO" ? "io" : flow.tokenSymbol === "TNSR" ? "tensor" : flow.tokenSymbol === "MNGO" ? "mngo" : flow.tokenSymbol === "MOON" ? "moon" : "sol")} className="font-semibold text-sm hover:text-bull">
+            <button onClick={() => { const tk = TOKENS.find(t => t.symbol === flow.tokenSymbol); if (tk) openToken(tk.id); }} className="font-semibold text-sm hover:text-bull">
               {flow.tokenSymbol}
             </button>
             <span className="text-[11px] text-muted-foreground">{FLOW_TYPE_LABEL[flow.type]}</span>

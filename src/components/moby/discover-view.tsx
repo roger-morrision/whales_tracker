@@ -206,7 +206,7 @@ function LaunchCalendar() {
                     </span>
                   )}
                 </div>
-                <button className="mt-2 w-full py-1 rounded-md bg-surface-3 hover:bg-surface-3/70 text-[10px] font-semibold flex items-center justify-center gap-1">
+                <button onClick={(e) => { e.stopPropagation(); useMoby.getState().pushToast({ title: "Reminder set", description: `We'll notify you when ${l.tokenSymbol} launches.`, type: "success" }); }} className="mt-2 w-full py-1 rounded-md bg-surface-3 hover:bg-surface-3/70 text-[10px] font-semibold flex items-center justify-center gap-1">
                   <Rocket className="h-2.5 w-2.5" /> Set reminder
                 </button>
               </div>

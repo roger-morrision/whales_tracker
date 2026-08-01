@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, X, TrendingUp, Hash } from "lucide-react";
-import { TOKENS, TRADERS, NARRATIVES, fmtPrice, fmtPct, fmtAge } from "@/lib/moby-data";
+import { Search, X, TrendingUp, Hash, Clock } from "lucide-react";
+import { TOKENS, TRADERS, NARRATIVES, TOKENS_BY_ID, fmtPrice, fmtPct, fmtAge } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Chip } from "./primitives";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,6 +13,7 @@ export function SearchModal() {
   const setOpen = useMoby((s) => s.setSearchOpen);
   const openToken = useMoby((s) => s.openToken);
   const openTrader = useMoby((s) => s.openTrader);
+  const recentlyViewed = useMoby((s) => s.recentlyViewed);
   const setActiveTab = useMoby((s) => s.setActiveTab);
   const [q, setQ] = useState("");
 
@@ -83,9 +84,39 @@ export function SearchModal() {
 
             <div className="max-h-[60vh] overflow-y-auto scrollbar-thin p-2">
               {!q.trim() && (
-                <div className="px-2 pt-1 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" /> Trending now
-                </div>
+                <>
+                  {/* Recently viewed */}
+                  {recentlyViewed.length > 0 && (
+                    <>
+                      <div className="px-2 pt-1 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> Recently viewed
+                      </div>
+                      {recentlyViewed.slice(0, 5).map((id) => {
+                        const t = TOKENS_BY_ID[id];
+                        if (!t) return null;
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => { openToken(id); setOpen(false); }}
+                            className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-surface-2 transition-colors text-left"
+                          >
+                            <TokenIcon symbol={t.symbol} glyph={t.logoGlyph} color={t.logoColor} size="sm" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold">{t.symbol}</div>
+                              <div className="text-[11px] text-muted-foreground truncate">{t.name}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs font-semibold tabular">{fmtPrice(t.price)}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                  <div className="px-2 pt-3 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" /> Trending now
+                  </div>
+                </>
               )}
 
               {/* Tokens */}

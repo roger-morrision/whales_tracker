@@ -159,7 +159,7 @@ export function ProfileView() {
             <p className="text-xs text-muted-foreground mb-3">
               Unlimited smart-money alerts, real-time whale push notifications, on-chain tax reports, and AI copilot calls.
             </p>
-            <button className="w-full py-2 rounded-lg bg-gold text-background text-xs font-bold hover:opacity-90">
+            <button onClick={() => useMoby.getState().pushToast({ title: "Moby Pro", description: "Upgrade flow coming soon. You're already Pro in this demo!", type: "info" })} className="w-full py-2 rounded-lg bg-gold text-background text-xs font-bold hover:opacity-90">
               Upgrade for $24/mo
             </button>
           </div>
@@ -214,7 +214,7 @@ export function ProfileView() {
             sub="Defaults, gas priority"
             onClick={() => setSettingsOpen(true)}
           />
-          <MenuItem icon={<HelpCircle className="h-4 w-4" />} label="Help & support" />
+          <MenuItem icon={<HelpCircle className="h-4 w-4" />} label="Help & support" onClick={() => useMoby.getState().pushToast({ title: "Help & support", description: "Visit moby.win/support or ask Moby AI for instant help.", type: "info" })} />
           <MenuItem
             icon={<LogOut className="h-4 w-4" />}
             label="Disconnect wallet"

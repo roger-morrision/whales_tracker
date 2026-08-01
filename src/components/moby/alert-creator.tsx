@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { X, Bell, Plus, Trash2, ChevronRight, Check } from "lucide-react";
 import { TOKENS, fmtPrice, fmtUsd } from "@/lib/moby-data";
 import { useMoby, type CustomAlert } from "@/lib/moby-store";
@@ -35,6 +35,13 @@ export function AlertCreatorModal() {
   const [threshold, setThreshold] = useState("");
   const [channels, setChannels] = useState<("push" | "email" | "telegram")[]>(["push"]);
   const [showTokenPicker, setShowTokenPicker] = useState(false);
+
+  // Sync presetTokenId when it changes (e.g., opening from different tokens)
+  useEffect(() => {
+    if (presetTokenId) {
+      Promise.resolve().then(() => setTokenId(presetTokenId));
+    }
+  }, [presetTokenId]);
 
   const token = useMemo(() => TOKENS.find((t) => t.id === tokenId) ?? TOKENS[0], [tokenId]);
 

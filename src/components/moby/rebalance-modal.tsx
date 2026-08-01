@@ -169,7 +169,17 @@ export function RebalanceModal() {
               </div>
 
               {/* Execute */}
-              <button className="w-full py-2.5 rounded-xl bg-bull text-background text-sm font-bold hover:opacity-90 flex items-center justify-center gap-1.5">
+              <button
+                onClick={() => {
+                  useMoby.getState().pushToast({
+                    title: "Rebalance executed",
+                    description: `${trades.filter((t) => t.action !== "HOLD").length} trades submitted. Estimated gas: $0.012`,
+                    type: "success",
+                  });
+                  setOpen(false);
+                }}
+                className="w-full py-2.5 rounded-xl bg-bull text-background text-sm font-bold hover:opacity-90 flex items-center justify-center gap-1.5"
+              >
                 <RefreshCw className="h-4 w-4" /> Execute rebalance
               </button>
               <p className="text-[10px] text-muted-foreground text-center">

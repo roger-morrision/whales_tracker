@@ -249,7 +249,7 @@ export function TradeModal() {
                     <span className="text-muted-foreground flex items-center gap-1">
                       <Zap className="h-3 w-3" /> Route
                     </span>
-                    <span className="font-medium">USD → SOL → {token.symbol}</span>
+                    <span className="font-medium">USD → {token.chain} → {token.symbol}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground flex items-center gap-1">

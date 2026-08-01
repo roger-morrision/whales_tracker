@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Newspaper, ExternalLink, ArrowUpRight, ArrowDownRight, Clock } from "lucide-react";
-import { NEWS, type NewsItem } from "@/lib/moby-data";
+import { NEWS, TOKENS_BY_ID, type NewsItem } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { SectionHeader, Chip } from "./primitives";
 import { cn } from "@/lib/utils";
@@ -89,7 +89,7 @@ function NewsCard({
           {item.tokensMentioned.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
               {item.tokensMentioned.map((id) => {
-                const tk = id === "sol" ? { symbol: "SOL", id } : id === "wif" ? { symbol: "WIF", id } : id === "jup" ? { symbol: "JUP", id } : id === "jto" ? { symbol: "JTO", id } : id === "io" ? { symbol: "IO", id } : id === "rndr" ? { symbol: "RNDR", id } : id === "bonk" ? { symbol: "BONK", id } : id === "hnt" ? { symbol: "HNT", id } : id === "drift" ? { symbol: "DRIFT", id } : null;
+                const tk = TOKENS_BY_ID[id];
                 if (!tk) return null;
                 return (
                   <button

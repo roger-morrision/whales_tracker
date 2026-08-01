@@ -89,7 +89,7 @@ export function TrailingStopsModal() {
           ))}
         </div>
       )}
-      <button className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5 mt-2">+ New trailing stop</button>
+      <button onClick={() => useMoby.getState().pushToast({ title: "New trailing stop", description: "Select a token from Discover to create a trailing stop.", type: "info" })} className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5 mt-2">+ New trailing stop</button>
     </ModalShell>
   );
 }
@@ -192,7 +192,7 @@ export function MigrationsModal() {
               <div><span className="text-muted-foreground">New: </span><span className="font-mono text-muted-foreground">{m.newContract}</span></div>
             </div>
             {m.status !== "completed" && (
-              <button className="w-full mt-2 py-1.5 rounded-lg bg-bull/15 text-bull border border-bull/30 text-xs font-bold">Migrate tokens</button>
+              <button onClick={() => useMoby.getState().pushToast({ title: "Migration started", description: `${m.tokenSymbol} migration from ${m.fromChain} to ${m.toChain} initiated.`, type: "info" })} className="w-full mt-2 py-1.5 rounded-lg bg-bull/15 text-bull border border-bull/30 text-xs font-bold">Migrate tokens</button>
             )}
           </div>
         ))}

@@ -466,6 +466,10 @@ interface MobyState {
   // ===== BATCH 8: Watchlist alerts =====
   watchlistAlertsOpen: boolean;
   setWatchlistAlertsOpen: (open: boolean) => void;
+
+  // Recently viewed tokens
+  recentlyViewed: string[];
+  addRecentlyViewed: (id: string) => void;
 }
 
 // ===== BATCH 3 types =====
@@ -633,7 +637,10 @@ export const useMoby = create<MobyState>()(
     })),
 
   selectedTokenId: null,
-  openToken: (id) => set({ selectedTokenId: id }),
+  openToken: (id) => set((s) => ({
+    selectedTokenId: id,
+    recentlyViewed: id ? [id, ...s.recentlyViewed.filter((x) => x !== id)].slice(0, 10) : s.recentlyViewed,
+  })),
 
   selectedTraderId: null,
   openTrader: (id) => set({ selectedTraderId: id }),
@@ -1282,6 +1289,13 @@ export const useMoby = create<MobyState>()(
   // ===== BATCH 8: Watchlist alerts =====
   watchlistAlertsOpen: false,
   setWatchlistAlertsOpen: (open) => set({ watchlistAlertsOpen: open }),
+
+  // Recently viewed tokens
+  recentlyViewed: [],
+  addRecentlyViewed: (id) =>
+    set((s) => ({
+      recentlyViewed: [id, ...s.recentlyViewed.filter((x) => x !== id)].slice(0, 10),
+    })),
   }),
   {
     name: "moby-storage",
@@ -1301,6 +1315,7 @@ export const useMoby = create<MobyState>()(
       activeWalletId: s.activeWalletId,
       theme: s.theme,
       pushPermission: s.pushPermission,
+      recentlyViewed: s.recentlyViewed,
     }),
   }
   )

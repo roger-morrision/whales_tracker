@@ -188,7 +188,7 @@ export function WalletConnectModal() {
               >
                 <Key className="h-3 w-3" /> Import existing wallet (seed phrase / private key)
               </button>
-              <button className="w-full text-center text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1">
+              <button onClick={() => useMoby.getState().pushToast({ title: "Wallet security", description: "Moby never stores your seed phrase. All transactions require your approval.", type: "info" })} className="w-full text-center text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1">
                 <ExternalLink className="h-3 w-3" /> Learn more about wallet security
               </button>
             </div>

@@ -87,7 +87,17 @@ export function PortfolioView() {
   // Slice history by range
   const history = useMemo(() => {
     const h = PORTFOLIO.history;
-    if (range === "1D") return h.slice(-1).length ? [{ t: h[h.length - 2]?.t ?? Date.now(), v: h[h.length - 2]?.v ?? totalValue }, { t: Date.now(), v: totalValue }] : h;
+    if (range === "1D") {
+      // Interpolate 24 hourly points from yesterday to now
+      const prev = h[h.length - 2]?.v ?? totalValue * 0.98;
+      const out: { t: number; v: number }[] = [];
+      for (let i = 0; i < 24; i++) {
+        const progress = i / 23;
+        const v = prev + (totalValue - prev) * progress + (Math.sin(i * 2.3) * totalValue * 0.003);
+        out.push({ t: Date.now() - (23 - i) * 3600_000, v: Math.round(v) });
+      }
+      return out;
+    }
     if (range === "1W") return h.slice(-7);
     if (range === "1M") return h;
     return h;
@@ -252,7 +262,7 @@ export function PortfolioView() {
         </div>
       </section>
 
-      <button className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors flex items-center justify-center gap-1.5">
+      <button onClick={() => useMoby.getState().setWalletOpen(true)} className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors flex items-center justify-center gap-1.5">
         <Plus className="h-3.5 w-3.5" /> Add wallet or chain
       </button>
     </div>
@@ -338,42 +348,6 @@ function CryptoHoldings() {
                 {isBull ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                 {isBull ? "+" : "-"}
                 {fmtUsd(Math.abs(h.pnl), { compact: true })}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function NftHoldings() {
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {PORTFOLIO.nftHoldings.map((n) => {
-        const value = n.floorPrice * n.count;
-        const cost = n.avgCost * n.count;
-        const pnl = value - cost;
-        const isBull = pnl >= 0;
-        return (
-          <div key={n.id} className="rounded-xl border border-border overflow-hidden">
-            <div className={cn("h-20 bg-gradient-to-br relative", n.color)}>
-              <div className="absolute inset-0 grid place-items-center">
-                <ImageIcon className="h-6 w-6 text-white/70" />
-              </div>
-              <div className="absolute top-1 right-1 bg-background/70 backdrop-blur px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                ×{n.count}
-              </div>
-            </div>
-            <div className="p-2">
-              <div className="font-semibold text-sm truncate">{n.collection}</div>
-              <div className="text-[10px] text-muted-foreground mb-1">{n.chain} · floor {n.floorPrice}</div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold tabular">{fmtUsd(value, { compact: true })}</span>
-                <span className={cn("text-[10px] tabular", isBull ? "text-bull" : "text-bear")}>
-                  {isBull ? "+" : "-"}
-                  {fmtUsd(Math.abs(pnl), { compact: true })}
-                </span>
               </div>
             </div>
           </div>

@@ -229,10 +229,22 @@ function PerpPositionCard({ position }: { position: PerpPosition }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2 mt-2">
-        <button className="py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2">
+        <button
+          onClick={() => useMoby.getState().pushToast({ title: "Margin added", description: `Added $500 to ${position.marketSymbol}`, type: "success" })}
+          className="py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2"
+        >
           Add margin
         </button>
-        <button className="py-1.5 rounded-lg bg-bull text-background text-xs font-bold hover:opacity-90">
+        <button
+          onClick={() => {
+            useMoby.getState().pushToast({
+              title: "Position closed",
+              description: `${position.marketSymbol} closed at ${fmtPrice(position.markPrice)}. PnL: ${position.unrealizedPnl >= 0 ? "+" : ""}${fmtUsd(position.unrealizedPnl)}`,
+              type: position.unrealizedPnl >= 0 ? "success" : "warn",
+            });
+          }}
+          className="py-1.5 rounded-lg bg-bull text-background text-xs font-bold hover:opacity-90"
+        >
           Close position
         </button>
       </div>

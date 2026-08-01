@@ -316,10 +316,16 @@ function PrivacySettings({
         <div className="text-[11px] text-muted-foreground">
           Moby never shares your wallet activity with third parties. Your data is encrypted at rest and in transit.
         </div>
-        <button className="w-full py-2 rounded-lg border border-border text-xs font-semibold hover:bg-surface-2">
+        <button
+          onClick={() => useMoby.getState().pushToast({ title: "Data export started", description: "Your data will be downloaded as JSON.", type: "info" })}
+          className="w-full py-2 rounded-lg border border-border text-xs font-semibold hover:bg-surface-2"
+        >
           Download my data
         </button>
-        <button className="w-full py-2 rounded-lg border border-bear/30 text-bear text-xs font-semibold hover:bg-bear/10">
+        <button
+          onClick={() => useMoby.getState().pushToast({ title: "Account deletion", description: "This is a demo — no real account was deleted.", type: "warn" })}
+          className="w-full py-2 rounded-lg border border-bear/30 text-bear text-xs font-semibold hover:bg-bear/10"
+        >
           Delete account
         </button>
       </Section>
