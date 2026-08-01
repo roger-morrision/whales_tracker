@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Bell,
   GitCompareArrows,
+  Share2,
 } from "lucide-react";
 import {
   Area,
@@ -416,6 +417,20 @@ function TokenDetailContent({ token }: { token: Token }) {
             📊 Depth
           </button>
         </div>
+        <button
+          onClick={() => {
+            const text = `${token.name} ($${token.symbol})\nPrice: ${fmtPrice(live)}\n24h: ${delta24h >= 0 ? "+" : ""}${delta24h.toFixed(2)}%\nSmart money: ${token.smartMoneyHolders} wallets\n\nDiscovered on Moby 🐋`;
+            if (typeof navigator !== "undefined" && navigator.share) {
+              navigator.share({ title: `${token.symbol} on Moby`, text }).catch(() => {});
+            } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+              navigator.clipboard.writeText(text);
+              useMoby.getState().pushToast({ title: "Copied to clipboard", type: "info" });
+            }
+          }}
+          className="w-full h-9 rounded-lg bg-bull/15 text-bull border border-bull/30 text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-bull/20"
+        >
+          <Share2 className="h-3 w-3" /> Share {token.symbol}
+        </button>
       </div>
     </div>
   );

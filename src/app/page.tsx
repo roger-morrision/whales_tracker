@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useMoby } from "@/lib/moby-store";
+import { TOKENS } from "@/lib/moby-data";
 import { TopBar } from "@/components/moby/top-bar";
 import { BottomNav } from "@/components/moby/bottom-nav";
 import { DiscoverView } from "@/components/moby/discover-view";
@@ -56,6 +57,7 @@ export default function Home() {
   const tickPrices = useMoby((s) => s.tickPrices);
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
   const setCopilotOpen = useMoby((s) => s.setCopilotOpen);
+  const wallet = useMoby((s) => s.wallet);
 
   // Register PWA service worker
   useEffect(() => {
@@ -64,13 +66,55 @@ export default function Home() {
     }
   }, []);
 
-  // Live price ticking — every 2.5s
+  // Live price ticking — every 2.5s (local simulation for smooth UI)
   useEffect(() => {
     const interval = setInterval(() => {
       tickPrices();
     }, 2500);
     return () => clearInterval(interval);
   }, [tickPrices]);
+
+  // Fetch real prices from /api/prices every 15s (overrides local tick)
+  useEffect(() => {
+    const fetchRealPrices = async () => {
+      try {
+        const res = await fetch("/api/prices?symbols=SOL,WIF,JUP,BONK,JTO,PYTH,DRIFT,IO,RNDR,POPCAT,HNT,TNSR,MNGO,MOON,ETH,BTC,NEON,RAY");
+        const data = await res.json();
+        if (data.prices) {
+          Object.entries(data.prices).forEach(([symbol, info]: [string, any]) => {
+            const token = TOKENS.find((t) => t.symbol === symbol);
+            if (token && info.price) {
+              useMoby.getState().setPrice(token.id, info.price);
+            }
+          });
+        }
+      } catch {
+        // Silently fail — local tick continues
+      }
+    };
+    fetchRealPrices();
+    const interval = setInterval(fetchRealPrices, 15_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch real wallet balance when wallet connects
+  useEffect(() => {
+    if (!wallet?.connected) return;
+    const fetchBalance = async () => {
+      try {
+        const res = await fetch(`/api/wallet?address=${encodeURIComponent(wallet.address)}`);
+        const data = await res.json();
+        if (data.totalUsd) {
+          useMoby.setState((s) => ({
+            wallet: s.wallet ? { ...s.wallet, balanceUsd: data.totalUsd } : null,
+          }));
+        }
+      } catch {
+        // Keep default balance
+      }
+    };
+    fetchBalance();
+  }, [wallet?.connected, wallet?.address]);
 
   // Periodic feed refresh — every 30s
   useEffect(() => {

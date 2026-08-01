@@ -121,6 +121,10 @@ export function TradeModal() {
     setTimeout(() => {
       setSubmitting(false);
       setSuccess(true);
+      // Haptic feedback on trade confirmation
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate([10, 30, 10]);
+      }
       useMoby.getState().pushToast({
         title: `${isBuy ? "Buy" : "Sell"} order confirmed`,
         description: `${isBuy ? "Bought" : "Sold"} ${fmtNum(amountOut)} ${token.symbol} for $${amount} USDC${quote ? ` · Quote: ${quote.quoteId.slice(0, 12)}` : ""}`,

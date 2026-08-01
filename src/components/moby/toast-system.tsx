@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { X, CheckCircle2, AlertCircle, Info, AlertTriangle, Bell } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { X, CheckCircle2, AlertCircle, Info, AlertTriangle, Bell, Share2 } from "lucide-react";
 import { useMoby, type ToastItem } from "@/lib/moby-store";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -63,19 +63,37 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
         {toast.description && (
           <div className="text-[11px] text-muted-foreground mt-0.5">{toast.description}</div>
         )}
-        {toast.actionLabel && (
-          <button
-            onClick={() => {
-              if (toast.actionId) {
-                useMoby.getState().openToken(toast.actionId);
-              }
-              onDismiss();
-            }}
-            className="mt-1.5 text-[11px] font-semibold text-bull hover:opacity-80"
-          >
-            {toast.actionLabel} →
-          </button>
-        )}
+        <div className="flex items-center gap-2 mt-1">
+          {toast.actionLabel && (
+            <button
+              onClick={() => {
+                if (toast.actionId) {
+                  useMoby.getState().openToken(toast.actionId);
+                }
+                onDismiss();
+              }}
+              className="text-[11px] font-semibold text-bull hover:opacity-80"
+            >
+              {toast.actionLabel} →
+            </button>
+          )}
+          {toast.type === "success" && toast.description && (
+            <button
+              onClick={() => {
+                const text = `${toast.title}\n${toast.description}\n\nVia Moby 🐋`;
+                if (typeof navigator !== "undefined" && navigator.share) {
+                  navigator.share({ title: toast.title, text }).catch(() => {});
+                } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+                  navigator.clipboard.writeText(text);
+                  useMoby.getState().pushToast({ title: "Copied to clipboard", type: "info" });
+                }
+              }}
+              className="text-[11px] font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
+            >
+              <Share2 className="h-2.5 w-2.5" /> Share
+            </button>
+          )}
+        </div>
       </div>
       <button
         onClick={onDismiss}
@@ -106,6 +124,10 @@ export function WhaleAlertPusher() {
     let idx = 0;
     const interval = setInterval(() => {
       const alert = alerts[idx % alerts.length];
+      // Haptic feedback on mobile
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate([30, 50, 30]);
+      }
       pushToast({
         title: alert.title,
         description: alert.description,
