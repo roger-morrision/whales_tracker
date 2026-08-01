@@ -696,23 +696,51 @@ export const useMoby = create<MobyState>()(
     };
     set((s) => ({ chat: [...s.chat, userMsg, pending] }));
 
-    // Simulate async assistant reply
-    setTimeout(() => {
-      const reply = generateAssistantReply(content);
-      set((s) => ({
-        chat: s.chat.map((m) =>
-          m.id === pendingId
-            ? {
-                ...m,
-                pending: false,
-                content: reply.content,
-                suggestedTokens: reply.suggestedTokens,
-                ts: Date.now(),
-              }
-            : m
-        ),
-      }));
-    }, 900 + Math.random() * 700);
+    // Try real LLM API first, fall back to heuristic
+    (async () => {
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: get().chat
+              .filter((m) => !m.pending && m.content)
+              .slice(-6) // Last 6 messages for context
+              .map((m) => ({ role: m.role, content: m.content })),
+          }),
+        });
+        const data = await res.json();
+        set((s) => ({
+          chat: s.chat.map((m) =>
+            m.id === pendingId
+              ? {
+                  ...m,
+                  pending: false,
+                  content: data.content,
+                  suggestedTokens: data.suggestedTokens,
+                  ts: Date.now(),
+                }
+              : m
+          ),
+        }));
+      } catch {
+        // Fallback to heuristic
+        const reply = generateAssistantReply(content);
+        set((s) => ({
+          chat: s.chat.map((m) =>
+            m.id === pendingId
+              ? {
+                  ...m,
+                  pending: false,
+                  content: reply.content,
+                  suggestedTokens: reply.suggestedTokens,
+                  ts: Date.now(),
+                }
+              : m
+          ),
+        }));
+      }
+    })();
   },
   clearChat: () => set({ chat: initialChat }),
 

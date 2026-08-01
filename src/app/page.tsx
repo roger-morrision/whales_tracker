@@ -48,6 +48,7 @@ import { SecurityAuditModal, TokenizedStocksModal, WalletPnlModal, SnipeBotModal
 import { TrailingStopsModal, HotWalletsModal, MigrationsModal, MevProtectionModal, WalletImportModal, WatchlistAlertsModal } from "@/components/moby/batch8-modals";
 import { ErrorBoundary } from "@/components/moby/error-boundary";
 import { PumpFunExplorerModal } from "@/components/moby/pumpfun-explorer";
+import { ShareModal } from "@/components/moby/share-modal";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -55,6 +56,13 @@ export default function Home() {
   const tickPrices = useMoby((s) => s.tickPrices);
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
   const setCopilotOpen = useMoby((s) => s.setCopilotOpen);
+
+  // Register PWA service worker
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
 
   // Live price ticking — every 2.5s
   useEffect(() => {
@@ -249,6 +257,13 @@ export default function Home() {
 
       {/* Batch 9: Pump.fun explorer */}
       <PumpFunExplorerModal />
+
+      {/* Share modal (global) */}
+      <ShareModal
+        data={{ title: "Moby — Trade Smarter", description: "Onchain intelligence for traders. Follow whales, discover tokens, trade smarter." }}
+        open={false}
+        onClose={() => {}}
+      />
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />
