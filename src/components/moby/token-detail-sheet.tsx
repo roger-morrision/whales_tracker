@@ -34,6 +34,7 @@ import {
 import { TOKENS_BY_ID, fmtUsd, fmtPrice, fmtPct, fmtNum, type Token } from "@/lib/moby-data";
 import { useMoby, useToken } from "@/lib/moby-store";
 import { TokenIcon, Chip, Sparkline } from "./primitives";
+import { HolderDistributionSection } from "./holder-distribution";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -360,8 +361,13 @@ function TokenDetailContent({ token }: { token: Token }) {
         </div>
       </div>
 
+      {/* Holder distribution + top holders */}
+      <div className="px-4 mt-4">
+        <HolderDistributionSection tokenId={token.id} />
+      </div>
+
       {/* External links */}
-      <div className="px-4 pb-6 flex gap-2">
+      <div className="px-4 mt-4 pb-6 flex gap-2">
         <button className="flex-1 h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1">
           <ExternalLink className="h-3 w-3" /> Explorer
         </button>

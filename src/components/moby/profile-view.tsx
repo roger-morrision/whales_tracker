@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Plus,
   Trash2,
+  Gift,
 } from "lucide-react";
 import { useMoby } from "@/lib/moby-store";
 import { TOKENS, fmtUsd, fmtNum, fmtPrice } from "@/lib/moby-data";
@@ -51,9 +52,29 @@ export function ProfileView() {
         <StatBox icon={<Bell className="h-3.5 w-3.5" />} label="Alerts" value={`${signals.length}`} accent="bear" />
       </div>
 
+      {/* Trading tools grid — new batch 3 features */}
+      <section>
+        <SectionHeader title="Trading tools" emoji="⚡" />
+        <div className="grid grid-cols-4 gap-2">
+          <ToolButton emoji="📋" label="Copy Trade" onClick={() => useMoby.getState().setCopyTradeOpen(true)} />
+          <ToolButton emoji="🎯" label="Limit" onClick={() => useMoby.getState().setLimitOrdersOpen(true)} />
+          <ToolButton emoji="📅" label="DCA" onClick={() => useMoby.getState().setDcaOpen(true)} />
+          <ToolButton emoji="📊" label="Rebalance" onClick={() => useMoby.getState().setRebalanceOpen(true)} />
+          <ToolButton emoji="📜" label="Activity" onClick={() => useMoby.getState().setWalletActivityOpen(true)} />
+          <ToolButton emoji="🌐" label="Solana" onClick={() => useMoby.getState().setSolanaStatsOpen(true)} />
+          <ToolButton emoji="🏆" label="Leaderboard" onClick={() => useMoby.getState().setPnlLeaderboardOpen(true)} />
+          <ToolButton emoji="💬" label="Social" onClick={() => useMoby.getState().setSocialOpen(true)} />
+        </div>
+      </section>
+
       {/* Achievements */}
       <section>
-        <SectionHeader title="Achievements" emoji="🏆" />
+        <SectionHeader
+          title="Achievements"
+          emoji="🏆"
+          action="View all"
+          onAction={() => useMoby.getState().setAchievementsOpen(true)}
+        />
         <div className="grid grid-cols-3 gap-2">
           <Achievement icon="🐋" label="Whale Watcher" desc="Tracked 100+ whales" unlocked />
           <Achievement icon="⚡" label="Early Bird" desc="Caught 10 early entries" unlocked />
@@ -124,6 +145,12 @@ export function ProfileView() {
             label="Create custom alert"
             sub={`${customAlerts.length} active`}
             onClick={() => openAlertCreator(null)}
+          />
+          <MenuItem
+            icon={<Gift className="h-4 w-4" />}
+            label="Refer & earn"
+            sub="Get $25 per friend"
+            onClick={() => useMoby.getState().setReferralOpen(true)}
           />
           <MenuItem
             icon={<Settings className="h-4 w-4" />}
@@ -238,6 +265,18 @@ function Achievement({ icon, label, desc, unlocked }: { icon: string; label: str
       <div className="text-[11px] font-semibold truncate">{label}</div>
       <div className="text-[9px] text-muted-foreground truncate">{desc}</div>
     </div>
+  );
+}
+
+function ToolButton({ emoji, label, onClick }: { emoji: string; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-xl border border-border bg-surface-2 p-2 hover:bg-surface-3 hover:border-bull/30 transition-colors text-center"
+    >
+      <div className="text-xl mb-0.5">{emoji}</div>
+      <div className="text-[10px] font-medium text-muted-foreground truncate">{label}</div>
+    </button>
   );
 }
 

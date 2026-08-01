@@ -223,6 +223,33 @@ export function PortfolioView() {
         {assetTab === "stocks" && <StockHoldings />}
       </section>
 
+      {/* Trading automation tools */}
+      <section>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={() => useMoby.getState().setRebalanceOpen(true)}
+            className="rounded-xl border border-border bg-surface-2 p-2.5 hover:bg-surface-3 hover:border-bull/30 transition-colors text-center"
+          >
+            <div className="text-xl mb-0.5">📊</div>
+            <div className="text-[10px] font-medium">Rebalance</div>
+          </button>
+          <button
+            onClick={() => useMoby.getState().setLimitOrdersOpen(true)}
+            className="rounded-xl border border-border bg-surface-2 p-2.5 hover:bg-surface-3 hover:border-bull/30 transition-colors text-center"
+          >
+            <div className="text-xl mb-0.5">🎯</div>
+            <div className="text-[10px] font-medium">Limit orders</div>
+          </button>
+          <button
+            onClick={() => useMoby.getState().setDcaOpen(true)}
+            className="rounded-xl border border-border bg-surface-2 p-2.5 hover:bg-surface-3 hover:border-bull/30 transition-colors text-center"
+          >
+            <div className="text-xl mb-0.5">📅</div>
+            <div className="text-[10px] font-medium">DCA</div>
+          </button>
+        </div>
+      </section>
+
       <button className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors flex items-center justify-center gap-1.5">
         <Plus className="h-3.5 w-3.5" /> Add wallet or chain
       </button>

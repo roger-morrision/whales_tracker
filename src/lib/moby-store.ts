@@ -231,6 +231,103 @@ interface MobyState {
   setCompareOpen: (open: boolean) => void;
   toggleCompareId: (id: string) => void;
   clearCompare: () => void;
+
+  // ===== BATCH 3: Copy trading =====
+  copyTradeOpen: boolean;
+  setCopyTradeOpen: (open: boolean) => void;
+  copyTrades: CopyTradeConfig[];
+  addCopyTrade: (c: Omit<CopyTradeConfig, "id" | "createdAt">) => void;
+  removeCopyTrade: (id: string) => void;
+  toggleCopyTrade: (id: string) => void;
+
+  // ===== BATCH 3: Limit orders =====
+  limitOrdersOpen: boolean;
+  setLimitOrdersOpen: (open: boolean) => void;
+  limitOrders: LimitOrder[];
+  addLimitOrder: (o: Omit<LimitOrder, "id" | "createdAt">) => void;
+  cancelLimitOrder: (id: string) => void;
+
+  // ===== BATCH 3: DCA scheduler =====
+  dcaOpen: boolean;
+  setDcaOpen: (open: boolean) => void;
+  dcaStrategies: DcaStrategy[];
+  addDcaStrategy: (s: Omit<DcaStrategy, "id" | "createdAt" | "nextRun">) => void;
+  removeDcaStrategy: (id: string) => void;
+  toggleDcaStrategy: (id: string) => void;
+
+  // ===== BATCH 3: Wallet activity =====
+  walletActivityOpen: boolean;
+  setWalletActivityOpen: (open: boolean) => void;
+
+  // ===== BATCH 3: Solana stats =====
+  solanaStatsOpen: boolean;
+  setSolanaStatsOpen: (open: boolean) => void;
+
+  // ===== BATCH 3: PNL leaderboard =====
+  pnlLeaderboardOpen: boolean;
+  setPnlLeaderboardOpen: (open: boolean) => void;
+
+  // ===== BATCH 3: Social sentiment =====
+  socialOpen: boolean;
+  setSocialOpen: (open: boolean) => void;
+
+  // ===== BATCH 3: Rebalancing =====
+  rebalanceOpen: boolean;
+  setRebalanceOpen: (open: boolean) => void;
+
+  // ===== BATCH 3: Referral =====
+  referralOpen: boolean;
+  setReferralOpen: (open: boolean) => void;
+
+  // ===== BATCH 3: Achievements detail =====
+  achievementsOpen: boolean;
+  setAchievementsOpen: (open: boolean) => void;
+}
+
+// ===== BATCH 3 types =====
+export interface CopyTradeConfig {
+  id: string;
+  traderId: string;
+  traderHandle: string;
+  traderGlyph: string;
+  traderColor: string;
+  enabled: boolean;
+  maxPerTradeUsd: number;
+  dailyLimitUsd: number;
+  totalAllocatedUsd: number;
+  totalCopiedUsd: number;
+  tradesCopied: number;
+  slippage: number;
+  onlyBuy: boolean;
+  minTraderScore: number;
+  createdAt: number;
+}
+
+export interface LimitOrder {
+  id: string;
+  tokenId: string;
+  tokenSymbol: string;
+  side: "BUY" | "SELL";
+  targetPrice: number;
+  amountUsd: number;
+  expiry: "1d" | "7d" | "30d" | "90d" | "gtc";
+  status: "open" | "filled" | "cancelled" | "expired";
+  createdAt: number;
+  filledAt?: number;
+  fillPrice?: number;
+}
+
+export interface DcaStrategy {
+  id: string;
+  name: string;
+  tokenIds: string[];
+  frequency: "daily" | "weekly" | "biweekly" | "monthly";
+  amountUsd: number;
+  enabled: boolean;
+  totalInvested: number;
+  runs: number;
+  nextRun: number; // timestamp
+  createdAt: number;
 }
 
 const initialPrices: Record<string, { price: number; prev: number; ts: number }> = {};
@@ -608,6 +705,177 @@ export const useMoby = create<MobyState>((set, get) => ({
         : [...s.compareIds, id],
     })),
   clearCompare: () => set({ compareIds: [] }),
+
+  // ===== BATCH 3: Copy trading =====
+  copyTradeOpen: false,
+  setCopyTradeOpen: (open) => set({ copyTradeOpen: open }),
+  copyTrades: [
+    {
+      id: "ct-1",
+      traderId: "t1",
+      traderHandle: "0xMoby",
+      traderGlyph: "M",
+      traderColor: "from-[#14F195] to-[#9945FF]",
+      enabled: true,
+      maxPerTradeUsd: 500,
+      dailyLimitUsd: 2000,
+      totalAllocatedUsd: 10_000,
+      totalCopiedUsd: 4_280,
+      tradesCopied: 18,
+      slippage: 1.5,
+      onlyBuy: false,
+      minTraderScore: 85,
+      createdAt: 0,
+    },
+  ],
+  addCopyTrade: (c) =>
+    set((s) => ({
+      copyTrades: [...s.copyTrades, { ...c, id: `ct-${Date.now()}`, createdAt: Date.now() }],
+      copyTradeOpen: false,
+    })),
+  removeCopyTrade: (id) =>
+    set((s) => ({ copyTrades: s.copyTrades.filter((x) => x.id !== id) })),
+  toggleCopyTrade: (id) =>
+    set((s) => ({
+      copyTrades: s.copyTrades.map((x) =>
+        x.id === id ? { ...x, enabled: !x.enabled } : x
+      ),
+    })),
+
+  // ===== BATCH 3: Limit orders =====
+  limitOrdersOpen: false,
+  setLimitOrdersOpen: (open) => set({ limitOrdersOpen: open }),
+  limitOrders: [
+    {
+      id: "lo-1",
+      tokenId: "wif",
+      tokenSymbol: "WIF",
+      side: "BUY",
+      targetPrice: 2.4,
+      amountUsd: 1000,
+      expiry: "7d",
+      status: "open",
+      createdAt: 0,
+    },
+    {
+      id: "lo-2",
+      tokenId: "sol",
+      tokenSymbol: "SOL",
+      side: "SELL",
+      targetPrice: 220,
+      amountUsd: 2500,
+      expiry: "30d",
+      status: "open",
+      createdAt: 0,
+    },
+    {
+      id: "lo-3",
+      tokenId: "jup",
+      tokenSymbol: "JUP",
+      side: "BUY",
+      targetPrice: 0.7,
+      amountUsd: 500,
+      expiry: "gtc",
+      status: "filled",
+      createdAt: 0,
+      filledAt: 0,
+      fillPrice: 0.68,
+    },
+  ],
+  addLimitOrder: (o) =>
+    set((s) => ({
+      limitOrders: [
+        { ...o, id: `lo-${Date.now()}`, createdAt: Date.now() },
+        ...s.limitOrders,
+      ],
+    })),
+  cancelLimitOrder: (id) =>
+    set((s) => ({
+      limitOrders: s.limitOrders.map((x) =>
+        x.id === id && x.status === "open" ? { ...x, status: "cancelled" } : x
+      ),
+    })),
+
+  // ===== BATCH 3: DCA scheduler =====
+  dcaOpen: false,
+  setDcaOpen: (open) => set({ dcaOpen: open }),
+  dcaStrategies: [
+    {
+      id: "dca-1",
+      name: "Weekly SOL stack",
+      tokenIds: ["sol"],
+      frequency: "weekly",
+      amountUsd: 200,
+      enabled: true,
+      totalInvested: 4_200,
+      runs: 21,
+      nextRun: 0,
+      createdAt: 0,
+    },
+    {
+      id: "dca-2",
+      name: "AI Infrastructure",
+      tokenIds: ["io", "rndr"],
+      frequency: "biweekly",
+      amountUsd: 300,
+      enabled: false,
+      totalInvested: 1_800,
+      runs: 6,
+      nextRun: 0,
+      createdAt: 0,
+    },
+  ],
+  addDcaStrategy: (s) =>
+    set((state) => ({
+      dcaStrategies: [
+        ...state.dcaStrategies,
+        {
+          ...s,
+          id: `dca-${Date.now()}`,
+          createdAt: Date.now(),
+          nextRun: Date.now() + 7 * 86400_000,
+          totalInvested: 0,
+          runs: 0,
+        },
+      ],
+      dcaOpen: false,
+    })),
+  removeDcaStrategy: (id) =>
+    set((s) => ({ dcaStrategies: s.dcaStrategies.filter((x) => x.id !== id) })),
+  toggleDcaStrategy: (id) =>
+    set((s) => ({
+      dcaStrategies: s.dcaStrategies.map((x) =>
+        x.id === id ? { ...x, enabled: !x.enabled } : x
+      ),
+    })),
+
+  // ===== BATCH 3: Wallet activity =====
+  walletActivityOpen: false,
+  setWalletActivityOpen: (open) => set({ walletActivityOpen: open }),
+
+  // ===== BATCH 3: Solana stats =====
+  solanaStatsOpen: false,
+  setSolanaStatsOpen: (open) => set({ solanaStatsOpen: open }),
+
+  // ===== BATCH 3: PNL leaderboard =====
+  pnlLeaderboardOpen: false,
+  setPnlLeaderboardOpen: (open) => set({ pnlLeaderboardOpen: open }),
+
+  // ===== BATCH 3: Social sentiment =====
+  socialOpen: false,
+  setSocialOpen: (open) => set({ socialOpen: open }),
+
+  // ===== BATCH 3: Rebalancing =====
+  rebalanceOpen: false,
+  setRebalanceOpen: (open) => set({ rebalanceOpen: open }),
+
+  // ===== BATCH 3: Referral =====
+  referralOpen: false,
+  setReferralOpen: (open) => set({ referralOpen: open }),
+
+  // ===== BATCH 3: Achievements detail =====
+  achievementsOpen: false,
+  setAchievementsOpen: (open) => set({ achievementsOpen: open }),
 }));
 
 // Convenience hook selectors

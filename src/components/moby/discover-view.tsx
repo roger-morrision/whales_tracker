@@ -58,8 +58,89 @@ export function DiscoverView() {
       </section>
 
       <SmartMoneyMovers />
+      <InsightsGrid />
       <NewsFeed />
     </div>
+  );
+}
+
+function InsightsGrid() {
+  return (
+    <section>
+      <SectionHeader title="Tools & insights" emoji="🧰" />
+      <div className="grid grid-cols-3 gap-2">
+        <InsightCard
+          emoji="🌐"
+          title="Solana stats"
+          sub="TPS · TVL · Validators"
+          accent="from-[#9945FF]/15"
+          onClick={() => useMoby.getState().setSolanaStatsOpen(true)}
+        />
+        <InsightCard
+          emoji="🏆"
+          title="P&L leaderboard"
+          sub="Top earners today"
+          accent="from-[#F59E0B]/15"
+          onClick={() => useMoby.getState().setPnlLeaderboardOpen(true)}
+        />
+        <InsightCard
+          emoji="💬"
+          title="Social sentiment"
+          sub="What Twitter thinks"
+          accent="from-[#22D3EE]/15"
+          onClick={() => useMoby.getState().setSocialOpen(true)}
+        />
+        <InsightCard
+          emoji="📋"
+          title="Copy trading"
+          sub="Mirror top traders"
+          accent="from-[#14F195]/15"
+          onClick={() => useMoby.getState().setCopyTradeOpen(true)}
+        />
+        <InsightCard
+          emoji="🎯"
+          title="Limit orders"
+          sub="Set price targets"
+          accent="from-[#EC4899]/15"
+          onClick={() => useMoby.getState().setLimitOrdersOpen(true)}
+        />
+        <InsightCard
+          emoji="📅"
+          title="DCA scheduler"
+          sub="Automate buys"
+          accent="from-[#A855F7]/15"
+          onClick={() => useMoby.getState().setDcaOpen(true)}
+        />
+      </div>
+    </section>
+  );
+}
+
+function InsightCard({
+  emoji,
+  title,
+  sub,
+  accent,
+  onClick,
+}: {
+  emoji: string;
+  title: string;
+  sub: string;
+  accent: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "rounded-xl border border-border p-2.5 text-left bg-gradient-to-br to-transparent hover:bg-surface-2 transition-colors",
+        accent
+      )}
+    >
+      <div className="text-xl mb-1">{emoji}</div>
+      <div className="text-[11px] font-semibold">{title}</div>
+      <div className="text-[9px] text-muted-foreground truncate">{sub}</div>
+    </button>
   );
 }
 

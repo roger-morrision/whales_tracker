@@ -21,6 +21,16 @@ import { AlertCreatorModal } from "@/components/moby/alert-creator";
 import { SettingsModal } from "@/components/moby/settings-modal";
 import { OnboardingOverlay } from "@/components/moby/onboarding";
 import { CompareModal } from "@/components/moby/compare-modal";
+import { CopyTradeModal } from "@/components/moby/copy-trade-modal";
+import { LimitOrdersModal } from "@/components/moby/limit-orders-modal";
+import { DcaModal } from "@/components/moby/dca-modal";
+import { WalletActivityModal } from "@/components/moby/wallet-activity-modal";
+import { SolanaStatsModal } from "@/components/moby/solana-stats-modal";
+import { PnlLeaderboardModal } from "@/components/moby/pnl-leaderboard-modal";
+import { SocialSentimentModal } from "@/components/moby/social-sentiment-modal";
+import { RebalanceModal } from "@/components/moby/rebalance-modal";
+import { ReferralModal } from "@/components/moby/referral-modal";
+import { AchievementsModal } from "@/components/moby/achievements-modal";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -55,11 +65,6 @@ export default function Home() {
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
         useMoby.getState().setSearchOpen(true);
-      }
-      // 's' opens screener
-      if (e.key === "s" && !e.metaKey && !e.ctrlKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
-        // Don't intercept typing
-        return;
       }
     };
     window.addEventListener("keydown", handler);
@@ -103,6 +108,18 @@ export default function Home() {
       <AlertCreatorModal />
       <SettingsModal />
       <CompareModal />
+
+      {/* Batch 3 new modals */}
+      <CopyTradeModal />
+      <LimitOrdersModal />
+      <DcaModal />
+      <WalletActivityModal />
+      <SolanaStatsModal />
+      <PnlLeaderboardModal />
+      <SocialSentimentModal />
+      <RebalanceModal />
+      <ReferralModal />
+      <AchievementsModal />
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />

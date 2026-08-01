@@ -1643,3 +1643,506 @@ export const WALLETS: WalletOption[] = [
     installed: true,
   },
 ];
+
+// ---------- WALLET ACTIVITY / TRANSACTION HISTORY ----------
+export interface WalletActivity {
+  id: string;
+  type: "SWAP" | "TRANSFER_IN" | "TRANSFER_OUT" | "STAKE" | "UNSTAKE" | "MINT" | "BURN" | "BRIDGE";
+  tokenSymbol: string;
+  tokenName: string;
+  amount: number;
+  usdValue: number;
+  counterparty: string;
+  counterpartyLabel?: string;
+  chain: Chain;
+  agoSeconds: number;
+  txHash: string;
+  status: "confirmed" | "pending" | "failed";
+  blockHeight: number;
+  gasUsd: number;
+}
+
+const activityTypes: WalletActivity["type"][] = [
+  "SWAP", "TRANSFER_IN", "TRANSFER_OUT", "STAKE", "UNSTAKE", "MINT", "BURN", "BRIDGE"
+];
+const activityTokens = ["SOL", "WIF", "JUP", "BONK", "JTO", "DRIFT", "IO", "ETH"];
+
+function genWalletActivity(): WalletActivity[] {
+  const out: WalletActivity[] = [];
+  for (let i = 0; i < 24; i++) {
+    const type = activityTypes[i % activityTypes.length];
+    const sym = activityTokens[i % activityTokens.length];
+    const tok = TOKENS.find((t) => t.symbol === sym) || TOKENS[0];
+    const usd = [42, 180, 612, 1_240, 2_840, 8_400, 18_400][i % 7];
+    const isIncoming = type === "TRANSFER_IN" || type === "MINT" || type === "UNSTAKE";
+    out.push({
+      id: `wa-${i}`,
+      type,
+      tokenSymbol: tok.symbol,
+      tokenName: tok.name,
+      amount: Number((usd / tok.price).toFixed(2)),
+      usdValue: usd,
+      counterparty: `0x${seededHex(`wa-${i}-addr`, 8)}...${seededHex(`wa-${i}-addr2`, 4)}`,
+      counterpartyLabel: ["Jupiter", "Drift", "Raydium", "Phantom", "Unknown"][i % 5],
+      chain: tok.chain,
+      agoSeconds: 60 + i * 412 + Math.floor(seededRand(`wa-${i}-ago`) * 100),
+      txHash: `0x${seededHex(`wa-${i}-tx`, 10)}...`,
+      status: i % 17 === 16 ? "failed" : i % 11 === 10 ? "pending" : "confirmed",
+      blockHeight: 284_000_000 + i * 1_842,
+      gasUsd: 0.0008 + (i % 4) * 0.0004,
+    });
+  }
+  return out;
+}
+
+export const WALLET_ACTIVITY: WalletActivity[] = genWalletActivity();
+
+// ---------- SOLANA ECOSYSTEM STATS ----------
+export interface SolanaStats {
+  tps: number;
+  tpsPeak24h: number;
+  tpsAvg7d: number;
+  tvl: number;
+  tvlChange24h: number;
+  validators: number;
+  activeValidators: number;
+  nakamotoCoefficient: number;
+  blockTime: number; // ms
+  slotTime: number; // ms
+  epoch: number;
+  epochProgress: number; // 0-1
+  epochTimeRemaining: string;
+  stake: number;
+  apy: number;
+  feeBurned24h: number;
+  newAccounts24h: number;
+  activeWallets7d: number;
+  programsDeployed: number;
+}
+
+export const SOLANA_STATS: SolanaStats = {
+  tps: 3_842,
+  tpsPeak24h: 4_920,
+  tpsAvg7d: 3_640,
+  tvl: 8_240_000_000,
+  tvlChange24h: 4.2,
+  validators: 1_842,
+  activeValidators: 1_612,
+  nakamotoCoefficient: 32,
+  blockTime: 400,
+  slotTime: 412,
+  epoch: 712,
+  epochProgress: 0.62,
+  epochTimeRemaining: "1d 14h",
+  stake: 84_200_000_000,
+  apy: 6.84,
+  feeBurned24h: 184_200,
+  newAccounts24h: 42_400,
+  activeWallets7d: 1_240_000,
+  programsDeployed: 5_400,
+};
+
+// Solana TVL history (30d) — deterministic
+function genSolanaTvlHistory(): { t: number; v: number }[] {
+  const out: { t: number; v: number }[] = [];
+  let v = 7_240_000_000;
+  for (let i = 0; i < 30; i++) {
+    const noise = (seededRand(`sol-tvl-${i}`) - 0.4) * 0.04;
+    v = v * (1 + 0.012 + noise);
+    out.push({ t: NOW - (30 - i) * 86400_000, v: Math.round(v) });
+  }
+  return out;
+}
+
+export const SOLANA_TVL_HISTORY: { t: number; v: number }[] = genSolanaTvlHistory();
+
+// ---------- PNL LEADERBOARD ----------
+export interface PnlEntry {
+  id: string;
+  handle: string;
+  displayName: string;
+  avatarColor: string;
+  avatarGlyph: string;
+  period: "daily" | "weekly" | "allTime";
+  pnlUsd: number;
+  pnlPct: number;
+  trades: number;
+  winRate: number;
+  bestTrade: string;
+  rank: number;
+}
+
+function genPnlLeaderboard(period: PnlEntry["period"]): PnlEntry[] {
+  const handles = [
+    { h: "0xMoby", n: "Moby Maxi", c: "from-[#14F195] to-[#9945FF]", g: "M" },
+    { h: "DegenDiva", n: "Diva", c: "from-[#EC4899] to-[#BE185D]", g: "D" },
+    { h: "WhaleScoop", n: "Scoop", c: "from-[#F59E0B] to-[#EF4444]", g: "W" },
+    { h: "SolanaSage", n: "Sage", c: "from-[#8B5CF6] to-[#6366F1]", g: "S" },
+    { h: "OnchainOwl", n: "Owl", c: "from-[#A855F7] to-[#7E22CE]", g: "O" },
+    { h: "AICopilot", n: "AlphaBot", c: "from-[#22D3EE] to-[#0EA5E9]", g: "A" },
+    { h: "FrankyFlips", n: "Franky", c: "from-[#10B981] to-[#047857]", g: "F" },
+    { h: "BaseBuilder", n: "Builder", c: "from-[#3B82F6] to-[#1D4ED8]", g: "B" },
+    { h: "MoonBoy", n: "MoonBoy", c: "from-[#FACC15] to-[#F59E0B]", g: "X" },
+    { h: "SolSniper", n: "Sniper", c: "from-[#EF4444] to-[#B91C1C]", g: "S" },
+  ];
+  const multipliers = period === "daily" ? 1 : period === "weekly" ? 7 : 240;
+  return handles.map((h, i) => {
+    const seed = `${period}-${i}`;
+    const base = (period === "daily" ? 84_000 : period === "weekly" ? 412_000 : 2_840_000);
+    const pnl = base * (1 + i * 0.42) * (0.5 + seededRand(seed) * 1.5);
+    return {
+      id: `${period}-${i}`,
+      handle: h.h,
+      displayName: h.n,
+      avatarColor: h.c,
+      avatarGlyph: h.g,
+      period,
+      pnlUsd: Math.round(pnl * multipliers / (period === "allTime" ? 1 : 1)),
+      pnlPct: Number(((seededRand(`${seed}-pct`) * 2 - 0.3) * 100).toFixed(1)),
+      trades: 4 + Math.floor(seededRand(`${seed}-t`) * 28),
+      winRate: 55 + Math.floor(seededRand(`${seed}-w`) * 40),
+      bestTrade: ["WIF", "BONK", "POPCAT", "JUP", "MNGO", "DRIFT", "IO"][i % 7],
+      rank: i + 1,
+    };
+  }).sort((a, b) => b.pnlUsd - a.pnlUsd).map((e, i) => ({ ...e, rank: i + 1 }));
+}
+
+export const PNL_DAILY: PnlEntry[] = genPnlLeaderboard("daily");
+export const PNL_WEEKLY: PnlEntry[] = genPnlLeaderboard("weekly");
+export const PNL_ALLTIME: PnlEntry[] = genPnlLeaderboard("allTime");
+
+// ---------- SOCIAL SENTIMENT ----------
+export interface SocialMention {
+  id: string;
+  platform: "twitter" | "farcaster" | "telegram" | "discord";
+  author: string;
+  authorHandle: string;
+  avatarColor: string;
+  content: string;
+  agoMinutes: number;
+  likes: number;
+  retweets: number;
+  replies: number;
+  sentiment: "bullish" | "bearish" | "neutral";
+  tokenMentions: string[];
+  verified?: boolean;
+}
+
+export const SOCIAL_MENTIONS: SocialMention[] = [
+  {
+    id: "sm1",
+    platform: "twitter",
+    author: "Moby",
+    authorHandle: "@moby",
+    avatarColor: "from-[#14F195] to-[#9945FF]",
+    content: "7 smart wallets just loaded up on $WIF within 12 minutes. This is the strongest cluster signal we've seen this week.",
+    agoMinutes: 8,
+    likes: 1240,
+    retweets: 412,
+    replies: 89,
+    sentiment: "bullish",
+    tokenMentions: ["wif"],
+    verified: true,
+  },
+  {
+    id: "sm2",
+    platform: "twitter",
+    author: "DegenDiva",
+    authorHandle: "@degendiva",
+    avatarColor: "from-[#EC4899] to-[#BE185D]",
+    content: "Meme season is BACK. $BONK +22% and $POPCAT +18% in 24h. Cats are next — watch $MOON 👀",
+    agoMinutes: 24,
+    likes: 820,
+    retweets: 184,
+    replies: 42,
+    sentiment: "bullish",
+    tokenMentions: ["bonk", "popcat", "moon"],
+    verified: true,
+  },
+  {
+    id: "sm3",
+    platform: "farcaster",
+    author: "Sage",
+    authorHandle: "sage",
+    avatarColor: "from-[#8B5CF6] to-[#6366F1]",
+    content: "Solana TVL crossed $8B. DePIN narrative is heating up — $HNT deployments accelerating in LatAm.",
+    agoMinutes: 42,
+    likes: 412,
+    retweets: 84,
+    replies: 28,
+    sentiment: "bullish",
+    tokenMentions: ["hnt"],
+  },
+  {
+    id: "sm4",
+    platform: "twitter",
+    author: "Bear Capital",
+    authorHandle: "@bearcap",
+    avatarColor: "from-[#94A3B8] to-[#475569]",
+    content: "Warning: $HNT is up but smart money is actually distributing. Top 3 wallets reduced exposure by 12% this week. Be careful.",
+    agoMinutes: 68,
+    likes: 312,
+    retweets: 92,
+    replies: 64,
+    sentiment: "bearish",
+    tokenMentions: ["hnt"],
+  },
+  {
+    id: "sm5",
+    platform: "telegram",
+    author: "AlphaBot",
+    authorHandle: "@alphabot",
+    avatarColor: "from-[#22D3EE] to-[#0EA5E9]",
+    content: "🚨 NEW SIGNAL: $MNGO cluster buy detected — 7 smart wallets, $1.24M inflow, 92% confidence. Setting up for a move.",
+    agoMinutes: 92,
+    likes: 642,
+    retweets: 218,
+    replies: 84,
+    sentiment: "bullish",
+    tokenMentions: ["mngo"],
+    verified: true,
+  },
+  {
+    id: "sm6",
+    platform: "twitter",
+    author: "MoonBoy",
+    authorHandle: "@moonboy",
+    avatarColor: "from-[#FACC15] to-[#F59E0B]",
+    content: "$MOON launching 18h ago already 142% up. Cat season narrative is real. 🌙🐈",
+    agoMinutes: 124,
+    likes: 284,
+    retweets: 64,
+    replies: 22,
+    sentiment: "bullish",
+    tokenMentions: ["moon"],
+  },
+  {
+    id: "sm7",
+    platform: "discord",
+    author: "FrankyFlips",
+    authorHandle: "franky",
+    avatarColor: "from-[#10B981] to-[#047857]",
+    content: "Just sniped $TNSR at 0.42 — smart money has been quietly accumulating for 3 days. NFTs next leg up imo.",
+    agoMinutes: 168,
+    likes: 184,
+    retweets: 32,
+    replies: 18,
+    sentiment: "bullish",
+    tokenMentions: ["tensor"],
+  },
+  {
+    id: "sm8",
+    platform: "twitter",
+    author: "OnchainOwl",
+    authorHandle: "@onchainowl",
+    avatarColor: "from-[#A855F7] to-[#7E22CE]",
+    content: "Stats don't lie:\n\n$SOL +6.4% in 24h\n$ETH +2.2%\n$BTC +1.4%\n\nSolana is leading the pack. Smart money is rotating in.",
+    agoMinutes: 210,
+    likes: 1_120,
+    retweets: 312,
+    replies: 124,
+    sentiment: "bullish",
+    tokenMentions: ["sol", "eth", "btc"],
+    verified: true,
+  },
+];
+
+// Aggregate social stats per token
+export interface SocialStats {
+  tokenId: string;
+  symbol: string;
+  mentions24h: number;
+  mentionsChange24h: number;
+  bullishPct: number;
+  bearishPct: number;
+  neutralPct: number;
+  engagementScore: number; // 0-100
+}
+
+export const SOCIAL_STATS: SocialStats[] = TOKENS.slice(0, 12).map((t, i) => {
+  const mentions = 100 + Math.floor(seededRand(`social-${t.id}`) * 5_000);
+  const bullish = 40 + Math.floor(seededRand(`bull-${t.id}`) * 50);
+  const bearish = Math.floor(seededRand(`bear-${t.id}`) * 30);
+  const neutral = 100 - bullish - bearish;
+  return {
+    tokenId: t.id,
+    symbol: t.symbol,
+    mentions24h: mentions,
+    mentionsChange24h: Number(((seededRand(`chg-${t.id}`) - 0.3) * 200).toFixed(1)),
+    bullishPct: bullish,
+    bearishPct: bearish,
+    neutralPct: neutral,
+    engagementScore: 30 + Math.floor(seededRand(`eng-${t.id}`) * 70),
+  };
+});
+
+// ---------- TOKEN HOLDER DISTRIBUTION ----------
+export interface HolderDistribution {
+  label: string;
+  pct: number;
+  count: number;
+  color: string;
+}
+
+export function getHolderDistribution(tokenId: string): HolderDistribution[] {
+  // Deterministic per token
+  const seed = tokenId;
+  const whales = 5 + Math.floor(seededRand(`${seed}-w`) * 8);
+  const institutions = 8 + Math.floor(seededRand(`${seed}-i`) * 12);
+  const smartMoney = 12 + Math.floor(seededRand(`${seed}-s`) * 18);
+  const retail = 100 - whales - institutions - smartMoney;
+  return [
+    { label: "Whales", pct: whales, count: Math.floor(seededRand(`${seed}-wc`) * 80) + 20, color: "#9945FF" },
+    { label: "Institutions", pct: institutions, count: Math.floor(seededRand(`${seed}-ic`) * 30) + 5, color: "#22D3EE" },
+    { label: "Smart money", pct: smartMoney, count: Math.floor(seededRand(`${seed}-sc`) * 200) + 50, color: "#14F195" },
+    { label: "Retail", pct: retail, count: Math.floor(seededRand(`${seed}-rc`) * 50_000) + 10_000, color: "#F59E0B" },
+  ];
+}
+
+// Top holders (deterministic per token)
+export interface TopHolder {
+  rank: number;
+  address: string;
+  label: string;
+  amount: number;
+  pct: number;
+  usdValue: number;
+  change24h: number; // percent change in holdings
+  isSmart: boolean;
+}
+
+export function getTopHolders(tokenId: string, count = 8): TopHolder[] {
+  const token = TOKENS_BY_ID[tokenId];
+  if (!token) return [];
+  const labels = [
+    "Binance Hot Wallet", "CEX Cold Storage", "Smart Wallet #4218",
+    "Fund: BlockSight", "MEV Bot Alpha", "Smart Wallet #9821",
+    "KOL: DegenDiva", "Fund: Paradigm", "Smart Wallet #1822",
+    "Retail Whale"
+  ];
+  return Array.from({ length: count }, (_, i) => {
+    const pct = (15 - i * 1.4) * (0.8 + seededRand(`${tokenId}-h-${i}`) * 0.4);
+    const amount = (token.marketCap * pct / 100) / token.price;
+    return {
+      rank: i + 1,
+      address: `0x${seededHex(`${tokenId}-ha-${i}`, 8)}...${seededHex(`${tokenId}-hb-${i}`, 4)}`,
+      label: labels[i % labels.length],
+      amount: Number(amount.toFixed(2)),
+      pct: Number(pct.toFixed(2)),
+      usdValue: Math.round(amount * token.price),
+      change24h: Number(((seededRand(`${tokenId}-hc-${i}`) - 0.4) * 20).toFixed(2)),
+      isSmart: i === 2 || i === 5 || i === 8,
+    };
+  });
+}
+
+// ---------- DCA STRATEGIES (presets) ----------
+export interface DcaPreset {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  tokens: string[];
+  frequency: "daily" | "weekly" | "biweekly" | "monthly";
+  amountUsd: number;
+  expectedApy: number;
+  riskLevel: "low" | "medium" | "high";
+  followers: number;
+}
+
+export const DCA_PRESETS: DcaPreset[] = [
+  {
+    id: "dca1",
+    name: "Solana Blue Chip",
+    emoji: "🌊",
+    description: "Dollar-cost into SOL + JUP + JTO — the core of Solana DeFi.",
+    tokens: ["sol", "jup", "jto"],
+    frequency: "weekly",
+    amountUsd: 200,
+    expectedApy: 42,
+    riskLevel: "medium",
+    followers: 8_400,
+  },
+  {
+    id: "dca2",
+    name: "AI Infrastructure",
+    emoji: "🧠",
+    description: "AI agent tokens building real infrastructure on Solana.",
+    tokens: ["io", "rndr"],
+    frequency: "weekly",
+    amountUsd: 150,
+    expectedApy: 68,
+    riskLevel: "high",
+    followers: 3_200,
+  },
+  {
+    id: "dca3",
+    name: "DePIN Basket",
+    emoji: "📡",
+    description: "Decentralized physical infrastructure — long-term hold.",
+    tokens: ["hnt", "io", "pyth"],
+    frequency: "biweekly",
+    amountUsd: 300,
+    expectedApy: 28,
+    riskLevel: "low",
+    followers: 1_840,
+  },
+  {
+    id: "dca4",
+    name: "Meme Basket",
+    emoji: "🐕",
+    description: "Equal-weight WIF + BONK + POPCAT. High volatility, high upside.",
+    tokens: ["wif", "bonk", "popcat"],
+    frequency: "daily",
+    amountUsd: 50,
+    expectedApy: 142,
+    riskLevel: "high",
+    followers: 12_400,
+  },
+  {
+    id: "dca5",
+    name: "BTC + ETH + SOL",
+    emoji: "👑",
+    description: "The big three. Lowest risk, slowest growth.",
+    tokens: ["btc", "eth", "sol"],
+    frequency: "monthly",
+    amountUsd: 500,
+    expectedApy: 18,
+    riskLevel: "low",
+    followers: 24_200,
+  },
+];
+
+// ---------- REFERRAL PROGRAM ----------
+export interface ReferralStats {
+  code: string;
+  link: string;
+  referrals: number;
+  activeReferrals: number;
+  earningsUsd: number;
+  pendingUsd: number;
+  tier: "Bronze" | "Silver" | "Gold" | "Platinum";
+  nextTierProgress: number; // 0-1
+  nextTierName: string;
+  rewardPerReferral: number;
+}
+
+export const REFERRAL_STATS: ReferralStats = {
+  code: "MOBY-ZTRADER",
+  link: "moby.win/r/ZTRADER",
+  referrals: 18,
+  activeReferrals: 12,
+  earningsUsd: 412,
+  pendingUsd: 84,
+  tier: "Silver",
+  nextTierProgress: 0.6,
+  nextTierName: "Gold",
+  rewardPerReferral: 25,
+};
+
+export const REFERRAL_TIERS = [
+  { name: "Bronze", min: 0, reward: 10, perk: "10% of referral fees" },
+  { name: "Silver", min: 10, reward: 25, perk: "15% of referral fees + 1 mo Pro" },
+  { name: "Gold", min: 50, reward: 50, perk: "20% of referral fees + 3 mo Pro" },
+  { name: "Platinum", min: 200, reward: 100, perk: "25% of referral fees + lifetime Pro" },
+];
