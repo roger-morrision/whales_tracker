@@ -1,0 +1,210 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-bull: var(--bull);
+  --color-bear: var(--bear);
+  --color-gold: var(--gold);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Moby dark theme is the default — designed for crypto traders */
+:root {
+  --radius: 0.875rem;
+  --background: oklch(0.13 0.005 240);
+  --foreground: oklch(0.97 0.005 240);
+  --card: oklch(0.17 0.006 240);
+  --card-foreground: oklch(0.97 0.005 240);
+  --popover: oklch(0.15 0.006 240);
+  --popover-foreground: oklch(0.97 0.005 240);
+  --primary: oklch(0.78 0.18 152);
+  --primary-foreground: oklch(0.13 0.005 240);
+  --secondary: oklch(0.22 0.008 240);
+  --secondary-foreground: oklch(0.97 0.005 240);
+  --muted: oklch(0.20 0.006 240);
+  --muted-foreground: oklch(0.62 0.01 240);
+  --accent: oklch(0.78 0.18 152);
+  --accent-foreground: oklch(0.13 0.005 240);
+  --destructive: oklch(0.66 0.21 22);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.78 0.18 152 / 60%);
+
+  /* Moby-specific */
+  --bull: oklch(0.78 0.18 152);
+  --bear: oklch(0.66 0.21 22);
+  --gold: oklch(0.82 0.16 85);
+  --surface: oklch(0.15 0.006 240);
+  --surface-2: oklch(0.18 0.006 240);
+  --surface-3: oklch(0.22 0.008 240);
+
+  --chart-1: oklch(0.78 0.18 152);
+  --chart-2: oklch(0.82 0.16 85);
+  --chart-3: oklch(0.65 0.20 250);
+  --chart-4: oklch(0.70 0.18 12);
+  --chart-5: oklch(0.62 0.14 200);
+
+  --sidebar: oklch(0.15 0.006 240);
+  --sidebar-foreground: oklch(0.97 0.005 240);
+  --sidebar-primary: oklch(0.78 0.18 152);
+  --sidebar-primary-foreground: oklch(0.13 0.005 240);
+  --sidebar-accent: oklch(0.22 0.008 240);
+  --sidebar-accent-foreground: oklch(0.97 0.005 240);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.78 0.18 152 / 60%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html, body {
+    @apply bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  body {
+    font-feature-settings: "ss01", "cv01", "cv02", "cv11";
+  }
+}
+
+/* Tabular numbers for prices/quantities — critical for trading UI */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Subtle scrollbars */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(1 0 0 / 12%) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: oklch(1 0 0 / 10%);
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: oklch(1 0 0 / 18%);
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Pulsing live dot */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+.live-dot {
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+/* Marquee for ticker tape */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee {
+  animation: marquee 60s linear infinite;
+}
+
+/* Number flash animation when prices update */
+@keyframes flash-bull {
+  0% { background-color: oklch(0.78 0.18 152 / 0%); }
+  20% { background-color: oklch(0.78 0.18 152 / 25%); }
+  100% { background-color: oklch(0.78 0.18 152 / 0%); }
+}
+@keyframes flash-bear {
+  0% { background-color: oklch(0.66 0.21 22 / 0%); }
+  20% { background-color: oklch(0.66 0.21 22 / 25%); }
+  100% { background-color: oklch(0.66 0.21 22 / 0%); }
+}
+.flash-bull { animation: flash-bull 1.2s ease-out; }
+.flash-bear { animation: flash-bear 1.2s ease-out; }
+
+/* Glow ring for "smart money" badges */
+.glow-bull {
+  box-shadow: 0 0 0 1px oklch(0.78 0.18 152 / 30%), 0 0 22px -6px oklch(0.78 0.18 152 / 60%);
+}
+.glow-gold {
+  box-shadow: 0 0 0 1px oklch(0.82 0.16 85 / 30%), 0 0 22px -6px oklch(0.82 0.16 85 / 55%);
+}
+
+/* Phone-frame shell on desktop — the Moby app is mobile-first */
+.phone-shell {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--background);
+}
+@media (min-width: 640px) {
+  .phone-shell {
+    min-height: 100vh;
+    border-left: 1px solid oklch(1 0 0 / 6%);
+    border-right: 1px solid oklch(1 0 0 / 6%);
+    box-shadow: 0 0 80px -20px oklch(0 0 0 / 80%);
+  }
+}
+
+/* Soft inner card hover */
+.card-hover {
+  transition: background-color 200ms ease, transform 200ms ease, border-color 200ms ease;
+}
+.card-hover:hover {
+  background-color: oklch(0.22 0.008 240);
+}
