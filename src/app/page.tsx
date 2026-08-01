@@ -44,6 +44,7 @@ import { NarrativeDetailModal } from "@/components/moby/narrative-detail-modal";
 import { SmartMoneyMapModal } from "@/components/moby/smart-money-map-modal";
 import { PushNotificationManager } from "@/components/moby/push-notifications";
 import { PortfolioAnalyticsModal, YieldFarmingModal, UnlocksModal, GovernanceModal, DeFiPositionsModal, CalendarModal, MultiWalletModal, WatchlistPerfModal } from "@/components/moby/batch6-modals";
+import { SecurityAuditModal, TokenizedStocksModal, WalletPnlModal, SnipeBotModal, PricePredictionModal, LiquidityDepthModal, TradingJournalModal, DefiHealthModal, HarvestModal } from "@/components/moby/batch7-modals";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -162,6 +163,17 @@ export default function Home() {
       <CalendarModal />
       <MultiWalletModal />
       <WatchlistPerfModal />
+
+      {/* Batch 7: Security + Stocks + WalletPnl + SnipeBot + Prediction + Liquidity + Journal + Health + Harvest */}
+      <SecurityAuditModal />
+      <TokenizedStocksModal />
+      <WalletPnlModal />
+      <SnipeBotModal />
+      <PricePredictionModal />
+      <LiquidityDepthModal />
+      <TradingJournalModal />
+      <DefiHealthModal />
+      <HarvestModal />
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />

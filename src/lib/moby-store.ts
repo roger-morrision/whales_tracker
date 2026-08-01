@@ -397,6 +397,50 @@ interface MobyState {
   // ===== BATCH 6: Theme toggle =====
   theme: "dark" | "light";
   toggleTheme: () => void;
+
+  // ===== BATCH 7: Token security audit =====
+  securityAuditOpen: boolean;
+  securityAuditTokenId: string | null;
+  openSecurityAudit: (tokenId: string) => void;
+  setSecurityAuditOpen: (open: boolean) => void;
+
+  // ===== BATCH 7: Tokenized stocks =====
+  stocksOpen: boolean;
+  setStocksOpen: (open: boolean) => void;
+
+  // ===== BATCH 7: Wallet PnL tracker =====
+  walletPnlOpen: boolean;
+  walletPnlAddress: string;
+  setWalletPnlOpen: (open: boolean) => void;
+  setWalletPnlAddress: (addr: string) => void;
+
+  // ===== BATCH 7: Snipe bot =====
+  snipeBotOpen: boolean;
+  setSnipeBotOpen: (open: boolean) => void;
+
+  // ===== BATCH 7: Price prediction =====
+  predictionOpen: boolean;
+  predictionTokenId: string | null;
+  openPrediction: (tokenId: string) => void;
+  setPredictionOpen: (open: boolean) => void;
+
+  // ===== BATCH 7: Liquidity depth =====
+  liquidityDepthOpen: boolean;
+  liquidityDepthTokenId: string | null;
+  openLiquidityDepth: (tokenId: string) => void;
+  setLiquidityDepthOpen: (open: boolean) => void;
+
+  // ===== BATCH 7: Trading journal =====
+  journalOpen: boolean;
+  setJournalOpen: (open: boolean) => void;
+
+  // ===== BATCH 7: DeFi health monitor =====
+  defiHealthOpen: boolean;
+  setDefiHealthOpen: (open: boolean) => void;
+
+  // ===== BATCH 7: Tax loss harvesting =====
+  harvestOpen: boolean;
+  setHarvestOpen: (open: boolean) => void;
 }
 
 // ===== BATCH 3 types =====
@@ -1143,6 +1187,50 @@ export const useMoby = create<MobyState>((set, get) => ({
   // ===== BATCH 6: Theme toggle =====
   theme: "dark",
   toggleTheme: () => set((s) => ({ theme: s.theme === "dark" ? "light" : "dark" })),
+
+  // ===== BATCH 7: Token security audit =====
+  securityAuditOpen: false,
+  securityAuditTokenId: null,
+  openSecurityAudit: (tokenId) => set({ securityAuditTokenId: tokenId, securityAuditOpen: true }),
+  setSecurityAuditOpen: (open) => set({ securityAuditOpen: open }),
+
+  // ===== BATCH 7: Tokenized stocks =====
+  stocksOpen: false,
+  setStocksOpen: (open) => set({ stocksOpen: open }),
+
+  // ===== BATCH 7: Wallet PnL tracker =====
+  walletPnlOpen: false,
+  walletPnlAddress: "0x7a3f...b9c2",
+  setWalletPnlOpen: (open) => set({ walletPnlOpen: open }),
+  setWalletPnlAddress: (addr) => set({ walletPnlAddress: addr }),
+
+  // ===== BATCH 7: Snipe bot =====
+  snipeBotOpen: false,
+  setSnipeBotOpen: (open) => set({ snipeBotOpen: open }),
+
+  // ===== BATCH 7: Price prediction =====
+  predictionOpen: false,
+  predictionTokenId: null,
+  openPrediction: (tokenId) => set({ predictionTokenId: tokenId, predictionOpen: true }),
+  setPredictionOpen: (open) => set({ predictionOpen: open }),
+
+  // ===== BATCH 7: Liquidity depth =====
+  liquidityDepthOpen: false,
+  liquidityDepthTokenId: null,
+  openLiquidityDepth: (tokenId) => set({ liquidityDepthTokenId: tokenId, liquidityDepthOpen: true }),
+  setLiquidityDepthOpen: (open) => set({ liquidityDepthOpen: open }),
+
+  // ===== BATCH 7: Trading journal =====
+  journalOpen: false,
+  setJournalOpen: (open) => set({ journalOpen: open }),
+
+  // ===== BATCH 7: DeFi health monitor =====
+  defiHealthOpen: false,
+  setDefiHealthOpen: (open) => set({ defiHealthOpen: open }),
+
+  // ===== BATCH 7: Tax loss harvesting =====
+  harvestOpen: false,
+  setHarvestOpen: (open) => set({ harvestOpen: open }),
 }));
 
 // Convenience hook selectors

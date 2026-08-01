@@ -4177,3 +4177,544 @@ export function getWatchlistPerformance(watchlist: string[]): {
     })),
   };
 }
+
+// ---------- TOKEN SECURITY AUDIT ----------
+export interface SecurityAudit {
+  tokenId: string;
+  overallScore: number; // 0-100
+  riskLevel: "low" | "medium" | "high" | "extreme";
+  checks: {
+    label: string;
+    status: "pass" | "fail" | "warning";
+    detail: string;
+  }[];
+  contractAudit: {
+    verified: boolean;
+    sourceCode: boolean;
+    proxyContract: boolean;
+    upgradeable: boolean;
+  };
+  taxScan: {
+    buyTax: number;
+    sellTax: number;
+    transferTax: number;
+    maxTax: number;
+  };
+  ownership: {
+    ownerRenounced: boolean;
+    mintAuthorityRevoked: boolean;
+    freezeAuthorityRevoked: boolean;
+    topHolderPct: number;
+  };
+  liquidity: {
+    locked: boolean;
+    lockDurationDays: number;
+    lockedUntil: string;
+    liquidityUsd: number;
+  };
+  honeypot: {
+    isHoneypot: boolean;
+    buyTax: number;
+    sellTax: number;
+    transferable: boolean;
+    simulationPassed: boolean;
+  };
+  warnings: string[];
+}
+
+export function getSecurityAudit(tokenId: string): SecurityAudit {
+  const token = TOKENS_BY_ID[tokenId];
+  const isNew = token ? token.ageHours < 100 : false;
+  const isVerified = token?.verified ?? false;
+
+  const baseScore = isVerified ? 85 : isNew ? 55 : 70;
+  const noise = seededRand(`audit-${tokenId}`);
+
+  return {
+    tokenId,
+    overallScore: Math.round(baseScore + noise * 15 - 5),
+    riskLevel: baseScore > 80 ? "low" : baseScore > 60 ? "medium" : baseScore > 40 ? "high" : "extreme",
+    checks: [
+      { label: "Contract verified", status: isVerified || !isNew ? "pass" : "warning", detail: isVerified ? "Source code matches on-chain bytecode" : "Contract not verified on explorer" },
+      { label: "Mint authority revoked", status: isNew && !isVerified ? "fail" : "pass", detail: isNew && !isVerified ? "Mint authority still active — owner can mint more tokens" : "Mint authority permanently revoked" },
+      { label: "Freeze authority revoked", status: "pass", detail: "Cannot freeze user accounts" },
+      { label: "Liquidity locked", status: isNew ? (seededRand(`liq-${tokenId}`) > 0.3 ? "pass" : "fail") : "pass", detail: isNew ? (seededRand(`liq-${tokenId}`) > 0.3 ? "Liquidity locked for 90 days" : "Liquidity NOT locked — rug pull risk!") : "Liquidity locked permanently" },
+      { label: "Honeypot check", status: "pass", detail: "Buy and sell simulation passed — token is tradable" },
+      { label: "Ownership renounced", status: isNew ? "warning" : "pass", detail: isNew ? "Ownership not yet renounced" : "Contract ownership renounced" },
+      { label: "Top holder concentration", status: seededRand(`hold-${tokenId}`) > 0.5 ? "warning" : "pass", detail: `Top holder owns ${(seededRand(`hp-${tokenId}`) * 20 + 5).toFixed(1)}% of supply` },
+      { label: "Tax scan", status: "pass", detail: "Buy: 0%, Sell: 0%, Transfer: 0%" },
+    ],
+    contractAudit: {
+      verified: isVerified,
+      sourceCode: isVerified,
+      proxyContract: false,
+      upgradeable: false,
+    },
+    taxScan: {
+      buyTax: 0,
+      sellTax: 0,
+      transferTax: 0,
+      maxTax: 0,
+    },
+    ownership: {
+      ownerRenounced: !isNew,
+      mintAuthorityRevoked: !isNew || isVerified,
+      freezeAuthorityRevoked: true,
+      topHolderPct: Number((seededRand(`hp2-${tokenId}`) * 20 + 5).toFixed(1)),
+    },
+    liquidity: {
+      locked: !isNew || seededRand(`liq2-${tokenId}`) > 0.3,
+      lockDurationDays: isNew ? 90 : 365,
+      lockedUntil: "2026-11-15",
+      liquidityUsd: token?.liquidity ?? 500_000,
+    },
+    honeypot: {
+      isHoneypot: false,
+      buyTax: 0,
+      sellTax: 0,
+      transferable: true,
+      simulationPassed: true,
+    },
+    warnings: isNew && !isVerified
+      ? ["Mint authority active — owner can mint unlimited tokens", "Liquidity may not be locked", "Contract not verified — review before buying"]
+      : [],
+  };
+}
+
+// ---------- TOKENIZED STOCKS ----------
+export interface TokenizedStock {
+  id: string;
+  ticker: string;
+  name: string;
+  price: number;
+  change24h: number;
+  marketCap: number;
+  volume24h: number;
+  shares: number;
+  isPreIPO: boolean;
+  color: string;
+  glyph: string;
+  description: string;
+  sparkline: number[];
+}
+
+export const TOKENIZED_STOCKS: TokenizedStock[] = [
+  {
+    id: "ts-spacex",
+    ticker: "SPX",
+    name: "SpaceX",
+    price: 124_000,
+    change24h: 4.2,
+    marketCap: 280_000_000_000,
+    volume24h: 4_200_000,
+    shares: 4,
+    isPreIPO: true,
+    color: "from-[#EF4444] to-[#B91C1C]",
+    glyph: "🚀",
+    description: "Private shares of SpaceX, tokenized for fractional ownership.",
+    sparkline: genSparkline("ts-spacex", 118000, 0.008, 40, 0.03),
+  },
+  {
+    id: "ts-openai",
+    ticker: "OAI",
+    name: "OpenAI",
+    price: 184_000,
+    change24h: 6.8,
+    marketCap: 157_000_000_000,
+    volume24h: 8_400_000,
+    shares: 2,
+    isPreIPO: true,
+    color: "from-[#10B981] to-[#047857]",
+    glyph: "🧠",
+    description: "Pre-IPO shares of OpenAI, the AI research company behind ChatGPT.",
+    sparkline: genSparkline("ts-openai", 162000, 0.01, 40, 0.04),
+  },
+  {
+    id: "ts-nvda",
+    ticker: "NVDA",
+    name: "NVIDIA",
+    price: 842.0,
+    change24h: 2.4,
+    marketCap: 2_080_000_000_000,
+    volume24h: 24_800_000,
+    shares: 12,
+    isPreIPO: false,
+    color: "from-[#22C55E] to-[#15803D]",
+    glyph: "💚",
+    description: "NVIDIA Corporation — GPU and AI chip leader.",
+    sparkline: genSparkline("ts-nvda", 820, 0.006, 40, 0.02),
+  },
+  {
+    id: "ts-aapl",
+    ticker: "AAPL",
+    name: "Apple",
+    price: 224.0,
+    change24h: -0.8,
+    marketCap: 3_420_000_000_000,
+    volume24h: 12_400_000,
+    shares: 24,
+    isPreIPO: false,
+    color: "from-[#94A3B8] to-[#475569]",
+    glyph: "🍎",
+    description: "Apple Inc. — consumer electronics and services.",
+    sparkline: genSparkline("ts-aapl", 226, 0.004, 40, -0.01),
+  },
+  {
+    id: "ts-tsla",
+    ticker: "TSLA",
+    name: "Tesla",
+    price: 248.0,
+    change24h: 3.8,
+    marketCap: 790_000_000_000,
+    volume24h: 18_400_000,
+    shares: 18,
+    isPreIPO: false,
+    color: "from-[#EF4444] to-[#B91C1C]",
+    glyph: "🚗",
+    description: "Tesla Inc. — electric vehicles and energy.",
+    sparkline: genSparkline("ts-tsla", 240, 0.008, 40, 0.03),
+  },
+  {
+    id: "ts-stripes",
+    ticker: "STRP",
+    name: "Stripe",
+    price: 82.0,
+    change24h: 1.2,
+    marketCap: 70_000_000_000,
+    volume24h: 2_400_000,
+    shares: 8,
+    isPreIPO: true,
+    color: "from-[#635BFF] to-[#4F46E5]",
+    glyph: "💳",
+    description: "Pre-IPO shares of Stripe, the payments infrastructure company.",
+    sparkline: genSparkline("ts-stripes", 78, 0.006, 40, 0.01),
+  },
+];
+
+// ---------- WALLET PNL TRACKER ----------
+export interface WalletPnlEntry {
+  tokenSymbol: string;
+  tokenName: string;
+  boughtUsd: number;
+  soldUsd: number;
+  currentUsd: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  totalPnl: number;
+  pnlPct: number;
+  amount: number;
+  avgBuyPrice: number;
+  currentPrice: number;
+  firstBuyDays: number;
+}
+
+export interface WalletPnlSummary {
+  address: string;
+  label: string;
+  totalInvested: number;
+  totalRealized: number;
+  totalUnrealized: number;
+  totalPnl: number;
+  totalPnlPct: number;
+  winRate: number;
+  bestTrade: { symbol: string; pnl: number };
+  worstTrade: { symbol: string; pnl: number };
+  positions: WalletPnlEntry[];
+}
+
+export function getWalletPnl(address: string): WalletPnlSummary {
+  const symbols = ["SOL", "WIF", "JUP", "BONK", "JTO", "DRIFT", "IO", "ETH"];
+  const positions: WalletPnlEntry[] = symbols.map((sym, i) => {
+    const tok = TOKENS.find((t) => t.symbol === sym) || TOKENS[0];
+    const bought = 2000 + i * 1200;
+    const sold = i % 3 === 0 ? bought * 0.4 : 0;
+    const current = bought - sold;
+    const realized = sold > 0 ? sold * 0.3 : 0;
+    const unrealized = current * 0.25 * (i % 2 === 0 ? 1 : -0.5);
+    const totalPnl = realized + unrealized;
+    return {
+      tokenSymbol: sym,
+      tokenName: tok.name,
+      boughtUsd: bought,
+      soldUsd: sold,
+      currentUsd: current,
+      realizedPnl: Math.round(realized),
+      unrealizedPnl: Math.round(unrealized),
+      totalPnl: Math.round(totalPnl),
+      pnlPct: Number(((totalPnl / bought) * 100).toFixed(1)),
+      amount: Number((bought / tok.price).toFixed(2)),
+      avgBuyPrice: Number((tok.price * 0.7).toFixed(4)),
+      currentPrice: tok.price,
+      firstBuyDays: 30 + i * 12,
+    };
+  });
+
+  const totalInvested = positions.reduce((s, p) => s + p.boughtUsd, 0);
+  const totalRealized = positions.reduce((s, p) => s + p.realizedPnl, 0);
+  const totalUnrealized = positions.reduce((s, p) => s + p.unrealizedPnl, 0);
+  const sorted = [...positions].sort((a, b) => b.totalPnl - a.totalPnl);
+
+  return {
+    address,
+    label: address.slice(0, 8) + "..." + address.slice(-4),
+    totalInvested,
+    totalRealized,
+    totalUnrealized,
+    totalPnl: totalRealized + totalUnrealized,
+    totalPnlPct: Number((((totalRealized + totalUnrealized) / totalInvested) * 100).toFixed(1)),
+    winRate: 64,
+    bestTrade: { symbol: sorted[0].tokenSymbol, pnl: sorted[0].totalPnl },
+    worstTrade: { symbol: sorted[sorted.length - 1].tokenSymbol, pnl: sorted[sorted.length - 1].totalPnl },
+    positions: sorted,
+  };
+}
+
+// ---------- SNIPE BOT ----------
+export interface SnipeRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  conditions: {
+    minLiquidity: number;
+    maxMarketCap: number;
+    minSmartMoneyEntries: number;
+    maxAgeMinutes: number;
+    requireContractVerified: boolean;
+    requireLiquidityLocked: boolean;
+    requireMintRevoked: boolean;
+    chains: string[];
+  };
+  actions: {
+    buyAmountUsd: number;
+    slippage: number;
+    autoSellAtProfit: number; // percent
+    autoSellAtLoss: number; // percent
+    maxPositions: number;
+  };
+  stats: {
+    triggered: number;
+    filled: number;
+    pnl: number;
+    winRate: number;
+  };
+}
+
+export const SNIPE_RULES: SnipeRule[] = [
+  {
+    id: "sr1",
+    name: "Smart money snipe",
+    enabled: true,
+    conditions: {
+      minLiquidity: 100_000,
+      maxMarketCap: 10_000_000,
+      minSmartMoneyEntries: 3,
+      maxAgeMinutes: 60,
+      requireContractVerified: true,
+      requireLiquidityLocked: true,
+      requireMintRevoked: true,
+      chains: ["SOL"],
+    },
+    actions: {
+      buyAmountUsd: 500,
+      slippage: 5,
+      autoSellAtProfit: 100,
+      autoSellAtLoss: 20,
+      maxPositions: 10,
+    },
+    stats: { triggered: 42, filled: 28, pnl: 4_280, winRate: 68 },
+  },
+  {
+    id: "sr2",
+    name: "Meme coin snipe",
+    enabled: false,
+    conditions: {
+      minLiquidity: 50_000,
+      maxMarketCap: 5_000_000,
+      minSmartMoneyEntries: 1,
+      maxAgeMinutes: 30,
+      requireContractVerified: false,
+      requireLiquidityLocked: true,
+      requireMintRevoked: true,
+      chains: ["SOL"],
+    },
+    actions: {
+      buyAmountUsd: 200,
+      slippage: 10,
+      autoSellAtProfit: 200,
+      autoSellAtLoss: 30,
+      maxPositions: 20,
+    },
+    stats: { triggered: 84, filled: 52, pnl: 1_840, winRate: 42 },
+  },
+];
+
+// ---------- PRICE PREDICTION ENGINE ----------
+export interface PricePrediction {
+  tokenId: string;
+  symbol: string;
+  currentPrice: number;
+  predictions: {
+    timeframe: "1h" | "4h" | "24h" | "7d";
+    predictedPrice: number;
+    changePct: number;
+    confidence: number;
+    direction: "up" | "down" | "neutral";
+  }[];
+  signals: {
+    technical: "bullish" | "bearish" | "neutral";
+    smartMoney: "bullish" | "bearish" | "neutral";
+    social: "bullish" | "bearish" | "neutral";
+    overall: "bullish" | "bearish" | "neutral";
+  };
+  aiSummary: string;
+}
+
+export function getPricePrediction(tokenId: string): PricePrediction {
+  const token = TOKENS_BY_ID[tokenId];
+  if (!token) return null as any;
+  const price = token.price;
+  const change = token.change24h;
+  const bull = change >= 0;
+  const smartInflow = token.smartMoneyInflow24h > 0;
+
+  return {
+    tokenId,
+    symbol: token.symbol,
+    currentPrice: price,
+    predictions: [
+      { timeframe: "1h", predictedPrice: price * (1 + (bull ? 0.012 : -0.008)), changePct: bull ? 1.2 : -0.8, confidence: 72, direction: bull ? "up" : "down" },
+      { timeframe: "4h", predictedPrice: price * (1 + (bull ? 0.024 : -0.018)), changePct: bull ? 2.4 : -1.8, confidence: 68, direction: bull ? "up" : "down" },
+      { timeframe: "24h", predictedPrice: price * (1 + (bull ? 0.054 : -0.042)), changePct: bull ? 5.4 : -4.2, confidence: 64, direction: bull ? "up" : "down" },
+      { timeframe: "7d", predictedPrice: price * (1 + (bull ? 0.12 : -0.08)), changePct: bull ? 12.0 : -8.0, confidence: 58, direction: bull ? "up" : "down" },
+    ],
+    signals: {
+      technical: bull ? "bullish" : "bearish",
+      smartMoney: smartInflow ? "bullish" : "bearish",
+      social: bull ? "bullish" : "neutral",
+      overall: bull && smartInflow ? "bullish" : !bull && !smartInflow ? "bearish" : "neutral",
+    },
+    aiSummary: `${token.name} (${token.symbol}) is currently ${bull ? "in an uptrend" : "pulling back"} with ${smartInflow ? "positive" : "negative"} smart money flow. The RSI is at ${bull ? "62" : "44"} indicating ${bull ? "momentum without being overbought" : "room for recovery"}. ${bull ? "Smart money has been accumulating" : "Smart money is distributing"}. Short-term outlook is ${bull ? "bullish" : "cautious"} with ${bull ? "68%" : "54%"} confidence.`,
+  };
+}
+
+// ---------- LIQUIDITY DEPTH ----------
+export function getLiquidityDepth(tokenId: string): { bids: { price: number; amount: number; total: number }[]; asks: { price: number; amount: number; total: number }[] } {
+  const token = TOKENS_BY_ID[tokenId];
+  if (!token) return { bids: [], asks: [] };
+  const price = token.price;
+  const bids: { price: number; amount: number; total: number }[] = [];
+  const asks: { price: number; amount: number; total: number }[] = [];
+  let bidTotal = 0;
+  let askTotal = 0;
+  for (let i = 0; i < 20; i++) {
+    const depthFactor = 1 + i * 0.15;
+    const bidPrice = price * (1 - (i + 1) * 0.002);
+    const askPrice = price * (1 + (i + 1) * 0.002);
+    const bidAmount = (token.liquidity / price) * 0.08 * depthFactor;
+    const askAmount = (token.liquidity / price) * 0.08 * depthFactor;
+    bidTotal += bidAmount;
+    askTotal += askAmount;
+    bids.push({ price: bidPrice, amount: bidAmount, total: bidTotal });
+    asks.push({ price: askPrice, amount: askAmount, total: askTotal });
+  }
+  return { bids: bids.reverse(), asks };
+}
+
+// ---------- TRADING JOURNAL ----------
+export interface JournalEntry {
+  id: string;
+  date: string;
+  tokenSymbol: string;
+  side: "BUY" | "SELL";
+  amount: number;
+  price: number;
+  usdValue: number;
+  pnl: number;
+  pnlPct: number;
+  note: string;
+  tags: string[];
+  mood: "confident" | "neutral" | "uncertain" | "fomo";
+  rating: number; // 1-5
+}
+
+export const JOURNAL_ENTRIES: JournalEntry[] = [
+  { id: "j1", date: "2026-07-30", tokenSymbol: "WIF", side: "BUY", amount: 1200, price: 2.42, usdValue: 2904, pnl: 0, pnlPct: 0, note: "Smart money cluster buy signal. 7 wallets accumulated within 1h.", tags: ["smart-money", "signal"], mood: "confident", rating: 5 },
+  { id: "j2", date: "2026-07-28", tokenSymbol: "SOL", side: "SELL", amount: 24, price: 182.0, usdValue: 4368, pnl: 480, pnlPct: 12.4, note: "Took profits at resistance. Will re-enter on pullback.", tags: ["take-profit"], mood: "confident", rating: 4 },
+  { id: "j3", date: "2026-07-25", tokenSymbol: "BONK", side: "BUY", amount: 8_400_000, price: 0.000022, usdValue: 185, pnl: 0, pnlPct: 0, note: "Small degen play. Meme season narrative.", tags: ["degen", "meme"], mood: "fomo", rating: 2 },
+  { id: "j4", date: "2026-07-20", tokenSymbol: "JUP", side: "SELL", amount: 5000, price: 0.82, usdValue: 4100, pnl: -220, pnlPct: -5.1, note: "Cut losses. Smart money distributing.", tags: ["stop-loss"], mood: "uncertain", rating: 3 },
+  { id: "j5", date: "2026-07-18", tokenSymbol: "IO", side: "BUY", amount: 320, price: 2.68, usdValue: 858, pnl: 0, pnlPct: 0, note: "AI infrastructure long-term hold. Volume spiking.", tags: ["ai", "long-term"], mood: "confident", rating: 4 },
+  { id: "j6", date: "2026-07-15", tokenSymbol: "DRIFT", side: "BUY", amount: 1200, price: 1.38, usdValue: 1656, pnl: 0, pnlPct: 0, note: "DeFi perps play. TVL growing fast.", tags: ["defi"], mood: "neutral", rating: 3 },
+  { id: "j7", date: "2026-07-10", tokenSymbol: "MNGO", side: "BUY", amount: 18000, price: 0.032, usdValue: 576, pnl: 0, pnlPct: 0, note: "Cluster buy signal — 7 smart wallets in 1h. High confidence.", tags: ["smart-money", "signal"], mood: "confident", rating: 5 },
+];
+
+// ---------- DEFI HEALTH MONITOR ----------
+export interface DefiHealthSummary {
+  totalCollateral: number;
+  totalDebt: number;
+  healthFactor: number;
+  liquidationDistance: number; // percent
+  riskLevel: "safe" | "moderate" | "danger" | "critical";
+  positions: {
+    protocol: string;
+    type: string;
+    asset: string;
+    collateral: number;
+    debt: number;
+    healthFactor: number;
+    liquidationPrice: number;
+    currentPrice: number;
+    distancePct: number;
+  }[];
+  recommendations: string[];
+}
+
+export function getDefiHealth(): DefiHealthSummary {
+  const positions = [
+    { protocol: "Kamino", type: "Borrowing", asset: "SOL", collateral: 36_000, debt: 15_520, healthFactor: 2.4, liquidationPrice: 84.2, currentPrice: 184.32, distancePct: 54.3 },
+    { protocol: "Marginfi", type: "Borrowing", asset: "JLP", collateral: 18_400, debt: 8_200, healthFactor: 2.2, liquidationPrice: 12.4, currentPrice: 14.8, distancePct: 16.2 },
+    { protocol: "Drift", type: "Borrowing", asset: "ETH", collateral: 12_000, debt: 6_400, healthFactor: 1.9, liquidationPrice: 2840, currentPrice: 3420, distancePct: 17.0 },
+  ];
+  const totalCollateral = positions.reduce((s, p) => s + p.collateral, 0);
+  const totalDebt = positions.reduce((s, p) => s + p.debt, 0);
+  const avgHealth = positions.reduce((s, p) => s + p.healthFactor, 0) / positions.length;
+  const minDistance = Math.min(...positions.map((p) => p.distancePct));
+  const riskLevel = avgHealth > 2.5 ? "safe" : avgHealth > 1.8 ? "moderate" : avgHealth > 1.3 ? "danger" : "critical";
+
+  return {
+    totalCollateral,
+    totalDebt,
+    healthFactor: avgHealth,
+    liquidationDistance: minDistance,
+    riskLevel,
+    positions: positions.map((p) => ({
+      ...p,
+      distancePct: p.distancePct,
+      liquidationPrice: p.liquidationPrice,
+      currentPrice: p.currentPrice,
+    })),
+    recommendations: [
+      minDistance < 20 ? "⚠️ Marginfi position is within 20% of liquidation — consider adding collateral" : "",
+      "Consider paying down Drift debt to improve health factor",
+      "Diversify collateral to reduce concentration risk",
+    ].filter(Boolean),
+  };
+}
+
+// ---------- TAX LOSS HARVESTING ----------
+export interface HarvestOpportunity {
+  id: string;
+  tokenSymbol: string;
+  unrealizedLoss: number;
+  potentialTaxSavings: number;
+  holdingPeriodDays: number;
+  isShortTerm: boolean;
+  recommendation: string;
+}
+
+export function getHarvestOpportunities(): HarvestOpportunity[] {
+  return [
+    { id: "h1", tokenSymbol: "HNT", unrealizedLoss: -1_240, potentialTaxSavings: 397, holdingPeriodDays: 84, isShortTerm: true, recommendation: "Sell HNT to realize $1,240 loss, save ~$397 in taxes. Rebuy after 30 days to maintain position." },
+    { id: "h2", tokenSymbol: "PYTH", unrealizedLoss: -680, potentialTaxSavings: 218, holdingPeriodDays: 142, isShortTerm: true, recommendation: "Sell PYTH to realize $680 loss, save ~$218 in taxes. Swap to a similar oracle token to maintain exposure." },
+    { id: "h3", tokenSymbol: "NEON", unrealizedLoss: -420, potentialTaxSavings: 134, holdingPeriodDays: 220, isShortTerm: true, recommendation: "Sell NEON to realize $420 loss, save ~$134 in taxes. Small position — easy to harvest." },
+  ];
+}

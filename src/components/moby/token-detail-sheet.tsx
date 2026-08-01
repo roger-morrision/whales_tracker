@@ -381,26 +381,48 @@ function TokenDetailContent({ token }: { token: Token }) {
         <HolderDistributionSection tokenId={token.id} />
       </div>
 
-      {/* External links */}
-      <div className="px-4 mt-4 pb-6 grid grid-cols-3 gap-2">
-        <button className="h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1">
-          <ExternalLink className="h-3 w-3" /> Explorer
-        </button>
-        <button
-          onClick={() => {
-            useMoby.getState().openToken(null);
-            setTimeout(() => useMoby.getState().openChart(token.id), 100);
-          }}
-          className="h-9 rounded-lg bg-bull/15 text-bull border border-bull/30 text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-bull/20"
-        >
-          <TrendingUp className="h-3 w-3" /> Full chart
-        </button>
-        <button
-          onClick={() => useMoby.getState().openAlertCreator(token.id)}
-          className="h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
-        >
-          <Bell className="h-3 w-3" /> Alert
-        </button>
+      {/* External links + tools */}
+      <div className="px-4 mt-4 pb-6 space-y-2">
+        <div className="grid grid-cols-3 gap-2">
+          <button className="h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1">
+            <ExternalLink className="h-3 w-3" /> Explorer
+          </button>
+          <button
+            onClick={() => {
+              useMoby.getState().openToken(null);
+              setTimeout(() => useMoby.getState().openChart(token.id), 100);
+            }}
+            className="h-9 rounded-lg bg-bull/15 text-bull border border-bull/30 text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-bull/20"
+          >
+            <TrendingUp className="h-3 w-3" /> Chart
+          </button>
+          <button
+            onClick={() => useMoby.getState().openAlertCreator(token.id)}
+            className="h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
+          >
+            <Bell className="h-3 w-3" /> Alert
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={() => useMoby.getState().openSecurityAudit(token.id)}
+            className="h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
+          >
+            🛡️ Audit
+          </button>
+          <button
+            onClick={() => useMoby.getState().openPrediction(token.id)}
+            className="h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
+          >
+            🔮 Predict
+          </button>
+          <button
+            onClick={() => useMoby.getState().openLiquidityDepth(token.id)}
+            className="h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
+          >
+            📊 Depth
+          </button>
+        </div>
       </div>
     </div>
   );
