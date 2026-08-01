@@ -13,6 +13,14 @@ import { TokenDetailSheet } from "@/components/moby/token-detail-sheet";
 import { TraderDetailSheet } from "@/components/moby/trader-detail-sheet";
 import { AICopilot } from "@/components/moby/ai-copilot";
 import { SearchModal, NotificationsPanel } from "@/components/moby/search-modal";
+import { WalletConnectModal } from "@/components/moby/wallet-modal";
+import { TokenScreenerModal } from "@/components/moby/token-screener";
+import { TradeModal } from "@/components/moby/trade-modal";
+import { TaxCalculatorModal } from "@/components/moby/tax-calculator";
+import { AlertCreatorModal } from "@/components/moby/alert-creator";
+import { SettingsModal } from "@/components/moby/settings-modal";
+import { OnboardingOverlay } from "@/components/moby/onboarding";
+import { CompareModal } from "@/components/moby/compare-modal";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -48,6 +56,11 @@ export default function Home() {
         e.preventDefault();
         useMoby.getState().setSearchOpen(true);
       }
+      // 's' opens screener
+      if (e.key === "s" && !e.metaKey && !e.ctrlKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        // Don't intercept typing
+        return;
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -77,12 +90,22 @@ export default function Home() {
 
       <BottomNav />
 
-      {/* Overlays */}
+      {/* Overlays — modals & sheets */}
       <TokenDetailSheet />
       <TraderDetailSheet />
       <AICopilot />
       <SearchModal />
       <NotificationsPanel />
+      <WalletConnectModal />
+      <TokenScreenerModal />
+      <TradeModal />
+      <TaxCalculatorModal />
+      <AlertCreatorModal />
+      <SettingsModal />
+      <CompareModal />
+
+      {/* Onboarding — first-time experience */}
+      <OnboardingOverlay />
     </div>
   );
 }

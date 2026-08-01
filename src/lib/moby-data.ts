@@ -1266,3 +1266,380 @@ export function nextPriceTick(price: number, volatility = 0.004): number {
   const drift = (Math.random() - 0.5) * 2 * volatility;
   return Math.max(0.000001, price * (1 + drift));
 }
+
+// ---------- MARKET OVERVIEW DATA ----------
+// Deterministic snapshot of the global crypto market.
+
+export interface MarketStats {
+  totalMarketCap: number;
+  totalVolume24h: number;
+  btcDominance: number;
+  ethDominance: number;
+  solDominance: number;
+  fearGreedIndex: number; // 0-100
+  fearGreedLabel: "Extreme Fear" | "Fear" | "Neutral" | "Greed" | "Extreme Greed";
+  fearGreedYesterday: number;
+  activeCryptos: number;
+  markets: number;
+  ethGas: number; // gwei
+  solGas: number; // lamports
+  btcMcapChange24h: number;
+  ethMcapChange24h: number;
+  solMcapChange24h: number;
+}
+
+export const MARKET_STATS: MarketStats = {
+  totalMarketCap: 2_412_000_000_000,
+  totalVolume24h: 84_200_000_000,
+  btcDominance: 53.2,
+  ethDominance: 17.8,
+  solDominance: 3.6,
+  fearGreedIndex: 72,
+  fearGreedLabel: "Greed",
+  fearGreedYesterday: 68,
+  activeCryptos: 10_842,
+  markets: 1_204,
+  ethGas: 18.4,
+  solGas: 5_000,
+  btcMcapChange24h: 1.42,
+  ethMcapChange24h: 2.18,
+  solMcapChange24h: 6.42,
+};
+
+// Fear & greed history (7 days) — deterministic
+function genFGHistory(): number[] {
+  const out: number[] = [];
+  let v = 64;
+  for (let i = 0; i < 7; i++) {
+    const r = makeRng(hashSeed(`fg-${i}`))();
+    v = Math.max(8, Math.min(92, v + (r - 0.45) * 16));
+    out.push(Math.round(v));
+  }
+  out.push(MARKET_STATS.fearGreedIndex);
+  return out;
+}
+
+export const FEAR_GREED_HISTORY: number[] = genFGHistory();
+
+// ---------- NEWS ----------
+export interface NewsItem {
+  id: string;
+  headline: string;
+  source: string;
+  agoMinutes: number;
+  category: "Market" | "DeFi" | "Meme" | "AI" | "DePIN" | "Regulation" | "Macro";
+  sentiment: "bullish" | "bearish" | "neutral";
+  url: string;
+  tokensMentioned: string[]; // token ids
+}
+
+export const NEWS: NewsItem[] = [
+  {
+    id: "n1",
+    headline: "Solana TVL crosses $8B as DeFi summer reignites onchain activity",
+    source: "The Block",
+    agoMinutes: 14,
+    category: "DeFi",
+    sentiment: "bullish",
+    url: "#",
+    tokensMentioned: ["sol", "jup", "jto"],
+  },
+  {
+    id: "n2",
+    headline: "Smart money rotates into AI agent tokens as io.net volume spikes 142%",
+    source: "CoinDesk",
+    agoMinutes: 38,
+    category: "AI",
+    sentiment: "bullish",
+    url: "#",
+    tokensMentioned: ["io", "rndr"],
+  },
+  {
+    id: "n3",
+    headline: "WIF up 14% as whale wallets accumulate 280K tokens in single block",
+    source: "Uncover",
+    agoMinutes: 52,
+    category: "Meme",
+    sentiment: "bullish",
+    url: "#",
+    tokensMentioned: ["wif"],
+  },
+  {
+    id: "n4",
+    headline: "SEC delays decision on spot Solana ETF until Q1 2027",
+    source: "Bloomberg",
+    agoMinutes: 95,
+    category: "Regulation",
+    sentiment: "neutral",
+    url: "#",
+    tokensMentioned: ["sol"],
+  },
+  {
+    id: "n5",
+    headline: "Bonk burn program removes 18B tokens, supply down 12% in 30 days",
+    source: "Decrypt",
+    agoMinutes: 142,
+    category: "Meme",
+    sentiment: "bullish",
+    url: "#",
+    tokensMentioned: ["bonk"],
+  },
+  {
+    id: "n6",
+    headline: "Helium deploys 50K new hotspots in Latin America expansion",
+    source: "Helium Foundation",
+    agoMinutes: 188,
+    category: "DePIN",
+    sentiment: "bullish",
+    url: "#",
+    tokensMentioned: ["hnt"],
+  },
+  {
+    id: "n7",
+    headline: "Fed signals potential rate cut in September, risk assets rally",
+    source: "Reuters",
+    agoMinutes: 240,
+    category: "Macro",
+    sentiment: "bullish",
+    url: "#",
+    tokensMentioned: [],
+  },
+  {
+    id: "n8",
+    headline: "Drift Protocol hits $1B open interest as perps volume triples",
+    source: "The Defiant",
+    agoMinutes: 320,
+    category: "DeFi",
+    sentiment: "bullish",
+    url: "#",
+    tokensMentioned: ["drift"],
+  },
+];
+
+// ---------- HEATMAP DATA ----------
+// Top tokens by market cap with 24h % change — for market heatmap visualization.
+export function getHeatmapTokens(): { id: string; symbol: string; mcap: number; change: number; color: string }[] {
+  return TOKENS.map((t) => ({
+    id: t.id,
+    symbol: t.symbol,
+    mcap: t.marketCap,
+    change: t.change24h,
+    color: t.logoColor,
+  })).sort((a, b) => b.mcap - a.mcap);
+}
+
+// ---------- TAX CALCULATOR DATA ----------
+// Simulated realized P&L events for the year.
+export interface TaxEvent {
+  id: string;
+  tokenId: string;
+  tokenSymbol: string;
+  date: string; // ISO date
+  type: "SELL" | "SWAP" | "TRANSFER";
+  proceeds: number;
+  costBasis: number;
+  gain: number;
+  holdingPeriodDays: number; // <365 = short-term
+  chain: string;
+}
+
+function genTaxEvents(): TaxEvent[] {
+  const symbols = ["SOL", "WIF", "JUP", "BONK", "JTO", "DRIFT", "IO", "ETH"];
+  const chains = ["SOL", "ETH"];
+  const events: TaxEvent[] = [];
+  for (let i = 0; i < 18; i++) {
+    const sym = symbols[i % symbols.length];
+    const chain = chains[i % 2];
+    const proceeds = 800 + (i + 1) * 1240;
+    const costBasis = proceeds * (0.4 + (i % 5) * 0.18);
+    const gain = proceeds - costBasis;
+    const holdingDays = 20 + i * 38;
+    const month = 1 + (i % 12);
+    const day = 1 + (i * 7) % 27;
+    events.push({
+      id: `tax-${i}`,
+      tokenId: sym.toLowerCase(),
+      tokenSymbol: sym,
+      date: `2026-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`,
+      type: i % 7 === 6 ? "SWAP" : i % 11 === 10 ? "TRANSFER" : "SELL",
+      proceeds: Math.round(proceeds),
+      costBasis: Math.round(costBasis),
+      gain: Math.round(gain),
+      holdingPeriodDays: holdingDays,
+      chain,
+    });
+  }
+  return events;
+}
+
+export const TAX_EVENTS: TaxEvent[] = genTaxEvents();
+
+export function computeTaxSummary() {
+  let shortGain = 0;
+  let longGain = 0;
+  let totalProceeds = 0;
+  let totalCost = 0;
+  const byChain: Record<string, number> = {};
+  const byToken: Record<string, number> = {};
+
+  TAX_EVENTS.forEach((e) => {
+    if (e.type === "TRANSFER") return; // transfers are not taxable
+    totalProceeds += e.proceeds;
+    totalCost += e.costBasis;
+    if (e.holdingPeriodDays < 365) {
+      shortGain += e.gain;
+    } else {
+      longGain += e.gain;
+    }
+    byChain[e.chain] = (byChain[e.chain] ?? 0) + e.gain;
+    byToken[e.tokenSymbol] = (byToken[e.tokenSymbol] ?? 0) + e.gain;
+  });
+
+  // Assume 32% short-term, 15% long-term (US-like)
+  const shortTermTax = shortGain * 0.32;
+  const longTermTax = longGain * 0.15;
+  const totalTax = shortTermTax + longTermTax;
+  const netGain = shortGain + longGain;
+
+  return {
+    shortGain,
+    longGain,
+    netGain,
+    shortTermTax,
+    longTermTax,
+    totalTax,
+    totalProceeds,
+    totalCost,
+    byChain,
+    byToken,
+    eventCount: TAX_EVENTS.filter((e) => e.type !== "TRANSFER").length,
+  };
+}
+
+// ---------- TOKEN LAUNCH CALENDAR ----------
+export interface LaunchEvent {
+  id: string;
+  tokenSymbol: string;
+  tokenName: string;
+  date: string; // ISO
+  chain: string;
+  category: string;
+  status: "upcoming" | "live" | "ended";
+  raiseUsd?: number;
+  color: string;
+  glyph?: string;
+}
+
+export const LAUNCHES: LaunchEvent[] = [
+  {
+    id: "l1",
+    tokenSymbol: "NEURAL",
+    tokenName: "NeuralAI",
+    date: "2026-08-03",
+    chain: "SOL",
+    category: "AI",
+    status: "upcoming",
+    raiseUsd: 12_000_000,
+    color: "from-[#22D3EE] to-[#0EA5E9]",
+    glyph: "🧠",
+  },
+  {
+    id: "l2",
+    tokenSymbol: "WARP",
+    tokenName: "WarpFi",
+    date: "2026-08-05",
+    chain: "SOL",
+    category: "DeFi",
+    status: "upcoming",
+    raiseUsd: 8_400_000,
+    color: "from-[#9945FF] to-[#14F195]",
+    glyph: "🪐",
+  },
+  {
+    id: "l3",
+    tokenSymbol: "DOGEX",
+    tokenName: "DogeX",
+    date: "2026-08-07",
+    chain: "SOL",
+    category: "Meme",
+    status: "upcoming",
+    raiseUsd: 1_200_000,
+    color: "from-[#F59E0B] to-[#EF4444]",
+    glyph: "🐕",
+  },
+  {
+    id: "l4",
+    tokenSymbol: "GRID",
+    tokenName: "GridNet",
+    date: "2026-08-09",
+    chain: "SOL",
+    category: "DePIN",
+    status: "upcoming",
+    raiseUsd: 4_200_000,
+    color: "from-[#A855F7] to-[#7E22CE]",
+    glyph: "📡",
+  },
+];
+
+// ---------- WALLET CONNECT OPTIONS ----------
+export interface WalletOption {
+  id: string;
+  name: string;
+  glyph: string;
+  color: string;
+  description: string;
+  installed: boolean;
+  recommended?: boolean;
+}
+
+export const WALLETS: WalletOption[] = [
+  {
+    id: "phantom",
+    name: "Phantom",
+    glyph: "👻",
+    color: "from-[#AB9FF2] to-[#7B3FE4]",
+    description: "Most popular Solana wallet",
+    installed: true,
+    recommended: true,
+  },
+  {
+    id: "solflare",
+    name: "Solflare",
+    glyph: "🔆",
+    color: "from-[#F5A623] to-[#E94E1B]",
+    description: "Native Solana wallet with staking",
+    installed: false,
+  },
+  {
+    id: "backpack",
+    name: "Backpack",
+    glyph: "🎒",
+    color: "from-[#22D3EE] to-[#0EA5E9]",
+    description: "xNFT-enabled multichain wallet",
+    installed: false,
+  },
+  {
+    id: "metamask",
+    name: "MetaMask",
+    glyph: "🦊",
+    color: "from-[#F6851B] to-[#E2761B]",
+    description: "Ethereum & EVM chains",
+    installed: false,
+  },
+  {
+    id: "keplr",
+    name: "Keplr",
+    glyph: "🦜",
+    color: "from-[#22C55E] to-[#15803D]",
+    description: "Cosmos ecosystem",
+    installed: false,
+  },
+  {
+    id: "wc",
+    name: "WalletConnect",
+    glyph: "🔗",
+    color: "from-[#3B82F6] to-[#1D4ED8]",
+    description: "Scan with any mobile wallet",
+    installed: true,
+  },
+];

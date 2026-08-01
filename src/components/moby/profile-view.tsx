@@ -14,9 +14,11 @@ import {
   Flame,
   Target,
   TrendingUp,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useMoby } from "@/lib/moby-store";
-import { TOKENS, fmtUsd, fmtNum } from "@/lib/moby-data";
+import { TOKENS, fmtUsd, fmtNum, fmtPrice } from "@/lib/moby-data";
 import { TokenIcon, Chip, SectionHeader } from "./primitives";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +28,12 @@ export function ProfileView() {
   const setCopilotOpen = useMoby((s) => s.setCopilotOpen);
   const openToken = useMoby((s) => s.openToken);
   const signals = useMoby((s) => s.signals);
+  const customAlerts = useMoby((s) => s.customAlerts);
+  const openAlertCreator = useMoby((s) => s.openAlertCreator);
+  const setSettingsOpen = useMoby((s) => s.setSettingsOpen);
+  const disconnectWallet = useMoby((s) => s.disconnectWallet);
+  const wallet = useMoby((s) => s.wallet);
+  const setWalletOpen = useMoby((s) => s.setWalletOpen);
 
   const watchlistTokens = useMemo(
     () => watchlist.map((id) => TOKENS.find((t) => t.id === id)).filter(Boolean),
@@ -105,22 +113,42 @@ export function ProfileView() {
         </div>
       </section>
 
+      {/* Custom alerts section */}
+      <CustomAlertsSection />
+
       {/* Menu */}
       <section>
         <div className="rounded-xl border border-border overflow-hidden">
-          <MenuItem icon={<Bell className="h-4 w-4" />} label="Notifications" sub="3 active alerts" />
-          <MenuItem icon={<Shield className="h-4 w-4" />} label="Privacy & security" sub="Wallet connections" />
-          <MenuItem icon={<Target className="h-4 w-4" />} label="Trading preferences" sub="Slippage, defaults" />
-          <MenuItem icon={<HelpCircle className="h-4 w-4" />} label="Help & support" />
+          <MenuItem
+            icon={<Bell className="h-4 w-4" />}
+            label="Create custom alert"
+            sub={`${customAlerts.length} active`}
+            onClick={() => openAlertCreator(null)}
+          />
           <MenuItem
             icon={<Settings className="h-4 w-4" />}
             label="Settings"
-            trailing={<ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            sub="Slippage, notifications, privacy"
+            onClick={() => setSettingsOpen(true)}
           />
+          <MenuItem
+            icon={<Shield className="h-4 w-4" />}
+            label="Privacy & security"
+            sub="Wallet connections"
+            onClick={() => setSettingsOpen(true)}
+          />
+          <MenuItem
+            icon={<Target className="h-4 w-4" />}
+            label="Trading preferences"
+            sub="Defaults, gas priority"
+            onClick={() => setSettingsOpen(true)}
+          />
+          <MenuItem icon={<HelpCircle className="h-4 w-4" />} label="Help & support" />
           <MenuItem
             icon={<LogOut className="h-4 w-4" />}
             label="Disconnect wallet"
             variant="danger"
+            onClick={() => disconnectWallet()}
           />
         </div>
       </section>
@@ -138,6 +166,9 @@ export function ProfileView() {
 }
 
 function ProfileHeader() {
+  const wallet = useMoby((s) => s.wallet);
+  const setWalletOpen = useMoby((s) => s.setWalletOpen);
+
   return (
     <div className="rounded-2xl p-4 bg-gradient-to-br from-[#9945FF]/15 via-[#14F195]/8 to-transparent border border-border text-center">
       <div className="relative inline-block mb-2">
@@ -149,8 +180,22 @@ function ProfileHeader() {
         </span>
       </div>
       <h2 className="font-bold text-lg">Z Trader</h2>
-      <div className="text-xs text-muted-foreground mb-2">@ztrader · 0x7a...3f4c</div>
-      <div className="flex justify-center gap-1.5">
+      <button
+        onClick={() => setWalletOpen(true)}
+        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+      >
+        {wallet ? (
+          <>
+            <span className="font-mono">{wallet.address}</span>
+            <span className="text-bull tabular">· ${(wallet.balanceUsd / 1000).toFixed(1)}K</span>
+          </>
+        ) : (
+          <>
+            @ztrader · <span className="text-bull">Connect wallet →</span>
+          </>
+        )}
+      </button>
+      <div className="flex justify-center gap-1.5 mt-2">
         <Chip variant="gold">Pro member</Chip>
         <Chip variant="bull">Smart money</Chip>
         <Chip variant="outline">Solana</Chip>
@@ -202,15 +247,18 @@ function MenuItem({
   sub,
   trailing,
   variant = "default",
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   sub?: string;
   trailing?: React.ReactNode;
   variant?: "default" | "danger";
+  onClick?: () => void;
 }) {
   return (
     <button
+      onClick={onClick}
       className={cn(
         "w-full flex items-center gap-3 p-3 hover:bg-surface-2 transition-colors text-left border-b border-border last:border-b-0",
         variant === "danger" && "text-bear"
@@ -223,5 +271,78 @@ function MenuItem({
       </div>
       {trailing ?? <ChevronRight className="h-4 w-4 text-muted-foreground" />}
     </button>
+  );
+}
+
+function CustomAlertsSection() {
+  const customAlerts = useMoby((s) => s.customAlerts);
+  const removeAlert = useMoby((s) => s.removeCustomAlert);
+  const openAlertCreator = useMoby((s) => s.openAlertCreator);
+  const openToken = useMoby((s) => s.openToken);
+
+  if (customAlerts.length === 0) {
+    return (
+      <section>
+        <SectionHeader title="Custom alerts" emoji="🔔" />
+        <div className="rounded-xl border border-dashed border-border p-4 text-center">
+          <Bell className="h-6 w-6 text-muted-foreground mx-auto mb-1.5" />
+          <p className="text-xs text-muted-foreground mb-2">No alerts yet</p>
+          <button
+            onClick={() => openAlertCreator(null)}
+            className="text-xs text-bull font-semibold hover:opacity-80 inline-flex items-center gap-1"
+          >
+            <Plus className="h-3 w-3" /> Create your first alert
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <SectionHeader
+        title="Custom alerts"
+        emoji="🔔"
+        action="New"
+        onAction={() => openAlertCreator(null)}
+      />
+      <div className="space-y-1.5">
+        {customAlerts.map((a) => {
+          const tk = TOKENS.find((t) => t.id === a.tokenId);
+          const isPrice = a.condition === "price_above" || a.condition === "price_below";
+          return (
+            <div key={a.id} className="rounded-lg border border-border p-2.5 flex items-center gap-2">
+              <button onClick={() => openToken(a.tokenId)}>
+                <TokenIcon
+                  symbol={a.tokenSymbol}
+                  glyph={tk?.logoGlyph}
+                  color={tk?.logoColor}
+                  size="sm"
+                />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold">
+                  ${a.tokenSymbol}{" "}
+                  <span className="text-muted-foreground font-normal">
+                    {a.condition.replace(/_/g, " ")}
+                  </span>
+                </div>
+                <div className="text-[10px] text-muted-foreground tabular">
+                  {isPrice ? fmtPrice(a.threshold) : fmtUsd(a.threshold, { compact: true })}
+                  {" · "}
+                  {a.channels.join(", ")}
+                </div>
+              </div>
+              <button
+                onClick={() => removeAlert(a.id)}
+                className="h-7 w-7 grid place-items-center rounded-md hover:bg-surface-3 text-muted-foreground hover:text-bear"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

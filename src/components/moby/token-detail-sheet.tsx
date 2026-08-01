@@ -20,6 +20,8 @@ import {
   Wallet,
   Activity,
   TrendingUp,
+  Bell,
+  GitCompareArrows,
 } from "lucide-react";
 import {
   Area,
@@ -76,7 +78,13 @@ function TokenDetailContent({ token }: { token: Token }) {
   const watchlist = useMoby((s) => s.watchlist);
   const toggleWatch = useMoby((s) => s.toggleWatch);
   const prices = useMoby((s) => s.prices);
+  const openTrade = useMoby((s) => s.openTrade);
+  const openAlertCreator = useMoby((s) => s.openAlertCreator);
+  const toggleCompareId = useMoby((s) => s.toggleCompareId);
+  const setCompareOpen = useMoby((s) => s.setCompareOpen);
+  const compareIds = useMoby((s) => s.compareIds);
   const watched = watchlist.includes(token.id);
+  const inCompare = compareIds.includes(token.id);
 
   const live = prices[token.id]?.price ?? token.price;
   const delta1h = ((live - token.price * (1 - token.change1h / 100)) / token.price) * 100;
@@ -209,11 +217,41 @@ function TokenDetailContent({ token }: { token: Token }) {
 
       {/* Trade buttons */}
       <div className="px-4 mt-3 grid grid-cols-2 gap-2">
-        <button className="py-2.5 rounded-xl bg-bear/15 text-bear border border-bear/30 text-sm font-bold hover:bg-bear/20 transition-colors">
+        <button
+          onClick={() => openTrade(token.id, "SELL")}
+          className="py-2.5 rounded-xl bg-bear/15 text-bear border border-bear/30 text-sm font-bold hover:bg-bear/20 transition-colors"
+        >
           Sell
         </button>
-        <button className="py-2.5 rounded-xl bg-bull text-background text-sm font-bold hover:opacity-90 transition-opacity">
+        <button
+          onClick={() => openTrade(token.id, "BUY")}
+          className="py-2.5 rounded-xl bg-bull text-background text-sm font-bold hover:opacity-90 transition-opacity"
+        >
           Buy
+        </button>
+      </div>
+
+      {/* Quick actions: alert + compare */}
+      <div className="px-4 mt-2 grid grid-cols-2 gap-2">
+        <button
+          onClick={() => openAlertCreator(token.id)}
+          className="py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2 flex items-center justify-center gap-1.5"
+        >
+          <Bell className="h-3 w-3" /> Create alert
+        </button>
+        <button
+          onClick={() => {
+            toggleCompareId(token.id);
+            setCompareOpen(true);
+          }}
+          className={cn(
+            "py-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5",
+            inCompare
+              ? "border-gold/40 text-gold bg-gold/10"
+              : "border-border text-muted-foreground hover:text-foreground hover:bg-surface-2"
+          )}
+        >
+          <GitCompareArrows className="h-3 w-3" /> {inCompare ? "In compare" : "Compare"}
         </button>
       </div>
 

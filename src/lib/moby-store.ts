@@ -30,6 +30,98 @@ export interface ToastLike {
   type: "info" | "success" | "warn" | "alert";
 }
 
+// ===== NEW types =====
+export type Chain = "SOL" | "ETH" | "BASE" | "BTC";
+export type Category = "DeFi" | "Meme" | "AI" | "L1" | "L2" | "Gaming" | "DePIN" | "RWA" | "NFT" | "Stablecoin";
+
+export interface ScreenerFilters {
+  chains: Chain[];
+  categories: Category[];
+  minLiquidity: number; // USD
+  minSmartMoneyHolders: number;
+  maxAgeHours: number; // 0 = no limit
+  minVolume24h: number;
+  sortBy: "trending" | "gainers" | "newest" | "smartMoney" | "volume" | "liquidity";
+  search: string;
+}
+
+export const DEFAULT_SCREENER_FILTERS: ScreenerFilters = {
+  chains: [],
+  categories: [],
+  minLiquidity: 0,
+  minSmartMoneyHolders: 0,
+  maxAgeHours: 0,
+  minVolume24h: 0,
+  sortBy: "trending",
+  search: "",
+};
+
+export interface CustomAlert {
+  id: string;
+  tokenId: string;
+  tokenSymbol: string;
+  condition: "price_above" | "price_below" | "smart_money_inflow" | "smart_money_outflow" | "new_whale_buy";
+  threshold: number; // USD value or price
+  channels: ("push" | "email" | "telegram")[];
+  createdAt: number;
+  active: boolean;
+  triggered: boolean;
+}
+
+export interface AppSettings {
+  defaultSlippage: number; // percent
+  defaultGas: "slow" | "standard" | "fast";
+  priorityFee: number; // micro-lamports
+  showHiddenTokens: boolean;
+  hideSmallBalances: boolean;
+  smallBalanceThreshold: number;
+  notifications: {
+    smartMoneyEntry: boolean;
+    whaleAccumulation: boolean;
+    priceAlerts: boolean;
+    newTokenLaunch: boolean;
+    portfolioMilestones: boolean;
+    weeklyDigest: boolean;
+  };
+  privacy: {
+    hideBalances: boolean;
+    blockTransactionTracking: boolean;
+  };
+  display: {
+    currency: "USD" | "EUR" | "JPY" | "CNY";
+    theme: "dark" | "system";
+    compactMode: boolean;
+    showSparklines: boolean;
+  };
+}
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  defaultSlippage: 1.0,
+  defaultGas: "fast",
+  priorityFee: 0.001,
+  showHiddenTokens: false,
+  hideSmallBalances: true,
+  smallBalanceThreshold: 10,
+  notifications: {
+    smartMoneyEntry: true,
+    whaleAccumulation: true,
+    priceAlerts: true,
+    newTokenLaunch: true,
+    portfolioMilestones: true,
+    weeklyDigest: false,
+  },
+  privacy: {
+    hideBalances: false,
+    blockTransactionTracking: false,
+  },
+  display: {
+    currency: "USD",
+    theme: "dark",
+    compactMode: false,
+    showSparklines: true,
+  },
+};
+
 interface MobyState {
   // navigation
   activeTab: TabKey;
@@ -88,6 +180,57 @@ interface MobyState {
 
   // refresh feeds (simulated)
   refreshFeeds: () => void;
+
+  // ===== NEW: Wallet connect =====
+  walletOpen: boolean;
+  setWalletOpen: (open: boolean) => void;
+  wallet: { connected: boolean; address: string; label: string; balanceUsd: number } | null;
+  connectWallet: (label: string) => void;
+  disconnectWallet: () => void;
+
+  // ===== NEW: Token screener =====
+  screenerOpen: boolean;
+  setScreenerOpen: (open: boolean) => void;
+  screenerFilters: ScreenerFilters;
+  setScreenerFilters: (f: Partial<ScreenerFilters>) => void;
+  resetScreenerFilters: () => void;
+
+  // ===== NEW: Trade / swap modal =====
+  tradeOpen: boolean;
+  tradeTokenId: string | null;
+  tradeSide: "BUY" | "SELL";
+  openTrade: (tokenId: string, side: "BUY" | "SELL") => void;
+  closeTrade: () => void;
+
+  // ===== NEW: Tax calculator =====
+  taxOpen: boolean;
+  setTaxOpen: (open: boolean) => void;
+
+  // ===== NEW: Custom alert creator =====
+  alertCreatorOpen: boolean;
+  alertCreatorTokenId: string | null;
+  openAlertCreator: (tokenId: string | null) => void;
+  closeAlertCreator: () => void;
+  customAlerts: CustomAlert[];
+  addCustomAlert: (a: Omit<CustomAlert, "id" | "createdAt">) => void;
+  removeCustomAlert: (id: string) => void;
+
+  // ===== NEW: Settings =====
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
+  settings: AppSettings;
+  setSettings: (s: Partial<AppSettings>) => void;
+
+  // ===== NEW: Onboarding =====
+  onboarded: boolean;
+  setOnboarded: (v: boolean) => void;
+
+  // ===== NEW: Token comparison =====
+  compareOpen: boolean;
+  compareIds: string[];
+  setCompareOpen: (open: boolean) => void;
+  toggleCompareId: (id: string) => void;
+  clearCompare: () => void;
 }
 
 const initialPrices: Record<string, { price: number; prev: number; ts: number }> = {};
@@ -348,6 +491,123 @@ export const useMoby = create<MobyState>((set, get) => ({
       });
     }
   },
+
+  // ===== NEW: Wallet connect =====
+  walletOpen: false,
+  setWalletOpen: (open) => set({ walletOpen: open }),
+  wallet: null,
+  connectWallet: (label) => {
+    const addr = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
+    set({
+      wallet: { connected: true, address: addr, label, balanceUsd: 8420.5 },
+      walletOpen: false,
+    });
+    get().pushAlert({
+      title: "Wallet connected",
+      description: `${label} · ${addr}`,
+      type: "success",
+    });
+  },
+  disconnectWallet: () => {
+    set({ wallet: null });
+    get().pushAlert({
+      title: "Wallet disconnected",
+      type: "info",
+    });
+  },
+
+  // ===== NEW: Token screener =====
+  screenerOpen: false,
+  setScreenerOpen: (open) => set({ screenerOpen: open }),
+  screenerFilters: DEFAULT_SCREENER_FILTERS,
+  setScreenerFilters: (f) =>
+    set((s) => ({ screenerFilters: { ...s.screenerFilters, ...f } })),
+  resetScreenerFilters: () => set({ screenerFilters: DEFAULT_SCREENER_FILTERS }),
+
+  // ===== NEW: Trade / swap =====
+  tradeOpen: false,
+  tradeTokenId: null,
+  tradeSide: "BUY",
+  openTrade: (tokenId, side) =>
+    set({ tradeOpen: true, tradeTokenId: tokenId, tradeSide: side }),
+  closeTrade: () => set({ tradeOpen: false }),
+
+  // ===== NEW: Tax calculator =====
+  taxOpen: false,
+  setTaxOpen: (open) => set({ taxOpen: open }),
+
+  // ===== NEW: Custom alert creator =====
+  alertCreatorOpen: false,
+  alertCreatorTokenId: null,
+  openAlertCreator: (tokenId) => set({ alertCreatorOpen: true, alertCreatorTokenId: tokenId }),
+  closeAlertCreator: () => set({ alertCreatorOpen: false }),
+  customAlerts: [
+    {
+      id: "ca-1",
+      tokenId: "wif",
+      tokenSymbol: "WIF",
+      condition: "price_above",
+      threshold: 3.5,
+      channels: ["push"],
+      createdAt: 0,
+      active: true,
+      triggered: false,
+    },
+    {
+      id: "ca-2",
+      tokenId: "sol",
+      tokenSymbol: "SOL",
+      condition: "smart_money_inflow",
+      threshold: 5_000_000,
+      channels: ["push", "telegram"],
+      createdAt: 0,
+      active: true,
+      triggered: false,
+    },
+  ],
+  addCustomAlert: (a) =>
+    set((s) => ({
+      customAlerts: [
+        { ...a, id: `ca-${Date.now()}`, createdAt: Date.now() },
+        ...s.customAlerts,
+      ],
+      alertCreatorOpen: false,
+      alerts: [
+        {
+          id: `a-${Date.now()}`,
+          title: "Alert created",
+          description: `${a.tokenSymbol} ${a.condition.replace(/_/g, " ")} ${a.threshold}`,
+          type: "success",
+        },
+        ...s.alerts,
+      ],
+    })),
+  removeCustomAlert: (id) =>
+    set((s) => ({ customAlerts: s.customAlerts.filter((x) => x.id !== id) })),
+
+  // ===== NEW: Settings =====
+  settingsOpen: false,
+  setSettingsOpen: (open) => set({ settingsOpen: open }),
+  settings: DEFAULT_SETTINGS,
+  setSettings: (s) => set((state) => ({ settings: { ...state.settings, ...s } })),
+
+  // ===== NEW: Onboarding =====
+  onboarded: false,
+  setOnboarded: (v) => set({ onboarded: v }),
+
+  // ===== NEW: Token comparison =====
+  compareOpen: false,
+  compareIds: [],
+  setCompareOpen: (open) => set({ compareOpen: open }),
+  toggleCompareId: (id) =>
+    set((s) => ({
+      compareIds: s.compareIds.includes(id)
+        ? s.compareIds.filter((x) => x !== id)
+        : s.compareIds.length >= 3
+        ? [...s.compareIds.slice(1), id]
+        : [...s.compareIds, id],
+    })),
+  clearCompare: () => set({ compareIds: [] }),
 }));
 
 // Convenience hook selectors

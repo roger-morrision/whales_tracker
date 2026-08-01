@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowUpRight, ArrowDownRight, Flame, TrendingUp, Star, StarOff } from "lucide-react";
-import { TOKENS, NARRATIVES, fmtUsd, fmtPct, fmtNum, fmtPrice, type Token } from "@/lib/moby-data";
+import { ArrowUpRight, ArrowDownRight, Flame, TrendingUp, Star, StarOff, Calendar, Rocket } from "lucide-react";
+import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, type Token } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Sparkline, Chip, SectionHeader } from "./primitives";
+import { MarketOverview } from "./market-overview";
+import { NewsFeed } from "./news-feed";
 import { cn } from "@/lib/utils";
 
 export function DiscoverView() {
@@ -19,10 +21,17 @@ export function DiscoverView() {
   return (
     <div className="space-y-6">
       <HeroBanner />
+      <MarketOverview />
       <NarrativesRow />
+      <LaunchCalendar />
 
       <section>
-        <SectionHeader title="Discover tokens" emoji="🧭" />
+        <SectionHeader
+          title="Discover tokens"
+          emoji="🧭"
+          action="Screener"
+          onAction={() => useMoby.getState().setScreenerOpen(true)}
+        />
         <div className="flex gap-1 p-1 bg-surface-2 rounded-lg mb-3">
           {[
             { k: "trending", label: "🔥 Trending" },
@@ -49,7 +58,54 @@ export function DiscoverView() {
       </section>
 
       <SmartMoneyMovers />
+      <NewsFeed />
     </div>
+  );
+}
+
+function LaunchCalendar() {
+  return (
+    <section>
+      <SectionHeader title="Upcoming launches" emoji="🚀" action="All" onAction={() => {}} />
+      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+        {LAUNCHES.map((l) => {
+          const d = new Date(l.date);
+          const day = d.getDate();
+          const month = d.toLocaleString("en-US", { month: "short" });
+          return (
+            <div
+              key={l.id}
+              className="shrink-0 w-44 rounded-xl border border-border overflow-hidden bg-surface-2"
+            >
+              <div className={cn("h-16 bg-gradient-to-br grid place-items-center text-2xl", l.color)}>
+                {l.glyph}
+              </div>
+              <div className="p-2.5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] font-bold text-bull bg-bull/10 px-1.5 py-0.5 rounded">
+                    {month} {day}
+                  </span>
+                  <Chip variant="outline">{l.chain}</Chip>
+                </div>
+                <div className="font-semibold text-sm">${l.tokenSymbol}</div>
+                <div className="text-[11px] text-muted-foreground truncate">{l.tokenName}</div>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[10px] text-muted-foreground">{l.category}</span>
+                  {l.raiseUsd && (
+                    <span className="text-[10px] text-gold font-semibold tabular">
+                      {fmtUsd(l.raiseUsd, { compact: true })} raise
+                    </span>
+                  )}
+                </div>
+                <button className="mt-2 w-full py-1 rounded-md bg-surface-3 hover:bg-surface-3/70 text-[10px] font-semibold flex items-center justify-center gap-1">
+                  <Rocket className="h-2.5 w-2.5" /> Set reminder
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

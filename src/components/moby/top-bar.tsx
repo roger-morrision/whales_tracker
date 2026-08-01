@@ -1,19 +1,22 @@
 "use client";
 
-import { Search, Bell, Sparkles, Wallet } from "lucide-react";
+import { Search, Bell, Sparkles, SlidersHorizontal, FileText } from "lucide-react";
 import { useMoby } from "@/lib/moby-store";
 import { MobyLogo } from "./primitives";
+import { WalletButton } from "./wallet-modal";
 import { TOKENS, fmtPrice, fmtPct } from "@/lib/moby-data";
 import { cn } from "@/lib/utils";
 
 /**
- * Top bar with logo, search trigger, notifications, AI copilot trigger.
+ * Top bar with logo, search, screener, tax, wallet, alerts, AI copilot trigger.
  * Below it: a marquee ticker tape with all token prices.
  */
 export function TopBar() {
   const setSearchOpen = useMoby((s) => s.setSearchOpen);
   const setNotifOpen = useMoby((s) => s.setNotifOpen);
   const setCopilotOpen = useMoby((s) => s.setCopilotOpen);
+  const setScreenerOpen = useMoby((s) => s.setScreenerOpen);
+  const setTaxOpen = useMoby((s) => s.setTaxOpen);
   const alerts = useMoby((s) => s.alerts);
   const setActiveTab = useMoby((s) => s.setActiveTab);
 
@@ -32,6 +35,22 @@ export function TopBar() {
             <Search className="h-4 w-4" />
           </button>
           <button
+            onClick={() => setScreenerOpen(true)}
+            className="h-9 w-9 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Token screener"
+            title="Token screener"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setTaxOpen(true)}
+            className="h-9 w-9 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Tax calculator"
+            title="Tax calculator"
+          >
+            <FileText className="h-4 w-4" />
+          </button>
+          <button
             onClick={() => setNotifOpen(true)}
             className="relative h-9 w-9 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Alerts"
@@ -41,13 +60,14 @@ export function TopBar() {
               <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-bear ring-2 ring-background" />
             )}
           </button>
+          <WalletButton />
           <button
             onClick={() => setCopilotOpen(true)}
             className="h-9 px-2.5 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-[#14F195]/20 to-[#22D3EE]/20 text-bull border border-bull/30 hover:from-[#14F195]/30 hover:to-[#22D3EE]/30 transition-colors"
             aria-label="Ask Moby AI"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            <span className="text-xs font-semibold">Ask Moby</span>
+            <span className="text-xs font-semibold hidden sm:inline">Ask Moby</span>
           </button>
         </div>
       </div>
