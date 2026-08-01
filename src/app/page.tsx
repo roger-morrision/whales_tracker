@@ -47,6 +47,7 @@ import { PortfolioAnalyticsModal, YieldFarmingModal, UnlocksModal, GovernanceMod
 import { SecurityAuditModal, TokenizedStocksModal, WalletPnlModal, SnipeBotModal, PricePredictionModal, LiquidityDepthModal, TradingJournalModal, DefiHealthModal, HarvestModal } from "@/components/moby/batch7-modals";
 import { TrailingStopsModal, HotWalletsModal, MigrationsModal, MevProtectionModal, WalletImportModal, WatchlistAlertsModal } from "@/components/moby/batch8-modals";
 import { ErrorBoundary } from "@/components/moby/error-boundary";
+import { PumpFunExplorerModal } from "@/components/moby/pumpfun-explorer";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -140,6 +141,7 @@ export default function Home() {
         if (s.mevInfoOpen) { s.setMevInfoOpen(false); return; }
         if (s.walletImportOpen) { s.setWalletImportOpen(false); return; }
         if (s.watchlistAlertsOpen) { s.setWatchlistAlertsOpen(false); return; }
+        if (s.pumpFunOpen) { s.setPumpFunOpen(false); return; }
       }
     };
     window.addEventListener("keydown", handler);
@@ -244,6 +246,9 @@ export default function Home() {
       <MevProtectionModal />
       <WalletImportModal />
       <WatchlistAlertsModal />
+
+      {/* Batch 9: Pump.fun explorer */}
+      <PumpFunExplorerModal />
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />

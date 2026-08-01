@@ -93,6 +93,7 @@ export function ProfileView() {
           <ToolButton emoji="🔀" label="Migrations" onClick={() => useMoby.getState().setMigrationsOpen(true)} />
           <ToolButton emoji="🔑" label="Import" onClick={() => useMoby.getState().setWalletImportOpen(true)} />
           <ToolButton emoji="🔔" label="WL alerts" onClick={() => useMoby.getState().setWatchlistAlertsOpen(true)} />
+          <ToolButton emoji="🔥" label="Launchpad" onClick={() => useMoby.getState().setPumpFunOpen(true)} />
         </div>
       </section>
 

@@ -470,6 +470,10 @@ interface MobyState {
   // Recently viewed tokens
   recentlyViewed: string[];
   addRecentlyViewed: (id: string) => void;
+
+  // ===== BATCH 9: Pump.fun explorer =====
+  pumpFunOpen: boolean;
+  setPumpFunOpen: (open: boolean) => void;
 }
 
 // ===== BATCH 3 types =====
@@ -1296,6 +1300,10 @@ export const useMoby = create<MobyState>()(
     set((s) => ({
       recentlyViewed: [id, ...s.recentlyViewed.filter((x) => x !== id)].slice(0, 10),
     })),
+
+  // ===== BATCH 9: Pump.fun explorer =====
+  pumpFunOpen: false,
+  setPumpFunOpen: (open) => set({ pumpFunOpen: open }),
   }),
   {
     name: "moby-storage",

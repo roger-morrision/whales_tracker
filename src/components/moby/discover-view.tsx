@@ -139,6 +139,13 @@ function InsightsGrid() {
           accent="from-[#9945FF]/15"
           onClick={() => useMoby.getState().setSmartMoneyMapOpen(true)}
         />
+        <InsightCard
+          emoji="🔥"
+          title="Launchpad explorer"
+          sub="pump.fun · bonk · Raydium"
+          accent="from-[#00FF7F]/15"
+          onClick={() => useMoby.getState().setPumpFunOpen(true)}
+        />
       </div>
     </section>
   );
