@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Check, Shield, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
+import { X, Check, Shield, ChevronRight, ExternalLink, Loader2, Key } from "lucide-react";
 import { WALLETS } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { motion, AnimatePresence } from "framer-motion";
@@ -179,6 +179,15 @@ export function WalletConnectModal() {
                   Moby never asks for your seed phrase.
                 </span>
               </div>
+              <button
+                onClick={() => {
+                  useMoby.getState().setWalletOpen(false);
+                  setTimeout(() => useMoby.getState().setWalletImportOpen(true), 200);
+                }}
+                className="w-full text-center text-[11px] text-bull hover:opacity-80 inline-flex items-center justify-center gap-1 font-semibold"
+              >
+                <Key className="h-3 w-3" /> Import existing wallet (seed phrase / private key)
+              </button>
               <button className="w-full text-center text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1">
                 <ExternalLink className="h-3 w-3" /> Learn more about wallet security
               </button>

@@ -4718,3 +4718,121 @@ export function getHarvestOpportunities(): HarvestOpportunity[] {
     { id: "h3", tokenSymbol: "NEON", unrealizedLoss: -420, potentialTaxSavings: 134, holdingPeriodDays: 220, isShortTerm: true, recommendation: "Sell NEON to realize $420 loss, save ~$134 in taxes. Small position — easy to harvest." },
   ];
 }
+
+// ---------- BATCH 8: Remaining Moby features ----------
+
+// ---------- TRAILING STOP LOSS ----------
+export interface TrailingStop {
+  id: string;
+  tokenId: string;
+  tokenSymbol: string;
+  side: "LONG" | "SHORT";
+  entryPrice: number;
+  currentPrice: number;
+  highestPrice: number;
+  trailPercent: number;
+  stopPrice: number;
+  amountUsd: number;
+  status: "active" | "triggered" | "cancelled";
+  createdAgoSec: number;
+  distancePct: number;
+}
+
+export const TRAILING_STOPS: TrailingStop[] = [
+  { id: "ts1", tokenId: "wif", tokenSymbol: "WIF", side: "LONG", entryPrice: 2.42, currentPrice: 2.84, highestPrice: 2.91, trailPercent: 8, stopPrice: 2.68, amountUsd: 5000, status: "active", createdAgoSec: 86400, distancePct: 5.6 },
+  { id: "ts2", tokenId: "sol", tokenSymbol: "SOL", side: "LONG", entryPrice: 172.4, currentPrice: 184.32, highestPrice: 188.4, trailPercent: 5, stopPrice: 179.0, amountUsd: 8000, status: "active", createdAgoSec: 43200, distancePct: 2.9 },
+  { id: "ts3", tokenId: "bonk", tokenSymbol: "BONK", side: "LONG", entryPrice: 0.000022, currentPrice: 0.0000284, highestPrice: 0.000031, trailPercent: 15, stopPrice: 0.0000264, amountUsd: 2000, status: "active", createdAgoSec: 21600, distancePct: 7.0 },
+  { id: "ts4", tokenId: "jup", tokenSymbol: "JUP", side: "LONG", entryPrice: 0.68, currentPrice: 0.84, highestPrice: 0.86, trailPercent: 10, stopPrice: 0.774, amountUsd: 3000, status: "triggered", createdAgoSec: 172800, distancePct: 0 },
+];
+
+// ---------- HOT WALLETS (most active right now) ----------
+export interface HotWallet {
+  id: string;
+  label: string;
+  address: string;
+  type: "whale" | "smart_money" | "kol" | "mev" | "fund";
+  score: number;
+  trades24h: number;
+  volume24h: number;
+  pnl24h: number;
+  pnlPct: number;
+  winRate: number;
+  topToken: string;
+  lastActiveSec: number;
+  isLive: boolean;
+  color: string;
+  glyph: string;
+  trend: "up" | "down";
+}
+
+export const HOT_WALLETS: HotWallet[] = [
+  { id: "hw1", label: "0xMoby", address: "0x7a3f...b9c2", type: "whale", score: 96, trades24h: 28, volume24h: 4_280_000, pnl24h: 184_000, pnlPct: 42.8, winRate: 78, topToken: "WIF", lastActiveSec: 120, isLive: true, color: "from-[#14F195] to-[#9945FF]", glyph: "M", trend: "up" },
+  { id: "hw2", label: "DegenDiva", address: "0x82ad...f1d4", type: "kol", score: 84, trades24h: 42, volume24h: 3_120_000, pnl24h: 248_000, pnlPct: 68.2, winRate: 64, topToken: "BONK", lastActiveSec: 340, isLive: true, color: "from-[#EC4899] to-[#BE185D]", glyph: "D", trend: "up" },
+  { id: "hw3", label: "AlphaBot", address: "0x9bc1...a82e", type: "smart_money", score: 90, trades24h: 18, volume24h: 1_840_000, pnl24h: 92_000, pnlPct: 28.4, winRate: 72, topToken: "JUP", lastActiveSec: 680, isLive: true, color: "from-[#22D3EE] to-[#0EA5E9]", glyph: "A", trend: "up" },
+  { id: "hw4", label: "Scoop", address: "0x4f8e...2c3b", type: "whale", score: 92, trades24h: 12, volume24h: 2_840_000, pnl24h: -84_000, pnlPct: -12.4, winRate: 58, topToken: "SOL", lastActiveSec: 1200, isLive: false, color: "from-[#F59E0B] to-[#EF4444]", glyph: "W", trend: "down" },
+  { id: "hw5", label: "Sage", address: "0x5a2f...8e1c", type: "smart_money", score: 88, trades24h: 8, volume24h: 920_000, pnl24h: 64_000, pnlPct: 18.2, winRate: 81, topToken: "IO", lastActiveSec: 2400, isLive: false, color: "from-[#8B5CF6] to-[#6366F1]", glyph: "S", trend: "up" },
+  { id: "hw6", label: "MEV Bot Alpha", address: "0x3c7d...9f2a", type: "mev", score: 94, trades24h: 184, volume24h: 8_400_000, pnl24h: 42_000, pnlPct: 8.4, winRate: 89, topToken: "SOL", lastActiveSec: 30, isLive: true, color: "from-[#A855F7] to-[#7E22CE]", glyph: "⚡", trend: "up" },
+];
+
+// ---------- TOKEN MIGRATIONS ----------
+export interface TokenMigration {
+  id: string;
+  tokenSymbol: string;
+  tokenName: string;
+  fromChain: string;
+  toChain: string;
+  status: "announced" | "in_progress" | "completed";
+  date: string;
+  ratio: string;
+  reason: string;
+  color: string;
+  glyph: string;
+  oldContract: string;
+  newContract: string;
+}
+
+export const TOKEN_MIGRATIONS: TokenMigration[] = [
+  { id: "m1", tokenSymbol: "WORM", tokenName: "Wormhole", fromChain: "SOL", toChain: "ALL", status: "completed", date: "2026-07-20", ratio: "1:1", reason: "Multi-chain expansion via wormhole bridge", color: "from-[#9945FF] to-[#14F195]", glyph: "🪱", oldContract: "0xAB12...CD34", newContract: "0xEF56...GH78" },
+  { id: "m2", tokenSymbol: "DUST", tokenName: "DUST Protocol", fromChain: "SOL", toChain: "BASE", status: "in_progress", date: "2026-08-10", ratio: "1:1", reason: "Migrating to Base for lower fees", color: "from-[#F59E0B] to-[#EF4444]", glyph: "💨", oldContract: "0x12AB...34CD", newContract: "0x56EF...78GH" },
+  { id: "m3", tokenSymbol: "STEP", tokenName: "Step Finance", fromChain: "SOL", toChain: "ETH", status: "announced", date: "2026-09-01", ratio: "1:1.2", reason: "Expanding to Ethereum DeFi ecosystem", color: "from-[#22D3EE] to-[#0EA5E9]", glyph: "👣", oldContract: "0xAB12...CD34", newContract: "Pending" },
+];
+
+// ---------- WATCHLIST ALERT CONFIG ----------
+export interface WatchlistAlert {
+  tokenId: string;
+  symbol: string;
+  priceAbove: number | null;
+  priceBelow: number | null;
+  changeAbove: number | null;
+  changeBelow: number | null;
+  smartMoneyEntry: boolean;
+  enabled: boolean;
+}
+
+// ---------- MEV PROTECTION STATUS ----------
+export interface MevProtectionInfo {
+  enabled: boolean;
+  mode: "auto" | "on" | "off";
+  protectedSwaps24h: number;
+  valueSaved24h: number;
+  attacksBlocked24h: number;
+  routes: {
+    label: string;
+    protected: boolean;
+    description: string;
+  }[];
+}
+
+export const MEV_PROTECTION: MevProtectionInfo = {
+  enabled: true,
+  mode: "auto",
+  protectedSwaps24h: 184,
+  valueSaved24h: 248,
+  attacksBlocked24h: 12,
+  routes: [
+    { label: "Jupiter Ultra", protected: true, description: "MEV-protected routing with dynamic slippage" },
+    { label: "Jupiter v6", protected: true, description: "Standard routing with slippage protection" },
+    { label: "Raydium direct", protected: false, description: "Direct pool swap — no MEV protection" },
+    { label: "Orca whirlpool", protected: false, description: "Direct whirlpool swap — no MEV protection" },
+  ],
+};

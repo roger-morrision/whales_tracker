@@ -87,6 +87,12 @@ export function ProfileView() {
           <ToolButton emoji="🔮" label="Predict" onClick={() => useMoby.getState().setPredictionOpen(true)} />
           <ToolButton emoji="📖" label="Journal" onClick={() => useMoby.getState().setJournalOpen(true)} />
           <ToolButton emoji="❤️" label="Health" onClick={() => useMoby.getState().setDefiHealthOpen(true)} />
+          <ToolButton emoji="📉" label="Trail stops" onClick={() => useMoby.getState().setTrailingStopsOpen(true)} />
+          <ToolButton emoji="🔥" label="Hot wallets" onClick={() => useMoby.getState().setHotWalletsOpen(true)} />
+          <ToolButton emoji="🛡️" label="MEV protect" onClick={() => useMoby.getState().setMevInfoOpen(true)} />
+          <ToolButton emoji="🔀" label="Migrations" onClick={() => useMoby.getState().setMigrationsOpen(true)} />
+          <ToolButton emoji="🔑" label="Import" onClick={() => useMoby.getState().setWalletImportOpen(true)} />
+          <ToolButton emoji="🔔" label="WL alerts" onClick={() => useMoby.getState().setWatchlistAlertsOpen(true)} />
         </div>
       </section>
 

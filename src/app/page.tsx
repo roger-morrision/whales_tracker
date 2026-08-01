@@ -45,6 +45,7 @@ import { SmartMoneyMapModal } from "@/components/moby/smart-money-map-modal";
 import { PushNotificationManager } from "@/components/moby/push-notifications";
 import { PortfolioAnalyticsModal, YieldFarmingModal, UnlocksModal, GovernanceModal, DeFiPositionsModal, CalendarModal, MultiWalletModal, WatchlistPerfModal } from "@/components/moby/batch6-modals";
 import { SecurityAuditModal, TokenizedStocksModal, WalletPnlModal, SnipeBotModal, PricePredictionModal, LiquidityDepthModal, TradingJournalModal, DefiHealthModal, HarvestModal } from "@/components/moby/batch7-modals";
+import { TrailingStopsModal, HotWalletsModal, MigrationsModal, MevProtectionModal, WalletImportModal, WatchlistAlertsModal } from "@/components/moby/batch8-modals";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -174,6 +175,14 @@ export default function Home() {
       <TradingJournalModal />
       <DefiHealthModal />
       <HarvestModal />
+
+      {/* Batch 8: TrailingStops + HotWallets + Migrations + MEV + WalletImport + WatchlistAlerts */}
+      <TrailingStopsModal />
+      <HotWalletsModal />
+      <MigrationsModal />
+      <MevProtectionModal />
+      <WalletImportModal />
+      <WatchlistAlertsModal />
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />

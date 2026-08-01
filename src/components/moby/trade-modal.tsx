@@ -253,6 +253,12 @@ export function TradeModal() {
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground flex items-center gap-1">
+                      <Shield className="h-3 w-3 text-bull" /> MEV protection
+                    </span>
+                    <span className="font-semibold text-bull">✓ Jupiter Ultra</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground flex items-center gap-1">
                       <TrendingUp className="h-3 w-3" /> Price impact
                     </span>
                     <span className={cn("font-semibold tabular", impactColor)}>{priceImpact.toFixed(2)}%</span>

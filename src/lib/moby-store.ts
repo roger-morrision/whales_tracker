@@ -441,6 +441,30 @@ interface MobyState {
   // ===== BATCH 7: Tax loss harvesting =====
   harvestOpen: boolean;
   setHarvestOpen: (open: boolean) => void;
+
+  // ===== BATCH 8: Trailing stops =====
+  trailingStopsOpen: boolean;
+  setTrailingStopsOpen: (open: boolean) => void;
+
+  // ===== BATCH 8: Hot wallets =====
+  hotWalletsOpen: boolean;
+  setHotWalletsOpen: (open: boolean) => void;
+
+  // ===== BATCH 8: Token migrations =====
+  migrationsOpen: boolean;
+  setMigrationsOpen: (open: boolean) => void;
+
+  // ===== BATCH 8: MEV protection info =====
+  mevInfoOpen: boolean;
+  setMevInfoOpen: (open: boolean) => void;
+
+  // ===== BATCH 8: Wallet import =====
+  walletImportOpen: boolean;
+  setWalletImportOpen: (open: boolean) => void;
+
+  // ===== BATCH 8: Watchlist alerts =====
+  watchlistAlertsOpen: boolean;
+  setWatchlistAlertsOpen: (open: boolean) => void;
 }
 
 // ===== BATCH 3 types =====
@@ -1231,6 +1255,30 @@ export const useMoby = create<MobyState>((set, get) => ({
   // ===== BATCH 7: Tax loss harvesting =====
   harvestOpen: false,
   setHarvestOpen: (open) => set({ harvestOpen: open }),
+
+  // ===== BATCH 8: Trailing stops =====
+  trailingStopsOpen: false,
+  setTrailingStopsOpen: (open) => set({ trailingStopsOpen: open }),
+
+  // ===== BATCH 8: Hot wallets =====
+  hotWalletsOpen: false,
+  setHotWalletsOpen: (open) => set({ hotWalletsOpen: open }),
+
+  // ===== BATCH 8: Token migrations =====
+  migrationsOpen: false,
+  setMigrationsOpen: (open) => set({ migrationsOpen: open }),
+
+  // ===== BATCH 8: MEV protection info =====
+  mevInfoOpen: false,
+  setMevInfoOpen: (open) => set({ mevInfoOpen: open }),
+
+  // ===== BATCH 8: Wallet import =====
+  walletImportOpen: false,
+  setWalletImportOpen: (open) => set({ walletImportOpen: open }),
+
+  // ===== BATCH 8: Watchlist alerts =====
+  watchlistAlertsOpen: false,
+  setWatchlistAlertsOpen: (open) => set({ watchlistAlertsOpen: open }),
 }));
 
 // Convenience hook selectors
