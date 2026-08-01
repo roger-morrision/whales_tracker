@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { getHolderDistribution, getTopHolders, fmtUsd, fmtNum, fmtPct } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { Chip } from "./primitives";
+import { WalletLink } from "./wallet-link";
 import { cn } from "@/lib/utils";
 import { ArrowUpRight, ArrowDownRight, Star } from "lucide-react";
 
@@ -68,7 +69,12 @@ export function HolderDistributionSection({ tokenId }: { tokenId: string }) {
             <div key={h.rank} className="flex items-center gap-2 text-xs">
               <span className="w-4 text-[10px] text-muted-foreground tabular">#{h.rank}</span>
               <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground truncate">{h.address}</span>
+                <WalletLink
+                  label={h.label}
+                  address={h.address}
+                  variant="mono"
+                  className="text-[10px] truncate"
+                />
                 {h.isSmart && (
                   <span className="text-[8px] font-bold text-bull bg-bull/15 px-1 py-0.5 rounded shrink-0 inline-flex items-center gap-0.5">
                     <Star className="h-2 w-2" /> SMART

@@ -16,6 +16,7 @@ import {
 import { WALLET_ACTIVITY, fmtUsd, fmtNum, fmtAgo, type WalletActivity } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Chip } from "./primitives";
+import { WalletLink } from "./wallet-link";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -158,7 +159,13 @@ export function WalletActivityModal() {
                           </div>
                           <div className="text-[11px] text-muted-foreground tabular">
                             {fmtNum(a.amount)} {a.tokenSymbol}
-                            {a.counterpartyLabel && ` · ${a.counterpartyLabel}`}
+                            {" · "}
+                            <WalletLink
+                              label={a.counterpartyLabel ?? "Unknown"}
+                              address={a.counterparty}
+                              variant="muted"
+                              className="text-[11px]"
+                            />
                           </div>
                         </div>
                         <div className="text-right">

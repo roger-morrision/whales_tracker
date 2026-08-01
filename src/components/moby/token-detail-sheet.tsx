@@ -35,6 +35,7 @@ import { TOKENS_BY_ID, fmtUsd, fmtPrice, fmtPct, fmtNum, fmtAge, type Token } fr
 import { useMoby, useToken } from "@/lib/moby-store";
 import { TokenIcon, Chip, Sparkline } from "./primitives";
 import { HolderDistributionSection } from "./holder-distribution";
+import { WalletLink } from "./wallet-link";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -322,14 +323,19 @@ function TokenDetailContent({ token }: { token: Token }) {
             {Array.from({ length: 4 }).map((_, i) => {
               const score = 92 - i * 6;
               const pct = 18 - i * 3;
+              const walletLabels = ["Smart Wallet #4218", "Whale: 0xMoby", "KOL: DegenDiva", "Smart Wallet #9821"];
+              const walletAddrs = [`0x${i + 4}2${(i + 1) * 3}...${i + 8}a${(i + 1) * 7}c`, `0xab${i}f...${i + 2}c`, `0xde${i}a...${i + 5}f`, `0x${i + 1}b${(i + 2) * 4}...${i + 3}d`];
               return (
                 <div key={i} className="flex items-center gap-2 text-xs">
                   <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#14F195] to-[#9945FF] grid place-items-center text-[10px] font-bold text-background">
                     {String.fromCharCode(65 + i)}
                   </div>
-                  <span className="font-mono text-muted-foreground text-[11px]">
-                    0x{i + 4}2{(i + 1) * 3}...{i + 8}a{(i + 1) * 7}c
-                  </span>
+                  <WalletLink
+                    label={walletLabels[i]}
+                    address={walletAddrs[i]}
+                    variant="mono"
+                    className="text-[11px] flex-1 min-w-0 truncate"
+                  />
                   <span className="ml-auto text-gold tabular font-semibold">{score}</span>
                   <span className="text-muted-foreground tabular w-10 text-right">{pct}%</span>
                 </div>
@@ -349,12 +355,19 @@ function TokenDetailContent({ token }: { token: Token }) {
           {Array.from({ length: 4 }).map((_, i) => {
             const isBuy = i % 3 !== 2;
             const usd = [42_000, 184_000, 612_000, 1_240_000][i];
+            const walletLabels = ["Smart Wallet #4218", "Whale: 0xMoby", "Smart Wallet #9821", "KOL: DegenDiva"];
+            const walletAddrs = [`0x${(i + 1) * 13}a...${i + 4}b`, `0x${(i + 2) * 17}c...${i + 5}d`, `0x${(i + 3) * 11}e...${i + 6}f`, `0x${(i + 4) * 19}g...${i + 7}h`];
             return (
               <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-surface-2 text-xs">
                 <span className={cn("h-6 w-6 rounded grid place-items-center", isBuy ? "bg-bull/15 text-bull" : "bg-bear/15 text-bear")}>
                   {isBuy ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                 </span>
-                <span className="font-mono text-muted-foreground text-[11px]">0x{(i + 1) * 13}a...{i + 4}b</span>
+                <WalletLink
+                  label={walletLabels[i]}
+                  address={walletAddrs[i]}
+                  variant="mono"
+                  className="text-[11px] flex-1 min-w-0 truncate"
+                />
                 <span className="ml-auto tabular font-semibold">{isBuy ? "+" : "-"}{fmtUsd(usd, { compact: true })}</span>
                 <span className="text-muted-foreground text-[10px]">{(i + 1) * 7}m ago</span>
               </div>

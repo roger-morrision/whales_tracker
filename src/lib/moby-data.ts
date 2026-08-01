@@ -857,6 +857,139 @@ export const TRADERS: Trader[] = [
   },
 ];
 
+// ---------- WALLET-TO-TRADER MAPPING ----------
+// Maps wallet labels and addresses to known trader IDs so that clicking
+// any wallet anywhere in the app opens the trader portfolio detail.
+
+const WALLET_KEYWORD_MAP: { keywords: string[]; traderId: string }[] = [
+  { keywords: ["0xmoby", "moby"], traderId: "t1" },
+  { keywords: ["scoop", "whalescoop"], traderId: "t2" },
+  { keywords: ["sage", "solanasage"], traderId: "t3" },
+  { keywords: ["diva", "degendiva"], traderId: "t4" },
+  { keywords: ["alphabot", "aicopilot", "alpha bot", "mev bot"], traderId: "t5" },
+  { keywords: ["franky", "flips", "frankyflips"], traderId: "t6" },
+  { keywords: ["owl", "onchainowl"], traderId: "t7" },
+  { keywords: ["builder", "basebuilder"], traderId: "t8" },
+];
+
+// Labels that indicate an exchange / fund / protocol — not a trader wallet.
+// "Unknown" is NOT included here because unknown wallets with addresses
+// should still be clickable (mapped to a trader by address hash).
+const NON_TRADER_LABELS = ["binance", "cex", "jupiter", "drift", "raydium", "phantom", "paradigm", "blocksight", "fund:"];
+
+/**
+ * Try to find a trader ID from a wallet label or address.
+ * Returns null if the wallet doesn't map to any known trader.
+ */
+export function findTraderForWallet(label: string, address?: string): string | null {
+  const haystack = `${label} ${address ?? ""}`.toLowerCase();
+
+  // Check if it's an exchange / fund / protocol (but NOT "unknown")
+  if (NON_TRADER_LABELS.some((kw) => haystack.includes(kw))) {
+    return null;
+  }
+
+  // Try keyword matching first
+  for (const entry of WALLET_KEYWORD_MAP) {
+    if (entry.keywords.some((kw) => haystack.includes(kw))) {
+      return entry.traderId;
+    }
+  }
+
+  // For "Smart Wallet #XXXX" labels, assign to the top smart trader
+  // (rotation based on the number in the label for variety)
+  if (haystack.includes("smart wallet")) {
+    const numMatch = label.match(/#?(\d+)/);
+    if (numMatch) {
+      const num = parseInt(numMatch[1], 10);
+      const traderIds = ["t1", "t3", "t5", "t7", "t2", "t6"];
+      return traderIds[num % traderIds.length];
+    }
+    return "t1";
+  }
+
+  // For "Sniper:" labels, assign to the sniper trader
+  if (haystack.includes("sniper")) {
+    return "t6";
+  }
+
+  // For "Whale:" labels without a known name, assign to the top whale
+  if (haystack.includes("whale")) {
+    return "t2";
+  }
+
+  // For "KOL:" labels without a known name, assign to a KOL trader
+  if (haystack.includes("kol")) {
+    return "t4";
+  }
+
+  // For generic/unknown labels with an address, map to a trader by address hash
+  if (address && address.startsWith("0x")) {
+    const hash = hashSeed(address);
+    const traderIds = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"];
+    return traderIds[hash % traderIds.length];
+  }
+
+  return null;
+}
+
+/**
+ * Get a display profile for any wallet — either a known trader or a
+ * generated profile based on the label.
+ */
+export function getWalletProfile(label: string, address?: string): {
+  traderId: string | null;
+  displayName: string;
+  handle: string;
+  avatarGlyph: string;
+  avatarColor: string;
+  score: number;
+  isSmart: boolean;
+  type: "trader" | "whale" | "smart_wallet" | "fund" | "cex" | "mev" | "kol" | "unknown";
+} {
+  const traderId = findTraderForWallet(label, address);
+  const lower = label.toLowerCase();
+
+  // Determine wallet type
+  let type: "trader" | "whale" | "smart_wallet" | "fund" | "cex" | "mev" | "kol" | "unknown" = "unknown";
+  if (lower.includes("binance") || lower.includes("cex")) type = "cex";
+  else if (lower.includes("fund")) type = "fund";
+  else if (lower.includes("mev")) type = "mev";
+  else if (lower.includes("kol")) type = "kol";
+  else if (lower.includes("smart wallet")) type = "smart_wallet";
+  else if (lower.includes("whale")) type = "whale";
+  else if (traderId) type = "trader";
+
+  if (traderId) {
+    const trader = TRADERS.find((t) => t.id === traderId);
+    if (trader) {
+      return {
+        traderId,
+        displayName: trader.displayName,
+        handle: trader.handle,
+        avatarGlyph: trader.avatarGlyph,
+        avatarColor: trader.avatarColor,
+        score: trader.smartScore,
+        isSmart: true,
+        type: "trader",
+      };
+    }
+  }
+
+  // Generate a profile for non-trader wallets
+  const score = 60 + Math.floor(seededRand(`wallet-${label}-${address ?? ""}`) * 38);
+  return {
+    traderId: null,
+    displayName: label,
+    handle: label.replace(/\s+/g, "").replace(/#/g, ""),
+    avatarGlyph: label[0]?.toUpperCase() ?? "?",
+    avatarColor: "from-[#64748B] to-[#334155]",
+    score,
+    isSmart: type === "smart_wallet" || type === "mev",
+    type,
+  };
+}
+
 // ---------- WHALE FLOWS ----------
 
 const flowTokens = ["SOL", "WIF", "JUP", "BONK", "POPCAT", "JTO", "DRIFT", "IO", "TNSR", "MNGO", "MOON", "BASD"];

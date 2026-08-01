@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { TRADERS, fmtUsd, fmtNum } from "@/lib/moby-data";
 import { useMoby, type CopyTradeConfig } from "@/lib/moby-store";
+import { WalletLink } from "./wallet-link";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -137,7 +138,11 @@ function CopyTradeCard({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-sm">@{config.traderHandle}</span>
+            <WalletLink
+              label={config.traderHandle}
+              address={`0x${config.traderId}`}
+              className="text-sm font-semibold"
+            />
             {config.enabled ? (
               <span className="text-[9px] font-bold text-bull bg-bull/15 px-1.5 py-0.5 rounded">LIVE</span>
             ) : (

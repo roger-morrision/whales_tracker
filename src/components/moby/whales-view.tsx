@@ -14,6 +14,7 @@ import {
 import { TRADERS, fmtUsd, fmtNum, fmtAgo, fmtPct, type Trader, type WhaleFlow } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Chip, SectionHeader } from "./primitives";
+import { WalletLink } from "./wallet-link";
 import { cn } from "@/lib/utils";
 
 const FLOW_TYPE_LABEL: Record<WhaleFlow["type"], string> = {
@@ -259,9 +260,14 @@ function FlowCard({ flow }: { flow: WhaleFlow }) {
             </Chip>
           </div>
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <Wallet className="h-3 w-3" />
-            <span className="truncate">{flow.walletLabel}</span>
-            <span className="font-mono">{flow.walletAddress}</span>
+            <Wallet className="h-3 w-3 shrink-0" />
+            <WalletLink
+              label={flow.walletLabel}
+              address={flow.walletAddress}
+              showAddress
+              variant="muted"
+              className="truncate"
+            />
           </div>
         </div>
       </div>

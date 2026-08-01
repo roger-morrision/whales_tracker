@@ -5,6 +5,7 @@ import { X, Trophy, Crown, Medal, TrendingUp } from "lucide-react";
 import { PNL_DAILY, PNL_WEEKLY, PNL_ALLTIME, fmtUsd, fmtNum, type PnlEntry } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { Chip } from "./primitives";
+import { WalletLink } from "./wallet-link";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
