@@ -366,7 +366,11 @@ function StockHoldings() {
         const pnl = value - cost;
         const isBull = s.change24h >= 0;
         return (
-          <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-2 transition-colors">
+          <button
+            key={s.id}
+            onClick={() => useMoby.getState().setStocksOpen(true)}
+            className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-2 transition-colors text-left"
+          >
             <div className={cn("h-10 w-10 rounded-full bg-gradient-to-br grid place-items-center font-bold text-white text-xs", s.color)}>
               {s.ticker.slice(0, 2)}
             </div>
@@ -386,7 +390,7 @@ function StockHoldings() {
                 {fmtPct(s.change24h)}
               </div>
             </div>
-          </div>
+          </button>
         );
       })}
     </div>

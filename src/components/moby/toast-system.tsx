@@ -25,7 +25,7 @@ export function ToastContainer() {
   const dismiss = useMoby((s) => s.dismissToast);
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[70] flex flex-col items-center gap-2 pt-2 px-4 pointer-events-none">
+    <div className="fixed top-0 left-0 right-0 z-[70] flex flex-col items-center gap-2 pt-2 px-4 pointer-events-none" role="status" aria-live="polite" aria-atomic="true">
       <AnimatePresence>
         {toasts.map((toast) => (
           <ToastView key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />

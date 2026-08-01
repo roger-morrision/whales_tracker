@@ -46,6 +46,7 @@ import { PushNotificationManager } from "@/components/moby/push-notifications";
 import { PortfolioAnalyticsModal, YieldFarmingModal, UnlocksModal, GovernanceModal, DeFiPositionsModal, CalendarModal, MultiWalletModal, WatchlistPerfModal } from "@/components/moby/batch6-modals";
 import { SecurityAuditModal, TokenizedStocksModal, WalletPnlModal, SnipeBotModal, PricePredictionModal, LiquidityDepthModal, TradingJournalModal, DefiHealthModal, HarvestModal } from "@/components/moby/batch7-modals";
 import { TrailingStopsModal, HotWalletsModal, MigrationsModal, MevProtectionModal, WalletImportModal, WatchlistAlertsModal } from "@/components/moby/batch8-modals";
+import { ErrorBoundary } from "@/components/moby/error-boundary";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -70,7 +71,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [refreshFeeds]);
 
-  // Keyboard shortcut for AI copilot: cmd/ctrl + k
+  // Keyboard shortcuts: cmd/ctrl+k (copilot), cmd/ctrl+/ (search), Escape (close top modal)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -81,12 +82,72 @@ export default function Home() {
         e.preventDefault();
         useMoby.getState().setSearchOpen(true);
       }
+      // Escape closes the topmost open modal/sheet
+      if (e.key === "Escape") {
+        const s = useMoby.getState();
+        if (s.selectedTraderId) { s.openTrader(null); return; }
+        if (s.selectedTokenId) { s.openToken(null); return; }
+        if (s.copilotOpen) { s.setCopilotOpen(false); return; }
+        if (s.searchOpen) { s.setSearchOpen(false); return; }
+        if (s.notifOpen) { s.setNotifOpen(false); return; }
+        if (s.walletOpen) { s.setWalletOpen(false); return; }
+        if (s.screenerOpen) { s.setScreenerOpen(false); return; }
+        if (s.tradeOpen) { s.closeTrade(); return; }
+        if (s.taxOpen) { s.setTaxOpen(false); return; }
+        if (s.alertCreatorOpen) { s.closeAlertCreator(); return; }
+        if (s.settingsOpen) { s.setSettingsOpen(false); return; }
+        if (s.compareOpen) { s.setCompareOpen(false); return; }
+        if (s.copyTradeOpen) { s.setCopyTradeOpen(false); return; }
+        if (s.limitOrdersOpen) { s.setLimitOrdersOpen(false); return; }
+        if (s.dcaOpen) { s.setDcaOpen(false); return; }
+        if (s.walletActivityOpen) { s.setWalletActivityOpen(false); return; }
+        if (s.solanaStatsOpen) { s.setSolanaStatsOpen(false); return; }
+        if (s.pnlLeaderboardOpen) { s.setPnlLeaderboardOpen(false); return; }
+        if (s.socialOpen) { s.setSocialOpen(false); return; }
+        if (s.rebalanceOpen) { s.setRebalanceOpen(false); return; }
+        if (s.referralOpen) { s.setReferralOpen(false); return; }
+        if (s.achievementsOpen) { s.setAchievementsOpen(false); return; }
+        if (s.perpsOpen) { s.setPerpsOpen(false); return; }
+        if (s.nftDetailOpen) { s.setNftDetailOpen(false); return; }
+        if (s.launchScannerOpen) { s.setLaunchScannerOpen(false); return; }
+        if (s.bridgeOpen) { s.setBridgeOpen(false); return; }
+        if (s.stakingOpen) { s.setStakingOpen(false); return; }
+        if (s.gasOptimizerOpen) { s.setGasOptimizerOpen(false); return; }
+        if (s.airdropOpen) { s.setAirdropOpen(false); return; }
+        if (s.chartOpen) { s.closeChart(); return; }
+        if (s.narrativeDetailOpen) { s.setNarrativeDetailOpen(false); return; }
+        if (s.smartMoneyMapOpen) { s.setSmartMoneyMapOpen(false); return; }
+        if (s.analyticsOpen) { s.setAnalyticsOpen(false); return; }
+        if (s.yieldOpen) { s.setYieldOpen(false); return; }
+        if (s.unlocksOpen) { s.setUnlocksOpen(false); return; }
+        if (s.governanceOpen) { s.setGovernanceOpen(false); return; }
+        if (s.defiOpen) { s.setDefiOpen(false); return; }
+        if (s.calendarOpen) { s.setCalendarOpen(false); return; }
+        if (s.multiWalletOpen) { s.setMultiWalletOpen(false); return; }
+        if (s.watchlistPerfOpen) { s.setWatchlistPerfOpen(false); return; }
+        if (s.securityAuditOpen) { s.setSecurityAuditOpen(false); return; }
+        if (s.stocksOpen) { s.setStocksOpen(false); return; }
+        if (s.walletPnlOpen) { s.setWalletPnlOpen(false); return; }
+        if (s.snipeBotOpen) { s.setSnipeBotOpen(false); return; }
+        if (s.predictionOpen) { s.setPredictionOpen(false); return; }
+        if (s.liquidityDepthOpen) { s.setLiquidityDepthOpen(false); return; }
+        if (s.journalOpen) { s.setJournalOpen(false); return; }
+        if (s.defiHealthOpen) { s.setDefiHealthOpen(false); return; }
+        if (s.harvestOpen) { s.setHarvestOpen(false); return; }
+        if (s.trailingStopsOpen) { s.setTrailingStopsOpen(false); return; }
+        if (s.hotWalletsOpen) { s.setHotWalletsOpen(false); return; }
+        if (s.migrationsOpen) { s.setMigrationsOpen(false); return; }
+        if (s.mevInfoOpen) { s.setMevInfoOpen(false); return; }
+        if (s.walletImportOpen) { s.setWalletImportOpen(false); return; }
+        if (s.watchlistAlertsOpen) { s.setWatchlistAlertsOpen(false); return; }
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [setCopilotOpen]);
 
   return (
+    <ErrorBoundary>
     <div className="phone-shell flex flex-col">
       <TopBar />
 
@@ -187,5 +248,6 @@ export default function Home() {
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />
     </div>
+    </ErrorBoundary>
   );
 }

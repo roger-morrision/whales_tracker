@@ -1,0 +1,17 @@
+{
+  "name": "Moby — Trade Smarter",
+  "short_name": "Moby",
+  "description": "Onchain intelligence for traders. Follow whales, KOLs, and top-performing traders in real time.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0d14",
+  "theme_color": "#0a0d14",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

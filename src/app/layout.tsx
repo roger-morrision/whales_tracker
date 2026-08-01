@@ -28,6 +28,7 @@ export const metadata: Metadata = {
     "trading",
   ],
   authors: [{ name: "AssetDash" }],
+  manifest: "/manifest.json",
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
