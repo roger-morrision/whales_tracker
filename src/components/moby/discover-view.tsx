@@ -336,12 +336,14 @@ export function TokenRow({ token, rank }: { token: Token; rank?: number }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-sm truncate">{token.symbol}</span>
+        </div>
+        <div className="flex items-center gap-1 flex-wrap mt-0.5">
           {!token.verified && <Chip variant="bear">New</Chip>}
           {token.smartMoneyInflow24h > 1_000_000 && <Chip variant="bull">Smart ↑</Chip>}
           <Chip variant="outline">{fmtAge(token.ageHours)}</Chip>
-        </div>
-        <div className="text-[11px] text-muted-foreground truncate">
-          {token.name} · {token.smartMoneyHolders} smart wallets
+          <span className="text-[10px] text-muted-foreground truncate ml-0.5">
+            {token.smartMoneyHolders} smart
+          </span>
         </div>
       </div>
       <Sparkline data={token.sparkline} width={56} height={24} bullish={isBull} />
