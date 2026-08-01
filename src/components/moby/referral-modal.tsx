@@ -13,7 +13,10 @@ export function ReferralModal() {
   const setOpen = useMoby((s) => s.setReferralOpen);
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = (text: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -71,7 +74,7 @@ export function ReferralModal() {
                   <div className="flex items-center gap-2">
                     <code className="flex-1 font-mono text-sm font-bold bg-surface-2 rounded-lg px-3 py-2">{REFERRAL_STATS.code}</code>
                     <button
-                      onClick={handleCopy}
+                      onClick={() => handleCopy(REFERRAL_STATS.code)}
                       className={cn(
                         "h-9 w-9 grid place-items-center rounded-lg",
                         copied ? "bg-bull/15 text-bull" : "bg-surface-2 text-muted-foreground hover:text-foreground"
@@ -86,7 +89,7 @@ export function ReferralModal() {
                   <div className="flex items-center gap-2">
                     <code className="flex-1 font-mono text-xs bg-surface-2 rounded-lg px-3 py-2 truncate">{REFERRAL_STATS.link}</code>
                     <button
-                      onClick={handleCopy}
+                      onClick={() => handleCopy(REFERRAL_STATS.code)}
                       className={cn(
                         "h-9 w-9 grid place-items-center rounded-lg",
                         copied ? "bg-bull/15 text-bull" : "bg-surface-2 text-muted-foreground hover:text-foreground"

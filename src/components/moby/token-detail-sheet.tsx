@@ -2,13 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetBody,
-} from "@/components/ui/sheet"; // not used directly — using custom sheet for richer layout
-import {
   X,
   Star,
   StarOff,

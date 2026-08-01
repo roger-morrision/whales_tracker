@@ -80,11 +80,11 @@ export function ProfileView() {
           <ToolButton emoji="📅" label="Calendar" onClick={() => useMoby.getState().setCalendarOpen(true)} />
           <ToolButton emoji="👛" label="Wallets" onClick={() => useMoby.getState().setMultiWalletOpen(true)} />
           <ToolButton emoji="⭐" label="Watchlist" onClick={() => useMoby.getState().setWatchlistPerfOpen(true)} />
-          <ToolButton emoji="🛡️" label="Security" onClick={() => useMoby.getState().setSecurityAuditOpen(true)} />
+          <ToolButton emoji="🛡️" label="Security" onClick={() => useMoby.getState().openSecurityAudit("sol")} />
           <ToolButton emoji="📈" label="Stocks" onClick={() => useMoby.getState().setStocksOpen(true)} />
           <ToolButton emoji="🔍" label="Wallet PnL" onClick={() => useMoby.getState().setWalletPnlOpen(true)} />
           <ToolButton emoji="🤖" label="Snipe bot" onClick={() => useMoby.getState().setSnipeBotOpen(true)} />
-          <ToolButton emoji="🔮" label="Predict" onClick={() => useMoby.getState().setPredictionOpen(true)} />
+          <ToolButton emoji="🔮" label="Predict" onClick={() => useMoby.getState().openPrediction("sol")} />
           <ToolButton emoji="📖" label="Journal" onClick={() => useMoby.getState().setJournalOpen(true)} />
           <ToolButton emoji="❤️" label="Health" onClick={() => useMoby.getState().setDefiHealthOpen(true)} />
           <ToolButton emoji="📉" label="Trail stops" onClick={() => useMoby.getState().setTrailingStopsOpen(true)} />

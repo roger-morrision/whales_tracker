@@ -423,7 +423,7 @@ export const TOKENS: Token[] = [
     logoColor: "from-[#FBBF24] to-[#F59E0B]",
     logoGlyph: "🥭",
     verified: false,
-    description: "Governance token for aSolana perps + lending protocol.",
+    description: "Governance token for a Solana perps + lending protocol.",
   },
   {
     id: "drift",
@@ -850,7 +850,7 @@ export const TRADERS: Trader[] = [
     chains: ["BASE", "ETH"],
     topHoldings: [
       { symbol: "ETH", pct: 38 },
-      { symbol: "BASD", pct: 12 },
+      { symbol: "BASED", pct: 12 },
     ],
     recentTrades: [],
     isLive: false,
@@ -992,7 +992,7 @@ export function getWalletProfile(label: string, address?: string): {
 
 // ---------- WHALE FLOWS ----------
 
-const flowTokens = ["SOL", "WIF", "JUP", "BONK", "POPCAT", "JTO", "DRIFT", "IO", "TNSR", "MNGO", "MOON", "BASD"];
+const flowTokens = ["SOL", "WIF", "JUP", "BONK", "POPCAT", "JTO", "DRIFT", "IO", "TNSR", "MNGO", "MOON", "BASED"];
 
 // Deterministic hex string generator — seeded by an index.
 function seededHex(key: string, len: number): string {
@@ -1150,7 +1150,7 @@ export const SIGNALS: SmartSignal[] = [
   {
     id: "s6",
     tokenId: "based",
-    tokenSymbol: "BASD",
+    tokenSymbol: "BASED",
     tokenName: "Based PEPE",
     type: "EARLY_ENTRY",
     title: "Early entry detected",
@@ -4160,7 +4160,7 @@ export function getWatchlistPerformance(watchlist: string[]): {
   }
   const totalValue = tokens.reduce((s, t) => s + t.marketCap, 0);
   const totalChange24h = tokens.reduce((s, t) => s + t.change24h, 0) / tokens.length;
-  const totalChange7d = tokens.reduce((s, t) => s + (t.change24h * 0.6), 0) / tokens.length;
+  const totalChange7d = tokens.reduce((s, t) => s + (t.change24h * (0.4 + seededRand(`7d-${t.id}`) * 0.6)), 0) / tokens.length;
   const sorted = [...tokens].sort((a, b) => b.change24h - a.change24h);
   return {
     totalValue,
@@ -4569,9 +4569,9 @@ export interface PricePrediction {
   aiSummary: string;
 }
 
-export function getPricePrediction(tokenId: string): PricePrediction {
+export function getPricePrediction(tokenId: string): PricePrediction | null {
   const token = TOKENS_BY_ID[tokenId];
-  if (!token) return null as any;
+  if (!token) return null;
   const price = token.price;
   const change = token.change24h;
   const bull = change >= 0;

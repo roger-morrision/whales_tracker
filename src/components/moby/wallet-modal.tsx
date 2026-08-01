@@ -45,7 +45,7 @@ export function WalletConnectModal() {
     try {
       if (typeof window !== "undefined") {
         const w = window as any;
-        let provider = null;
+        let provider: any = null;
 
         if (walletId === "phantom" && (w.solana?.isPhantom || w.phantom?.solana?.isPhantom)) {
           provider = w.solana || w.phantom?.solana;

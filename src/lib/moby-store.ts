@@ -1,5 +1,6 @@
 // Moby global client state — Zustand store
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import {
   TOKENS,
   TRADERS,
@@ -262,7 +263,7 @@ interface MobyState {
   dcaOpen: boolean;
   setDcaOpen: (open: boolean) => void;
   dcaStrategies: DcaStrategy[];
-  addDcaStrategy: (s: Omit<DcaStrategy, "id" | "createdAt" | "nextRun">) => void;
+  addDcaStrategy: (s: Omit<DcaStrategy, "id" | "createdAt" | "nextRun" | "totalInvested" | "runs">) => void;
   removeDcaStrategy: (id: string) => void;
   toggleDcaStrategy: (id: string) => void;
 
@@ -606,7 +607,9 @@ function generateAssistantReply(userText: string): { content: string; suggestedT
   };
 }
 
-export const useMoby = create<MobyState>((set, get) => ({
+export const useMoby = create<MobyState>()(
+  persist(
+    (set, get) => ({
   activeTab: "discover",
   setActiveTab: (t) => set({ activeTab: t }),
 
@@ -1279,7 +1282,29 @@ export const useMoby = create<MobyState>((set, get) => ({
   // ===== BATCH 8: Watchlist alerts =====
   watchlistAlertsOpen: false,
   setWatchlistAlertsOpen: (open) => set({ watchlistAlertsOpen: open }),
-}));
+  }),
+  {
+    name: "moby-storage",
+    storage: createJSONStorage(() => localStorage),
+    partialize: (s) => ({
+      watchlist: s.watchlist,
+      followedTraders: s.followedTraders,
+      savedSignals: s.savedSignals,
+      customAlerts: s.customAlerts,
+      copyTrades: s.copyTrades,
+      limitOrders: s.limitOrders,
+      dcaStrategies: s.dcaStrategies,
+      settings: s.settings,
+      onboarded: s.onboarded,
+      claimedAirdrops: s.claimedAirdrops,
+      votedProposals: s.votedProposals,
+      activeWalletId: s.activeWalletId,
+      theme: s.theme,
+      pushPermission: s.pushPermission,
+    }),
+  }
+  )
+);
 
 // Convenience hook selectors
 export function useToken(id: string | null): Token | null {

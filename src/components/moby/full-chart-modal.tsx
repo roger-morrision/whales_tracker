@@ -226,12 +226,6 @@ export function FullChartModal() {
                         {/* Candle bodies using open-close as bars */}
                         <Bar dataKey={(d) => d.c >= d.o ? d.c - d.o : 0} fill="var(--bull)" radius={[1, 1, 0, 0]} />
                         <Bar dataKey={(d) => d.c < d.o ? d.o - d.c : 0} fill="var(--bear)" radius={[1, 1, 0, 0]} />
-                        {indicator === "ema" && (
-                          <>
-                            <Line type="monotone" dataKey="ema12" stroke="var(--bull)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                            <Line type="monotone" dataKey="ema26" stroke="var(--bear)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                          </>
-                        )}
                       </ComposedChart>
                     ) : indicator === "line" ? (
                       <AreaChart data={chartData}>

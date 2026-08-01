@@ -159,7 +159,7 @@ export function SearchModal() {
                     <button
                       key={n.id}
                       onClick={() => {
-                        setActiveTab("discover");
+                        useMoby.getState().openNarrative(n.id);
                         setOpen(false);
                       }}
                       className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-surface-2 transition-colors text-left"

@@ -81,7 +81,10 @@ function TraderDetailContent({ traderId, onClose }: { traderId: string; onClose:
           )}
         </div>
         <h2 className="font-bold text-lg">{trader.displayName}</h2>
-        <button className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground">
+        <button
+          onClick={() => { if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(trader.handle); }}
+          className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground"
+        >
           @{trader.handle} <Copy className="h-3 w-3" />
         </button>
         <p className="text-xs text-muted-foreground mt-2 max-w-xs mx-auto">{trader.bio}</p>

@@ -113,7 +113,7 @@ export function LaunchScannerModal() {
                     onlySmartMoney ? "border-bull/30 bg-bull/10 text-bull" : "border-border text-muted-foreground"
                   )}
                 >
-                  🐌 Smart money only
+                  🐋 Smart money only
                 </button>
               </div>
 

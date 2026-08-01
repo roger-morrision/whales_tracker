@@ -118,7 +118,7 @@ export function OnboardingOverlay() {
                       i === step
                         ? "border-bull/30 bg-bull/5"
                         : i < step
-                        ? "border-bull/20 bg-bull/5/50 opacity-60"
+                        ? "border-bull/20 bg-bull/5 opacity-60"
                         : "border-border opacity-40"
                     )}
                   >

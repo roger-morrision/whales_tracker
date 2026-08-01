@@ -376,7 +376,7 @@ export function DeFiPositionsModal() {
   const positions: typeof DEFI_POSITIONS[number][] = DEFI_POSITIONS;
   const totalValue = positions.reduce((s: number, p: any) => s + p.amountUsd, 0);
   const totalCollateral = positions.filter((p: any) => p.type === "Lending").reduce((s: number, p: any) => s + p.amountUsd, 0);
-  const totalDebt = positions.filter((p: any) => p.type === "Borrowing").reduce((s: number, p: any) => s + p.debtUsd ?? 0, 0);
+  const totalDebt = positions.filter((p: any) => p.type === "Borrowing").reduce((s: number, p: any) => s + (p.debtUsd ?? 0), 0);
 
   return (
     <AnimatePresence>
