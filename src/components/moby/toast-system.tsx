@@ -1,0 +1,123 @@
+"use client";
+
+import { useEffect } from "react";
+import { X, CheckCircle2, AlertCircle, Info, AlertTriangle, Bell } from "lucide-react";
+import { useMoby, type ToastItem } from "@/lib/moby-store";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+
+const TYPE_CONFIG: Record<
+  ToastItem["type"],
+  { icon: typeof Info; color: string; bg: string }
+> = {
+  info: { icon: Info, color: "text-[#22D3EE]", bg: "bg-[#22D3EE]/10" },
+  success: { icon: CheckCircle2, color: "text-bull", bg: "bg-bull/10" },
+  warn: { icon: AlertTriangle, color: "text-gold", bg: "bg-gold/10" },
+  alert: { icon: AlertCircle, color: "text-bear", bg: "bg-bear/10" },
+};
+
+/**
+ * Toast notification system — renders transient popups at the top of the screen.
+ * Auto-dismisses after 4 seconds. Supports optional action button.
+ */
+export function ToastContainer() {
+  const toasts = useMoby((s) => s.toasts);
+  const dismiss = useMoby((s) => s.dismissToast);
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[70] flex flex-col items-center gap-2 pt-2 px-4 pointer-events-none">
+      <AnimatePresence>
+        {toasts.map((toast) => (
+          <ToastView key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
+  const config = TYPE_CONFIG[toast.type];
+  const Icon = config.icon;
+
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 4500);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+      transition={{ type: "spring", damping: 25, stiffness: 300 }}
+      className={cn(
+        "pointer-events-auto w-full max-w-sm rounded-xl border bg-surface border-border shadow-2xl p-3 flex items-start gap-2.5",
+        toast.type === "alert" && "border-bear/30"
+      )}
+    >
+      <div className={cn("h-8 w-8 rounded-lg grid place-items-center shrink-0", config.bg)}>
+        <Icon className={cn("h-4 w-4", config.color)} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold">{toast.title}</div>
+        {toast.description && (
+          <div className="text-[11px] text-muted-foreground mt-0.5">{toast.description}</div>
+        )}
+        {toast.actionLabel && (
+          <button
+            onClick={() => {
+              if (toast.actionId) {
+                useMoby.getState().openToken(toast.actionId);
+              }
+              onDismiss();
+            }}
+            className="mt-1.5 text-[11px] font-semibold text-bull hover:opacity-80"
+          >
+            {toast.actionLabel} →
+          </button>
+        )}
+      </div>
+      <button
+        onClick={onDismiss}
+        className="h-5 w-5 grid place-items-center rounded text-muted-foreground hover:text-foreground shrink-0"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </motion.div>
+  );
+}
+
+/**
+ * Simulated whale alert pusher — periodically pushes toast notifications
+ * for new smart money entries and whale flows.
+ */
+export function WhaleAlertPusher() {
+  const pushToast = useMoby((s) => s.pushToast);
+  const refreshFeeds = useMoby((s) => s.refreshFeeds);
+
+  useEffect(() => {
+    // Push a whale alert every ~45s
+    const alerts = [
+      { title: "🐋 Whale alert: WIF", description: "0xMoby bought 280K WIF ($795K)", actionId: "wif", actionLabel: "View WIF" },
+      { title: "⚡ Smart money entry: MNGO", description: "7 wallets accumulated $1.24M", actionId: "mngo", actionLabel: "View MNGO" },
+      { title: "🐋 Whale alert: SOL", description: "Scoop bought 24K SOL ($4.4M)", actionId: "sol", actionLabel: "View SOL" },
+      { title: "⚡ Cluster buy: BONK", description: "5 smart wallets bought within 30m", actionId: "bonk", actionLabel: "View BONK" },
+    ];
+    let idx = 0;
+    const interval = setInterval(() => {
+      const alert = alerts[idx % alerts.length];
+      pushToast({
+        title: alert.title,
+        description: alert.description,
+        type: "alert",
+        actionLabel: alert.actionLabel,
+        actionId: alert.actionId,
+      });
+      refreshFeeds();
+      idx++;
+    }, 45_000);
+    return () => clearInterval(interval);
+  }, [pushToast, refreshFeeds]);
+
+  return null;
+}

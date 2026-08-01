@@ -2320,3 +2320,884 @@ export const REFERRAL_TIERS = [
   { name: "Gold", min: 50, reward: 50, perk: "20% of referral fees + 3 mo Pro" },
   { name: "Platinum", min: 200, reward: 100, perk: "25% of referral fees + lifetime Pro" },
 ];
+
+// ---------- PERPETUALS TRADING ----------
+export interface PerpMarket {
+  id: string;
+  symbol: string;
+  name: string;
+  markPrice: number;
+  indexPrice: number;
+  fundingRate: number; // 8h rate, percent
+  nextFundingMs: number;
+  openInterestUsd: number;
+  openInterestLong: number; // percent
+  openInterestShort: number;
+  volume24h: number;
+  maxLeverage: number;
+  priceChange24h: number;
+  color: string;
+  glyph?: string;
+}
+
+export const PERP_MARKETS: PerpMarket[] = [
+  {
+    id: "perp-sol",
+    symbol: "SOL-PERP",
+    name: "Solana Perpetual",
+    markPrice: 184.32,
+    indexPrice: 184.28,
+    fundingRate: 0.0085,
+    nextFundingMs: 4 * 3600_000,
+    openInterestUsd: 84_200_000,
+    openInterestLong: 62,
+    openInterestShort: 38,
+    volume24h: 412_000_000,
+    maxLeverage: 20,
+    priceChange24h: 6.42,
+    color: "from-[#9945FF] to-[#14F195]",
+    glyph: "◎",
+  },
+  {
+    id: "perp-wif",
+    symbol: "WIF-PERP",
+    name: "dogwifhat Perpetual",
+    markPrice: 2.84,
+    indexPrice: 2.842,
+    fundingRate: 0.0241,
+    nextFundingMs: 2 * 3600_000,
+    openInterestUsd: 32_400_000,
+    openInterestLong: 71,
+    openInterestShort: 29,
+    volume24h: 184_000_000,
+    maxLeverage: 10,
+    priceChange24h: 14.27,
+    color: "from-[#F5B7B1] to-[#E8DAEF]",
+    glyph: "🐕",
+  },
+  {
+    id: "perp-btc",
+    symbol: "BTC-PERP",
+    name: "Bitcoin Perpetual",
+    markPrice: 64280.0,
+    indexPrice: 64260.0,
+    fundingRate: 0.0042,
+    nextFundingMs: 6 * 3600_000,
+    openInterestUsd: 412_000_000,
+    openInterestLong: 54,
+    openInterestShort: 46,
+    volume24h: 1_840_000_000,
+    maxLeverage: 25,
+    priceChange24h: 1.42,
+    color: "from-[#F7931A] to-[#C7701A]",
+    glyph: "₿",
+  },
+  {
+    id: "perp-eth",
+    symbol: "ETH-PERP",
+    name: "Ethereum Perpetual",
+    markPrice: 3420.4,
+    indexPrice: 3418.0,
+    fundingRate: 0.0061,
+    nextFundingMs: 5 * 3600_000,
+    openInterestUsd: 184_000_000,
+    openInterestLong: 58,
+    openInterestShort: 42,
+    volume24h: 642_000_000,
+    maxLeverage: 20,
+    priceChange24h: 2.18,
+    color: "from-[#627EEA] to-[#3B5BDB]",
+    glyph: "Ξ",
+  },
+  {
+    id: "perp-bonk",
+    symbol: "BONK-PERP",
+    name: "Bonk Perpetual",
+    markPrice: 0.0000284,
+    indexPrice: 0.0000285,
+    fundingRate: 0.0312,
+    nextFundingMs: 1 * 3600_000,
+    openInterestUsd: 12_400_000,
+    openInterestLong: 78,
+    openInterestShort: 22,
+    volume24h: 84_000_000,
+    maxLeverage: 5,
+    priceChange24h: 22.14,
+    color: "from-[#F97316] to-[#EF4444]",
+    glyph: "🔥",
+  },
+  {
+    id: "perp-jup",
+    symbol: "JUP-PERP",
+    name: "Jupiter Perpetual",
+    markPrice: 0.842,
+    indexPrice: 0.841,
+    fundingRate: 0.0098,
+    nextFundingMs: 3 * 3600_000,
+    openInterestUsd: 18_400_000,
+    openInterestLong: 65,
+    openInterestShort: 35,
+    volume24h: 92_000_000,
+    maxLeverage: 10,
+    priceChange24h: 3.18,
+    color: "from-[#C7A8FF] to-[#8B5CF6]",
+    glyph: "🪐",
+  },
+];
+
+export interface PerpPosition {
+  id: string;
+  marketSymbol: string;
+  side: "LONG" | "SHORT";
+  sizeUsd: number;
+  sizeToken: number;
+  entryPrice: number;
+  markPrice: number;
+  leverage: number;
+  marginUsd: number;
+  liquidationPrice: number;
+  unrealizedPnl: number;
+  unrealizedPnlPct: number;
+  fundingPaid: number;
+  openedAgoSec: number;
+}
+
+export const PERP_POSITIONS: PerpPosition[] = [
+  {
+    id: "pp1",
+    marketSymbol: "SOL-PERP",
+    side: "LONG",
+    sizeUsd: 18_400,
+    sizeToken: 100,
+    entryPrice: 172.4,
+    markPrice: 184.32,
+    leverage: 5,
+    marginUsd: 3_680,
+    liquidationPrice: 142.8,
+    unrealizedPnl: 1_192,
+    unrealizedPnlPct: 32.4,
+    fundingPaid: -42.8,
+    openedAgoSec: 86400,
+  },
+  {
+    id: "pp2",
+    marketSymbol: "WIF-PERP",
+    side: "LONG",
+    sizeUsd: 8_400,
+    sizeToken: 3200,
+    entryPrice: 2.42,
+    markPrice: 2.84,
+    leverage: 3,
+    marginUsd: 2_800,
+    liquidationPrice: 1.68,
+    unrealizedPnl: 1_344,
+    unrealizedPnlPct: 48.0,
+    fundingPaid: -18.4,
+    openedAgoSec: 43200,
+  },
+  {
+    id: "pp3",
+    marketSymbol: "BTC-PERP",
+    side: "SHORT",
+    sizeUsd: 12_000,
+    sizeToken: 0.18,
+    entryPrice: 65800,
+    markPrice: 64280,
+    leverage: 4,
+    marginUsd: 3_000,
+    liquidationPrice: 72400,
+    unrealizedPnl: 274,
+    unrealizedPnlPct: 9.1,
+    fundingPaid: 12.4,
+    openedAgoSec: 21600,
+  },
+];
+
+// ---------- NFT COLLECTIONS ----------
+export interface NftCollection {
+  id: string;
+  name: string;
+  symbol: string;
+  chain: Chain;
+  floorPrice: number;
+  floorChange24h: number;
+  volume24h: number;
+  items: number;
+  owners: number;
+  listedPct: number;
+  color: string;
+  glyph: string;
+  verified: boolean;
+  traits: { name: string; values: { label: string; pct: number; floorMod: number }[] }[];
+}
+
+export const NFT_COLLECTIONS: NftCollection[] = [
+  {
+    id: "nft-madlads",
+    name: "Mad Lads",
+    symbol: "LADS",
+    chain: "SOL",
+    floorPrice: 84.2,
+    floorChange24h: 6.4,
+    volume24h: 1_840_000,
+    items: 10_000,
+    owners: 5_412,
+    listedPct: 4.2,
+    color: "from-[#8B5CF6] to-[#6366F1]",
+    glyph: "🤖",
+    verified: true,
+    traits: [
+      {
+        name: "Background",
+        values: [
+          { label: "Solana", pct: 12.4, floorMod: 1.0 },
+          { label: "Purple", pct: 8.2, floorMod: 1.4 },
+          { label: "Galaxy", pct: 5.1, floorMod: 1.8 },
+        ],
+      },
+      {
+        name: "Type",
+        values: [
+          { label: "AI", pct: 18.4, floorMod: 1.2 },
+          { label: "Alien", pct: 6.2, floorMod: 2.1 },
+          { label: "Human", pct: 52.0, floorMod: 0.9 },
+        ],
+      },
+    ],
+  },
+  {
+    id: "nft-tensorians",
+    name: "Tensorians",
+    symbol: "TNSR",
+    chain: "SOL",
+    floorPrice: 42.0,
+    floorChange24h: -2.1,
+    volume24h: 642_000,
+    items: 10_000,
+    owners: 4_120,
+    listedPct: 6.8,
+    color: "from-[#22D3EE] to-[#0EA5E9]",
+    glyph: "📐",
+    verified: true,
+    traits: [
+      {
+        name: "Rarity",
+        values: [
+          { label: "Legendary", pct: 2.1, floorMod: 4.2 },
+          { label: "Epic", pct: 8.4, floorMod: 1.8 },
+          { label: "Rare", pct: 18.2, floorMod: 1.2 },
+        ],
+      },
+    ],
+  },
+  {
+    id: "nft-claynosaurz",
+    name: "Claynosaurz",
+    symbol: "CLAY",
+    chain: "SOL",
+    floorPrice: 18.4,
+    floorChange24h: 4.2,
+    volume24h: 284_000,
+    items: 10_000,
+    owners: 3_840,
+    listedPct: 8.4,
+    color: "from-[#F59E0B] to-[#EF4444]",
+    glyph: "🦖",
+    verified: true,
+    traits: [
+      {
+        name: "Species",
+        values: [
+          { label: "T-Rex", pct: 22.0, floorMod: 1.0 },
+          { label: "Stego", pct: 14.0, floorMod: 1.3 },
+          { label: "Raptor", pct: 8.0, floorMod: 1.6 },
+        ],
+      },
+    ],
+  },
+  {
+    id: "nft-y00ts",
+    name: "y00ts",
+    symbol: "Y00TS",
+    chain: "SOL",
+    floorPrice: 124.0,
+    floorChange24h: 12.4,
+    volume24h: 2_400_000,
+    items: 15_000,
+    owners: 7_240,
+    listedPct: 3.2,
+    color: "from-[#94A3B8] to-[#475569]",
+    glyph: "🎒",
+    verified: true,
+    traits: [
+      {
+        name: "Trait",
+        values: [
+          { label: "Rare", pct: 4.2, floorMod: 3.4 },
+          { label: "Common", pct: 42.0, floorMod: 0.8 },
+        ],
+      },
+    ],
+  },
+];
+
+// NFT floor price history (30d) — deterministic
+export function genNftFloorHistory(collectionId: string, startPrice: number): { t: number; v: number }[] {
+  const out: { t: number; v: number }[] = [];
+  let v = startPrice * 0.8;
+  for (let i = 0; i < 30; i++) {
+    const noise = (seededRand(`${collectionId}-floor-${i}`) - 0.45) * 0.06;
+    v = v * (1 + 0.008 + noise);
+    out.push({ t: NOW - (30 - i) * 86400_000, v: Math.round(v * 100) / 100 });
+  }
+  return out;
+}
+
+// ---------- TOKEN LAUNCH SCANNER ----------
+export interface TokenLaunch {
+  id: string;
+  symbol: string;
+  name: string;
+  chain: Chain;
+  ageMinutes: number;
+  marketCap: number;
+  liquidity: number;
+  volume24h: number;
+  holders: number;
+  smartMoneyEntries: number;
+  smartMoneyInflowUsd: number;
+  priceChange1h: number;
+  priceChange24h: number;
+  verified: boolean;
+  contractVerified: boolean;
+  liquidityLocked: boolean;
+  mintAuthorityRevoked: boolean;
+  color: string;
+  glyph: string;
+  sparkline: number[];
+}
+
+function genLaunchSparkline(id: string, start: number): number[] {
+  const rng = makeRng(hashSeed(id));
+  const out: number[] = [];
+  let v = start;
+  for (let i = 0; i < 24; i++) {
+    v = v * (1 + (rng() - 0.3) * 0.15);
+    out.push(Number(v.toFixed(6)));
+  }
+  return out;
+}
+
+export const TOKEN_LAUNCHES: TokenLaunch[] = [
+  {
+    id: "launch-1",
+    symbol: "MOON",
+    name: "MoonCat",
+    chain: "SOL",
+    ageMinutes: 18,
+    marketCap: 4_200_000,
+    liquidity: 220_000,
+    volume24h: 8_400_000,
+    holders: 1_240,
+    smartMoneyEntries: 3,
+    smartMoneyInflowUsd: 612_000,
+    priceChange1h: 38.2,
+    priceChange24h: 142.8,
+    verified: false,
+    contractVerified: true,
+    liquidityLocked: true,
+    mintAuthorityRevoked: true,
+    color: "from-[#C084FC] to-[#7E22CE]",
+    glyph: "🌙",
+    sparkline: genLaunchSparkline("launch-1", 0.00018),
+  },
+  {
+    id: "launch-2",
+    symbol: "NEURAL",
+    name: "NeuralAI",
+    chain: "SOL",
+    ageMinutes: 42,
+    marketCap: 8_400_000,
+    liquidity: 480_000,
+    volume24h: 12_400_000,
+    holders: 2_140,
+    smartMoneyEntries: 5,
+    smartMoneyInflowUsd: 1_240_000,
+    priceChange1h: 18.4,
+    priceChange24h: 84.2,
+    verified: false,
+    contractVerified: true,
+    liquidityLocked: true,
+    mintAuthorityRevoked: true,
+    color: "from-[#22D3EE] to-[#0EA5E9]",
+    glyph: "🧠",
+    sparkline: genLaunchSparkline("launch-2", 0.42),
+  },
+  {
+    id: "launch-3",
+    symbol: "WARP",
+    name: "WarpFi",
+    chain: "SOL",
+    ageMinutes: 95,
+    marketCap: 12_400_000,
+    liquidity: 840_000,
+    volume24h: 18_400_000,
+    holders: 3_240,
+    smartMoneyEntries: 7,
+    smartMoneyInflowUsd: 2_120_000,
+    priceChange1h: 8.2,
+    priceChange24h: 42.1,
+    verified: false,
+    contractVerified: true,
+    liquidityLocked: true,
+    mintAuthorityRevoked: true,
+    color: "from-[#9945FF] to-[#14F195]",
+    glyph: "🪐",
+    sparkline: genLaunchSparkline("launch-3", 0.84),
+  },
+  {
+    id: "launch-4",
+    symbol: "DOGEX",
+    name: "DogeX",
+    chain: "SOL",
+    ageMinutes: 12,
+    marketCap: 1_200_000,
+    liquidity: 84_000,
+    volume24h: 2_400_000,
+    holders: 420,
+    smartMoneyEntries: 1,
+    smartMoneyInflowUsd: 84_000,
+    priceChange1h: 84.2,
+    priceChange24h: 240.0,
+    verified: false,
+    contractVerified: false,
+    liquidityLocked: false,
+    mintAuthorityRevoked: false,
+    color: "from-[#F59E0B] to-[#EF4444]",
+    glyph: "🐕",
+    sparkline: genLaunchSparkline("launch-4", 0.000084),
+  },
+  {
+    id: "launch-5",
+    symbol: "GRID",
+    name: "GridNet",
+    chain: "SOL",
+    ageMinutes: 240,
+    marketCap: 6_200_000,
+    liquidity: 320_000,
+    volume24h: 4_200_000,
+    holders: 1_840,
+    smartMoneyEntries: 4,
+    smartMoneyInflowUsd: 840_000,
+    priceChange1h: 4.2,
+    priceChange24h: 18.4,
+    verified: false,
+    contractVerified: true,
+    liquidityLocked: true,
+    mintAuthorityRevoked: true,
+    color: "from-[#A855F7] to-[#7E22CE]",
+    glyph: "📡",
+    sparkline: genLaunchSparkline("launch-5", 0.124),
+  },
+  {
+    id: "launch-6",
+    symbol: "CYBER",
+    name: "CyberPunk",
+    chain: "SOL",
+    ageMinutes: 65,
+    marketCap: 3_400_000,
+    liquidity: 180_000,
+    volume24h: 6_200_000,
+    holders: 940,
+    smartMoneyEntries: 2,
+    smartMoneyInflowUsd: 412_000,
+    priceChange1h: 22.4,
+    priceChange24h: 64.2,
+    verified: false,
+    contractVerified: true,
+    liquidityLocked: true,
+    mintAuthorityRevoked: false,
+    color: "from-[#EC4899] to-[#BE185D]",
+    glyph: "🦾",
+    sparkline: genLaunchSparkline("launch-6", 0.00042),
+  },
+];
+
+// ---------- CROSS-CHAIN BRIDGE ----------
+export interface BridgeRoute {
+  id: string;
+  fromChain: string;
+  toChain: string;
+  fromToken: string;
+  toToken: string;
+  bridge: "Wormhole" | "deBridge" | "Mayan" | "Hop" | "Across";
+  estimatedTime: string;
+  feeUsd: number;
+  feePct: number;
+  gasUsd: number;
+  minAmount: number;
+  maxAmount: number;
+  reliability: number; // 0-100
+  color: string;
+}
+
+export const BRIDGE_ROUTES: BridgeRoute[] = [
+  {
+    id: "br1",
+    fromChain: "SOL",
+    toChain: "ETH",
+    fromToken: "SOL",
+    toToken: "SOL",
+    bridge: "Wormhole",
+    estimatedTime: "5-10 min",
+    feeUsd: 12.4,
+    feePct: 0.06,
+    gasUsd: 0.0008,
+    minAmount: 0.1,
+    maxAmount: 100_000,
+    reliability: 98,
+    color: "from-[#9945FF] to-[#627EEA]",
+  },
+  {
+    id: "br2",
+    fromChain: "SOL",
+    toChain: "ETH",
+    fromToken: "SOL",
+    toToken: "SOL",
+    bridge: "deBridge",
+    estimatedTime: "2-5 min",
+    feeUsd: 8.2,
+    feePct: 0.04,
+    gasUsd: 0.0008,
+    minAmount: 0.1,
+    maxAmount: 500_000,
+    reliability: 96,
+    color: "from-[#14F195] to-[#627EEA]",
+  },
+  {
+    id: "br3",
+    fromChain: "SOL",
+    toChain: "ETH",
+    fromToken: "USDC",
+    toToken: "USDC",
+    bridge: "Mayan",
+    estimatedTime: "1-3 min",
+    feeUsd: 4.1,
+    feePct: 0.02,
+    gasUsd: 0.0008,
+    minAmount: 10,
+    maxAmount: 1_000_000,
+    reliability: 94,
+    color: "from-[#22D3EE] to-[#627EEA]",
+  },
+  {
+    id: "br4",
+    fromChain: "ETH",
+    toChain: "BASE",
+    fromToken: "ETH",
+    toToken: "ETH",
+    bridge: "Hop",
+    estimatedTime: "10-20 min",
+    feeUsd: 2.4,
+    feePct: 0.12,
+    gasUsd: 4.2,
+    minAmount: 0.01,
+    maxAmount: 50_000,
+    reliability: 92,
+    color: "from-[#627EEA] to-[#22C55E]",
+  },
+];
+
+// ---------- STAKING DASHBOARD ----------
+export interface Validator {
+  id: string;
+  name: string;
+  avatarColor: string;
+  avatarGlyph: string;
+  apy: number;
+  commission: number;
+  uptime: number;
+  totalStaked: number;
+  activeStakers: number;
+  rank: number;
+  slashed: boolean;
+  verified: boolean;
+}
+
+export const VALIDATORS: Validator[] = [
+  {
+    id: "v1",
+    name: "Marinade Finance",
+    avatarColor: "from-[#14F195] to-[#22D3EE]",
+    avatarGlyph: "M",
+    apy: 7.24,
+    commission: 1.5,
+    uptime: 99.98,
+    totalStaked: 4_200_000,
+    activeStakers: 84_200,
+    rank: 1,
+    slashed: false,
+    verified: true,
+  },
+  {
+    id: "v2",
+    name: "Jito",
+    avatarColor: "from-[#22D3EE] to-[#0EA5E9]",
+    avatarGlyph: "J",
+    apy: 7.18,
+    commission: 2.0,
+    uptime: 99.95,
+    totalStaked: 3_800_000,
+    activeStakers: 62_400,
+    rank: 2,
+    slashed: false,
+    verified: true,
+  },
+  {
+    id: "v3",
+    name: "Sanctum",
+    avatarColor: "from-[#9945FF] to-[#7E22CE]",
+    avatarGlyph: "S",
+    apy: 7.42,
+    commission: 1.0,
+    uptime: 99.92,
+    totalStaked: 2_400_000,
+    activeStakers: 38_200,
+    rank: 3,
+    slashed: false,
+    verified: true,
+  },
+  {
+    id: "v4",
+    name: "BlazeStake",
+    avatarColor: "from-[#F59E0B] to-[#EF4444]",
+    avatarGlyph: "B",
+    apy: 7.32,
+    commission: 2.5,
+    uptime: 99.88,
+    totalStaked: 1_200_000,
+    activeStakers: 18_400,
+    rank: 4,
+    slashed: false,
+    verified: true,
+  },
+  {
+    id: "v5",
+    name: "Cogent Crypto",
+    avatarColor: "from-[#8B5CF6] to-[#6366F1]",
+    avatarGlyph: "C",
+    apy: 7.55,
+    commission: 3.0,
+    uptime: 99.84,
+    totalStaked: 840_000,
+    activeStakers: 8_200,
+    rank: 5,
+    slashed: false,
+    verified: false,
+  },
+];
+
+export interface StakePosition {
+  id: string;
+  validatorId: string;
+  validatorName: string;
+  amount: number;
+  amountUsd: number;
+  apy: number;
+  rewardsEarned: number;
+  rewardsUsd: number;
+  stakedAgoDays: number;
+  unbondingPeriodDays: number;
+}
+
+export const STAKE_POSITIONS: StakePosition[] = [
+  {
+    id: "sp1",
+    validatorId: "v1",
+    validatorName: "Marinade Finance",
+    amount: 42.4,
+    amountUsd: 7_820,
+    apy: 7.24,
+    rewardsEarned: 1.84,
+    rewardsUsd: 340,
+    stakedAgoDays: 124,
+    unbondingPeriodDays: 2,
+  },
+  {
+    id: "sp2",
+    validatorId: "v2",
+    validatorName: "Jito",
+    amount: 18.2,
+    amountUsd: 3_355,
+    apy: 7.18,
+    rewardsEarned: 0.42,
+    rewardsUsd: 78,
+    stakedAgoDays: 42,
+    unbondingPeriodDays: 2,
+  },
+];
+
+// ---------- AIRDROP CENTER ----------
+export interface AirdropClaim {
+  id: string;
+  project: string;
+  token: string;
+  glyph: string;
+  color: string;
+  eligibleAmount: number;
+  claimedAmount: number;
+  status: "eligible" | "claimed" | "not_eligible" | "snapshot_pending";
+  snapshotDate: string;
+  claimDeadline: string;
+  estimatedValue: number;
+  requirements: string[];
+  description: string;
+}
+
+export const AIRDROPS: AirdropClaim[] = [
+  {
+    id: "ad1",
+    project: "Jupiter",
+    token: "JUP",
+    glyph: "🪐",
+    color: "from-[#C7A8FF] to-[#8B5CF6]",
+    eligibleAmount: 4_200,
+    claimedAmount: 0,
+    status: "eligible",
+    snapshotDate: "2026-07-15",
+    claimDeadline: "2026-09-30",
+    estimatedValue: 3_540,
+    requirements: ["1,000+ JUP-SOL LP", "5+ swaps on Jupiter"],
+    description: "Active liquidity providers and frequent traders earn JUP tokens.",
+  },
+  {
+    id: "ad2",
+    project: "Drift Protocol",
+    token: "DRIFT",
+    glyph: "📉",
+    color: "from-[#2DD4BF] to-[#0D9488]",
+    eligibleAmount: 1_240,
+    claimedAmount: 1_240,
+    status: "claimed",
+    snapshotDate: "2026-06-01",
+    claimDeadline: "2026-08-31",
+    estimatedValue: 2_280,
+    requirements: ["$10K+ open interest", "30+ days active"],
+    description: "Perps traders with sustained open interest.",
+  },
+  {
+    id: "ad3",
+    project: "Tensor",
+    token: "TNSR",
+    glyph: "📐",
+    color: "from-[#22D3EE] to-[#0EA5E9]",
+    eligibleAmount: 0,
+    claimedAmount: 0,
+    status: "snapshot_pending",
+    snapshotDate: "2026-08-15",
+    claimDeadline: "2026-10-31",
+    estimatedValue: 0,
+    requirements: ["Pending snapshot", "NFT traders auto-eligible"],
+    description: "NFT marketplace users. Snapshot on Aug 15.",
+  },
+  {
+    id: "ad4",
+    project: "Kamino Finance",
+    token: "KMNO",
+    glyph: "🦊",
+    color: "from-[#F97316] to-[#EF4444]",
+    eligibleAmount: 820,
+    claimedAmount: 0,
+    status: "eligible",
+    snapshotDate: "2026-07-01",
+    claimDeadline: "2026-09-15",
+    estimatedValue: 412,
+    requirements: ["$5K+ deposited", "10+ borrow events"],
+    description: "Lending protocol users.",
+  },
+  {
+    id: "ad5",
+    project: "Marginfi",
+    token: "MRGN",
+    glyph: "🌊",
+    color: "from-[#3B82F6] to-[#1D4ED8]",
+    eligibleAmount: 0,
+    claimedAmount: 0,
+    status: "not_eligible",
+    snapshotDate: "2026-06-15",
+    claimDeadline: "2026-08-31",
+    estimatedValue: 0,
+    requirements: ["Did not meet activity threshold"],
+    description: "Lending users with $50K+ TVL activity.",
+  },
+];
+
+// ---------- GAS FEE OPTIMIZER ----------
+export interface GasEstimate {
+  priority: "slow" | "standard" | "fast" | "turbo";
+  label: string;
+  feeUsd: number;
+  feeLamports: number;
+  estimatedTime: string;
+  confidence: number;
+  recommended: boolean;
+}
+
+export function getGasEstimates(): GasEstimate[] {
+  return [
+    {
+      priority: "slow",
+      label: "Slow",
+      feeUsd: 0.0004,
+      feeLamports: 2_500,
+      estimatedTime: "30-60s",
+      confidence: 85,
+      recommended: false,
+    },
+    {
+      priority: "standard",
+      label: "Standard",
+      feeUsd: 0.0008,
+      feeLamports: 5_000,
+      estimatedTime: "5-15s",
+      confidence: 92,
+      recommended: false,
+    },
+    {
+      priority: "fast",
+      label: "Fast",
+      feeUsd: 0.0014,
+      feeLamports: 8_500,
+      estimatedTime: "1-3s",
+      confidence: 98,
+      recommended: true,
+    },
+    {
+      priority: "turbo",
+      label: "Turbo",
+      feeUsd: 0.0028,
+      feeLamports: 17_000,
+      estimatedTime: "<1s",
+      confidence: 99,
+      recommended: false,
+    },
+  ];
+}
+
+// Network congestion data (24h) — deterministic
+export function genCongestionHistory(): { t: number; v: number }[] {
+  const out: { t: number; v: number }[] = [];
+  for (let i = 0; i < 24; i++) {
+    // Simulate peak congestion during US/EU hours
+    const hour = (i + 12) % 24;
+    const peakFactor = hour > 14 && hour < 22 ? 1.5 : 0.7;
+    const noise = seededRand(`congestion-${i}`);
+    out.push({
+      t: NOW - (24 - i) * 3600_000,
+      v: Math.round(40 + noise * 60 * peakFactor),
+    });
+  }
+  return out;
+}
+
+export const CONGESTION_HISTORY: { t: number; v: number }[] = genCongestionHistory();

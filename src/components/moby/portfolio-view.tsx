@@ -32,6 +32,7 @@ import {
 } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Chip, SectionHeader, AnimatedNumber } from "./primitives";
+import { NftCollectionsList } from "./nft-detail-modal";
 import { cn } from "@/lib/utils";
 
 type Range = "1D" | "1W" | "1M" | "ALL";
@@ -220,7 +221,7 @@ export function PortfolioView() {
           ))}
         </div>
         {assetTab === "crypto" && <CryptoHoldings />}
-        {assetTab === "nft" && <NftHoldings />}
+        {assetTab === "nft" && <NftCollectionsList />}
         {assetTab === "stocks" && <StockHoldings />}
       </section>
 

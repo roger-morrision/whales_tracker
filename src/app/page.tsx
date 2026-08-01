@@ -31,6 +31,14 @@ import { SocialSentimentModal } from "@/components/moby/social-sentiment-modal";
 import { RebalanceModal } from "@/components/moby/rebalance-modal";
 import { ReferralModal } from "@/components/moby/referral-modal";
 import { AchievementsModal } from "@/components/moby/achievements-modal";
+import { PerpsModal } from "@/components/moby/perps-modal";
+import { NftDetailModal } from "@/components/moby/nft-detail-modal";
+import { LaunchScannerModal } from "@/components/moby/launch-scanner-modal";
+import { BridgeModal } from "@/components/moby/bridge-modal";
+import { StakingModal } from "@/components/moby/staking-modal";
+import { GasOptimizerModal } from "@/components/moby/gas-optimizer-modal";
+import { AirdropModal } from "@/components/moby/airdrop-modal";
+import { ToastContainer, WhaleAlertPusher } from "@/components/moby/toast-system";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -109,7 +117,7 @@ export default function Home() {
       <SettingsModal />
       <CompareModal />
 
-      {/* Batch 3 new modals */}
+      {/* Batch 3 modals */}
       <CopyTradeModal />
       <LimitOrdersModal />
       <DcaModal />
@@ -120,6 +128,19 @@ export default function Home() {
       <RebalanceModal />
       <ReferralModal />
       <AchievementsModal />
+
+      {/* Batch 4 modals */}
+      <PerpsModal />
+      <NftDetailModal />
+      <LaunchScannerModal />
+      <BridgeModal />
+      <StakingModal />
+      <GasOptimizerModal />
+      <AirdropModal />
+
+      {/* Toast notifications + whale alert pusher */}
+      <ToastContainer />
+      <WhaleAlertPusher />
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />

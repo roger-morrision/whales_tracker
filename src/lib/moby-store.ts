@@ -30,6 +30,17 @@ export interface ToastLike {
   type: "info" | "success" | "warn" | "alert";
 }
 
+// Toast notifications (transient popups)
+export interface ToastItem {
+  id: string;
+  ts: number;
+  title: string;
+  description?: string;
+  type: "info" | "success" | "warn" | "alert";
+  actionLabel?: string;
+  actionId?: string; // token id or trader id for action
+}
+
 // ===== NEW types =====
 export type Chain = "SOL" | "ETH" | "BASE" | "BTC";
 export type Category = "DeFi" | "Meme" | "AI" | "L1" | "L2" | "Gaming" | "DePIN" | "RWA" | "NFT" | "Stablecoin";
@@ -282,6 +293,45 @@ interface MobyState {
   // ===== BATCH 3: Achievements detail =====
   achievementsOpen: boolean;
   setAchievementsOpen: (open: boolean) => void;
+
+  // ===== BATCH 4: Perpetuals =====
+  perpsOpen: boolean;
+  setPerpsOpen: (open: boolean) => void;
+  selectedPerpId: string | null;
+  openPerp: (id: string | null) => void;
+
+  // ===== BATCH 4: NFT detail =====
+  nftDetailOpen: boolean;
+  setNftDetailOpen: (open: boolean) => void;
+  selectedNftId: string | null;
+  openNft: (id: string | null) => void;
+
+  // ===== BATCH 4: Launch scanner =====
+  launchScannerOpen: boolean;
+  setLaunchScannerOpen: (open: boolean) => void;
+
+  // ===== BATCH 4: Bridge =====
+  bridgeOpen: boolean;
+  setBridgeOpen: (open: boolean) => void;
+
+  // ===== BATCH 4: Staking =====
+  stakingOpen: boolean;
+  setStakingOpen: (open: boolean) => void;
+
+  // ===== BATCH 4: Gas optimizer =====
+  gasOptimizerOpen: boolean;
+  setGasOptimizerOpen: (open: boolean) => void;
+
+  // ===== BATCH 4: Airdrop center =====
+  airdropOpen: boolean;
+  setAirdropOpen: (open: boolean) => void;
+  claimedAirdrops: string[];
+  claimAirdrop: (id: string) => void;
+
+  // ===== BATCH 4: Toast notifications =====
+  toasts: ToastItem[];
+  pushToast: (t: Omit<ToastItem, "id" | "ts">) => void;
+  dismissToast: (id: string) => void;
 }
 
 // ===== BATCH 3 types =====
@@ -876,6 +926,65 @@ export const useMoby = create<MobyState>((set, get) => ({
   // ===== BATCH 3: Achievements detail =====
   achievementsOpen: false,
   setAchievementsOpen: (open) => set({ achievementsOpen: open }),
+
+  // ===== BATCH 4: Perpetuals =====
+  perpsOpen: false,
+  setPerpsOpen: (open) => set({ perpsOpen: open }),
+  selectedPerpId: null,
+  openPerp: (id) => set({ selectedPerpId: id }),
+
+  // ===== BATCH 4: NFT detail =====
+  nftDetailOpen: false,
+  setNftDetailOpen: (open) => set({ nftDetailOpen: open }),
+  selectedNftId: null,
+  openNft: (id) => set({ selectedNftId: id }),
+
+  // ===== BATCH 4: Launch scanner =====
+  launchScannerOpen: false,
+  setLaunchScannerOpen: (open) => set({ launchScannerOpen: open }),
+
+  // ===== BATCH 4: Bridge =====
+  bridgeOpen: false,
+  setBridgeOpen: (open) => set({ bridgeOpen: open }),
+
+  // ===== BATCH 4: Staking =====
+  stakingOpen: false,
+  setStakingOpen: (open) => set({ stakingOpen: open }),
+
+  // ===== BATCH 4: Gas optimizer =====
+  gasOptimizerOpen: false,
+  setGasOptimizerOpen: (open) => set({ gasOptimizerOpen: open }),
+
+  // ===== BATCH 4: Airdrop center =====
+  airdropOpen: false,
+  setAirdropOpen: (open) => set({ airdropOpen: open }),
+  claimedAirdrops: ["ad2"], // Drift already claimed
+  claimAirdrop: (id) =>
+    set((s) => ({
+      claimedAirdrops: [...s.claimedAirdrops, id],
+      toasts: [
+        {
+          id: `toast-${Date.now()}`,
+          ts: Date.now(),
+          title: "Airdrop claimed!",
+          description: "Tokens will arrive in your wallet shortly.",
+          type: "success",
+        },
+        ...s.toasts,
+      ],
+    })),
+
+  // ===== BATCH 4: Toast notifications =====
+  toasts: [],
+  pushToast: (t) =>
+    set((s) => ({
+      toasts: [
+        { ...t, id: `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, ts: Date.now() },
+        ...s.toasts,
+      ].slice(0, 5), // Keep only 5 most recent
+    })),
+  dismissToast: (id) =>
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }));
 
 // Convenience hook selectors

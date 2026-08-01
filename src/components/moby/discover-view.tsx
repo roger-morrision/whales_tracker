@@ -111,6 +111,27 @@ function InsightsGrid() {
           accent="from-[#A855F7]/15"
           onClick={() => useMoby.getState().setDcaOpen(true)}
         />
+        <InsightCard
+          emoji="⚡"
+          title="Perpetuals"
+          sub="Leverage · Funding"
+          accent="from-[#F59E0B]/15"
+          onClick={() => useMoby.getState().setPerpsOpen(true)}
+        />
+        <InsightCard
+          emoji="🚀"
+          title="Launch scanner"
+          sub="New tokens w/ smart money"
+          accent="from-[#14F195]/15"
+          onClick={() => useMoby.getState().setLaunchScannerOpen(true)}
+        />
+        <InsightCard
+          emoji="🎁"
+          title="Airdrops"
+          sub="Claim eligible tokens"
+          accent="from-[#F59E0B]/15"
+          onClick={() => useMoby.getState().setAirdropOpen(true)}
+        />
       </div>
     </section>
   );
