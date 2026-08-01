@@ -70,6 +70,7 @@ export function ProfileView() {
           <ToolButton emoji="🔥" label="Staking" onClick={() => useMoby.getState().setStakingOpen(true)} />
           <ToolButton emoji="⛽" label="Gas" onClick={() => useMoby.getState().setGasOptimizerOpen(true)} />
           <ToolButton emoji="🎁" label="Airdrops" onClick={() => useMoby.getState().setAirdropOpen(true)} />
+          <ToolButton emoji="🕸️" label="Map" onClick={() => useMoby.getState().setSmartMoneyMapOpen(true)} />
           <ToolButton emoji="🐋" label="Whales" onClick={() => useMoby.getState().setActiveTab("whales")} />
         </div>
       </section>
@@ -155,6 +156,18 @@ export function ProfileView() {
             label="Create custom alert"
             sub={`${customAlerts.length} active`}
             onClick={() => openAlertCreator(null)}
+          />
+          <MenuItem
+            icon={<Bell className="h-4 w-4" />}
+            label="Push notifications"
+            sub={
+              useMoby.getState().pushPermission === "granted"
+                ? "✓ Enabled"
+                : useMoby.getState().pushPermission === "denied"
+                ? "Denied"
+                : "Tap to enable"
+            }
+            onClick={() => useMoby.getState().requestPushPermission()}
           />
           <MenuItem
             icon={<Gift className="h-4 w-4" />}

@@ -332,6 +332,27 @@ interface MobyState {
   toasts: ToastItem[];
   pushToast: (t: Omit<ToastItem, "id" | "ts">) => void;
   dismissToast: (id: string) => void;
+
+  // ===== BATCH 5: Full-screen chart =====
+  chartOpen: boolean;
+  chartTokenId: string | null;
+  openChart: (tokenId: string) => void;
+  closeChart: () => void;
+
+  // ===== BATCH 5: Narrative detail =====
+  narrativeDetailOpen: boolean;
+  selectedNarrativeId: string | null;
+  openNarrative: (id: string | null) => void;
+  setNarrativeDetailOpen: (open: boolean) => void;
+
+  // ===== BATCH 5: Smart money map =====
+  smartMoneyMapOpen: boolean;
+  setSmartMoneyMapOpen: (open: boolean) => void;
+
+  // ===== BATCH 5: Push notifications =====
+  pushPermission: "default" | "granted" | "denied";
+  requestPushPermission: () => void;
+  setPushPermission: (p: "default" | "granted" | "denied") => void;
 }
 
 // ===== BATCH 3 types =====
@@ -985,6 +1006,42 @@ export const useMoby = create<MobyState>((set, get) => ({
     })),
   dismissToast: (id) =>
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
+  // ===== BATCH 5: Full-screen chart =====
+  chartOpen: false,
+  chartTokenId: null,
+  openChart: (tokenId) => set({ chartOpen: true, chartTokenId: tokenId }),
+  closeChart: () => set({ chartOpen: false }),
+
+  // ===== BATCH 5: Narrative detail =====
+  narrativeDetailOpen: false,
+  selectedNarrativeId: null,
+  openNarrative: (id) => set({ selectedNarrativeId: id, narrativeDetailOpen: true }),
+  setNarrativeDetailOpen: (open) => set({ narrativeDetailOpen: open }),
+
+  // ===== BATCH 5: Smart money map =====
+  smartMoneyMapOpen: false,
+  setSmartMoneyMapOpen: (open) => set({ smartMoneyMapOpen: open }),
+
+  // ===== BATCH 5: Push notifications =====
+  pushPermission: typeof window !== "undefined" && "Notification" in window
+    ? Notification.permission
+    : "default",
+  requestPushPermission: () => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      Notification.requestPermission().then((p) => {
+        useMoby.getState().setPushPermission(p as "default" | "granted" | "denied");
+        if (p === "granted") {
+          useMoby.getState().pushToast({
+            title: "Push notifications enabled",
+            description: "You'll get alerts for whale moves and smart money entries.",
+            type: "success",
+          });
+        }
+      });
+    }
+  },
+  setPushPermission: (p) => set({ pushPermission: p }),
 }));
 
 // Convenience hook selectors

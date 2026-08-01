@@ -132,6 +132,13 @@ function InsightsGrid() {
           accent="from-[#F59E0B]/15"
           onClick={() => useMoby.getState().setAirdropOpen(true)}
         />
+        <InsightCard
+          emoji="🕸️"
+          title="Smart money map"
+          sub="Wallet-to-wallet flows"
+          accent="from-[#9945FF]/15"
+          onClick={() => useMoby.getState().setSmartMoneyMapOpen(true)}
+        />
       </div>
     </section>
   );
@@ -255,7 +262,7 @@ function HeroBanner() {
 }
 
 function NarrativesRow() {
-  const openToken = useMoby((s) => s.openToken);
+  const openNarrative = useMoby((s) => s.openNarrative);
   return (
     <section>
       <SectionHeader title="Hot narratives" emoji="📊" action="All" onAction={() => {}} />
@@ -263,7 +270,7 @@ function NarrativesRow() {
         {NARRATIVES.map((n) => (
           <button
             key={n.id}
-            onClick={() => openToken(n.topTokens[0])}
+            onClick={() => openNarrative(n.id)}
             className={cn(
               "relative shrink-0 w-40 p-3 rounded-xl bg-gradient-to-br border border-border text-left overflow-hidden card-hover",
               n.color

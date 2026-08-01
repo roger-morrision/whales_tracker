@@ -3201,3 +3201,290 @@ export function genCongestionHistory(): { t: number; v: number }[] {
 }
 
 export const CONGESTION_HISTORY: { t: number; v: number }[] = genCongestionHistory();
+
+// ---------- TECHNICAL INDICATORS ----------
+// RSI, MACD, Bollinger Bands, EMA, volume profile
+
+export interface Candle {
+  t: number;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+}
+
+/** Generate deterministic OHLCV candles from a base price. */
+export function genCandles(seedKey: string, basePrice: number, count = 120): Candle[] {
+  const rng = makeRng(hashSeed(seedKey));
+  const out: Candle[] = [];
+  let prevClose = basePrice;
+  for (let i = 0; i < count; i++) {
+    const vol = 0.02 + rng() * 0.03;
+    const open = prevClose;
+    const change = (rng() - 0.48) * vol;
+    const close = Math.max(0.0001, open * (1 + change));
+    const high = Math.max(open, close) * (1 + rng() * vol * 0.5);
+    const low = Math.min(open, close) * (1 - rng() * vol * 0.5);
+    const volume = (1_000_000 + rng() * 4_000_000) * (1 + Math.abs(change) * 10);
+    out.push({
+      t: NOW - (count - i) * 3600_000, // hourly candles
+      o: Number(open.toFixed(6)),
+      h: Number(high.toFixed(6)),
+      l: Number(low.toFixed(6)),
+      c: Number(close.toFixed(6)),
+      v: Math.round(volume),
+    });
+    prevClose = close;
+  }
+  return out;
+}
+
+/** Simple Moving Average */
+export function sma(values: number[], period: number): (number | null)[] {
+  const out: (number | null)[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (i < period - 1) {
+      out.push(null);
+    } else {
+      const slice = values.slice(i - period + 1, i + 1);
+      out.push(slice.reduce((s, v) => s + v, 0) / period);
+    }
+  }
+  return out;
+}
+
+/** Exponential Moving Average */
+export function ema(values: number[], period: number): (number | null)[] {
+  const out: (number | null)[] = [];
+  const k = 2 / (period + 1);
+  let prev: number | null = null;
+  for (let i = 0; i < values.length; i++) {
+    if (i < period - 1) {
+      out.push(null);
+    } else if (prev === null) {
+      const slice = values.slice(0, period);
+      prev = slice.reduce((s, v) => s + v, 0) / period;
+      out.push(prev);
+    } else {
+      prev = values[i] * k + prev * (1 - k);
+      out.push(prev);
+    }
+  }
+  return out;
+}
+
+/** Relative Strength Index */
+export function rsi(values: number[], period = 14): (number | null)[] {
+  const out: (number | null)[] = [];
+  let avgGain = 0;
+  let avgLoss = 0;
+  for (let i = 0; i < values.length; i++) {
+    if (i === 0) {
+      out.push(null);
+      continue;
+    }
+    const change = values[i] - values[i - 1];
+    const gain = Math.max(0, change);
+    const loss = Math.max(0, -change);
+    if (i <= period) {
+      avgGain += gain;
+      avgLoss += loss;
+      if (i === period) {
+        avgGain /= period;
+        avgLoss /= period;
+        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        out.push(100 - 100 / (1 + rs));
+      } else {
+        out.push(null);
+      }
+    } else {
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+      out.push(100 - 100 / (1 + rs));
+    }
+  }
+  return out;
+}
+
+/** MACD (Moving Average Convergence Divergence) */
+export function macd(values: number[], fast = 12, slow = 26, signal = 9): {
+  macd: (number | null)[];
+  signal: (number | null)[];
+  histogram: (number | null)[];
+} {
+  const emaFast = ema(values, fast);
+  const emaSlow = ema(values, slow);
+  const macdLine = values.map((_, i) =>
+    emaFast[i] !== null && emaSlow[i] !== null
+      ? (emaFast[i] as number) - (emaSlow[i] as number)
+      : null
+  );
+  // Signal line = EMA of MACD
+  const validMacd = macdLine.map((v) => v ?? 0);
+  const signalLine = ema(validMacd, signal);
+  const histogram = macdLine.map((v, i) =>
+    v !== null && signalLine[i] !== null ? v - (signalLine[i] as number) : null
+  );
+  return { macd: macdLine, signal: signalLine, histogram };
+}
+
+/** Bollinger Bands */
+export function bollingerBands(values: number[], period = 20, stdDev = 2): {
+  upper: (number | null)[];
+  middle: (number | null)[];
+  lower: (number | null)[];
+} {
+  const middle = sma(values, period);
+  const upper: (number | null)[] = [];
+  const lower: (number | null)[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (i < period - 1 || middle[i] === null) {
+      upper.push(null);
+      lower.push(null);
+    } else {
+      const slice = values.slice(i - period + 1, i + 1);
+      const mean = middle[i] as number;
+      const variance = slice.reduce((s, v) => s + (v - mean) ** 2, 0) / period;
+      const sd = Math.sqrt(variance);
+      upper.push(mean + sd * stdDev);
+      lower.push(mean - sd * stdDev);
+    }
+  }
+  return { upper, middle, lower };
+}
+
+// ---------- NARRATIVE DEEP-DIVE ----------
+export interface NarrativeDetail {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  description: string;
+  longDescription: string;
+  marketCap: number;
+  change24h: number;
+  mentions24h: number;
+  smartMoneyInflow24h: number;
+  tokens: {
+    id: string;
+    symbol: string;
+    name: string;
+    weight: number; // % of narrative
+    change24h: number;
+    smartMoneyInflow: number;
+    color: string;
+    glyph?: string;
+  }[];
+  relatedNews: { headline: string; source: string; agoMinutes: number }[];
+  smartMoneyCount: number;
+  whaleActivity24h: number;
+}
+
+export function getNarrativeDetail(narrativeId: string): NarrativeDetail | null {
+  const n = NARRATIVES.find((x) => x.id === narrativeId);
+  if (!n) return null;
+  const tokens = n.topTokens
+    .map((tid) => TOKENS_BY_ID[tid])
+    .filter(Boolean)
+    .map((t, i) => ({
+      id: t.id,
+      symbol: t.symbol,
+      name: t.name,
+      weight: Math.round(100 / n.topTokens.length * (1 - i * 0.1)),
+      change24h: t.change24h,
+      smartMoneyInflow: t.smartMoneyInflow24h,
+      color: t.logoColor,
+      glyph: t.logoGlyph,
+    }));
+  const totalMcap = tokens.reduce((s, t) => {
+    const tk = TOKENS_BY_ID[t.id];
+    return s + (tk?.marketCap ?? 0);
+  }, 0);
+  const totalInflow = tokens.reduce((s, t) => s + t.smartMoneyInflow, 0);
+  return {
+    id: n.id,
+    name: n.name,
+    emoji: n.emoji,
+    color: n.color,
+    description: n.description,
+    longDescription:
+      n.name === "AI Agents"
+        ? "Tokens building AI-native infrastructure and on-chain agents. This narrative includes GPU networks, AI model marketplaces, and autonomous agent protocols. Smart money has been rotating into this sector as AI adoption accelerates."
+        : n.name === "Meme Season"
+        ? "Solana meme coins leading attention this cycle. Driven by community engagement, viral marketing, and speculative fervor. High volatility, high upside — but also high risk of rapid drawdowns."
+        : n.name === "DePIN"
+        ? "Decentralized physical infrastructure networks — wireless, compute, storage, and sensors. Long-term hold thesis with real-world utility and revenue generation."
+        : n.name === "Cat Coins"
+        ? "Cat-themed meme coins outperforming dogs today. A sub-narrative of meme season, driven by fresh launches and community rotation from dog-themed tokens."
+        : "Solana-native DeFi protocols gaining TVL. DEXs, lending, perps, and yield aggregators building the core financial infrastructure of Solana.",
+    marketCap: totalMcap,
+    change24h: n.change24h,
+    mentions24h: n.mentions24h,
+    smartMoneyInflow24h: totalInflow,
+    tokens,
+    relatedNews: NEWS.filter((news) =>
+      news.tokensMentioned.some((tid) => n.topTokens.includes(tid))
+    ).map((news) => ({
+      headline: news.headline,
+      source: news.source,
+      agoMinutes: news.agoMinutes,
+    })),
+    smartMoneyCount: tokens.length * 80,
+    whaleActivity24h: Math.round(totalInflow * 0.3),
+  };
+}
+
+// ---------- SMART MONEY MAP (wallet-to-wallet flows) ----------
+export interface WalletNode {
+  id: string;
+  label: string;
+  type: "whale" | "smart_money" | "kol" | "cex" | "fund";
+  x: number; // 0-100 position
+  y: number;
+  size: number; // relative
+  color: string;
+  glyph: string;
+  inflowUsd: number;
+  outflowUsd: number;
+}
+
+export interface WalletEdge {
+  from: string;
+  to: string;
+  value: number; // USD
+  tokenSymbol: string;
+  agoSeconds: number;
+}
+
+export interface SmartMoneyMap {
+  nodes: WalletNode[];
+  edges: WalletEdge[];
+}
+
+export function getSmartMoneyMap(): SmartMoneyMap {
+  const nodes: WalletNode[] = [
+    { id: "w1", label: "0xMoby", type: "whale", x: 20, y: 30, size: 40, color: "#14F195", glyph: "M", inflowUsd: 4_200_000, outflowUsd: 1_800_000 },
+    { id: "w2", label: "DegenDiva", type: "kol", x: 50, y: 20, size: 35, color: "#EC4899", glyph: "D", inflowUsd: 3_100_000, outflowUsd: 2_400_000 },
+    { id: "w3", label: "Scoop", type: "whale", x: 80, y: 30, size: 38, color: "#F59E0B", glyph: "W", inflowUsd: 2_800_000, outflowUsd: 1_200_000 },
+    { id: "w4", label: "AlphaBot", type: "smart_money", x: 30, y: 60, size: 32, color: "#22D3EE", glyph: "A", inflowUsd: 1_800_000, outflowUsd: 2_100_000 },
+    { id: "w5", label: "Sage", type: "smart_money", x: 70, y: 60, size: 30, color: "#8B5CF6", glyph: "S", inflowUsd: 1_400_000, outflowUsd: 900_000 },
+    { id: "w6", label: "Franky", type: "smart_money", x: 50, y: 80, size: 28, color: "#10B981", glyph: "F", inflowUsd: 612_000, outflowUsd: 412_000 },
+    { id: "w7", label: "Binance", type: "cex", x: 10, y: 80, size: 45, color: "#F7931A", glyph: "B", inflowUsd: 8_400_000, outflowUsd: 6_200_000 },
+    { id: "w8", label: "Paradigm", type: "fund", x: 90, y: 80, size: 42, color: "#627EEA", glyph: "P", inflowUsd: 5_200_000, outflowUsd: 3_800_000 },
+  ];
+  const edges: WalletEdge[] = [
+    { from: "w7", to: "w1", value: 1_200_000, tokenSymbol: "SOL", agoSeconds: 320 },
+    { from: "w1", to: "w2", value: 840_000, tokenSymbol: "WIF", agoSeconds: 480 },
+    { from: "w2", to: "w4", value: 620_000, tokenSymbol: "BONK", agoSeconds: 640 },
+    { from: "w3", to: "w1", value: 420_000, tokenSymbol: "SOL", agoSeconds: 800 },
+    { from: "w4", to: "w5", value: 380_000, tokenSymbol: "JUP", agoSeconds: 960 },
+    { from: "w5", to: "w6", value: 280_000, tokenSymbol: "DRIFT", agoSeconds: 1120 },
+    { from: "w8", to: "w3", value: 920_000, tokenSymbol: "ETH", agoSeconds: 1280 },
+    { from: "w2", to: "w6", value: 180_000, tokenSymbol: "POPCAT", agoSeconds: 1440 },
+    { from: "w1", to: "w4", value: 340_000, tokenSymbol: "IO", agoSeconds: 1600 },
+    { from: "w7", to: "w8", value: 2_400_000, tokenSymbol: "USDC", agoSeconds: 1760 },
+  ];
+  return { nodes, edges };
+}

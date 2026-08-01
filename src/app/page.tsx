@@ -39,6 +39,10 @@ import { StakingModal } from "@/components/moby/staking-modal";
 import { GasOptimizerModal } from "@/components/moby/gas-optimizer-modal";
 import { AirdropModal } from "@/components/moby/airdrop-modal";
 import { ToastContainer, WhaleAlertPusher } from "@/components/moby/toast-system";
+import { FullChartModal } from "@/components/moby/full-chart-modal";
+import { NarrativeDetailModal } from "@/components/moby/narrative-detail-modal";
+import { SmartMoneyMapModal } from "@/components/moby/smart-money-map-modal";
+import { PushNotificationManager } from "@/components/moby/push-notifications";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -141,6 +145,12 @@ export default function Home() {
       {/* Toast notifications + whale alert pusher */}
       <ToastContainer />
       <WhaleAlertPusher />
+
+      {/* Batch 5: Full-screen chart + narrative detail + smart money map + push */}
+      <FullChartModal />
+      <NarrativeDetailModal />
+      <SmartMoneyMapModal />
+      <PushNotificationManager />
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />
