@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, X, TrendingUp, Hash } from "lucide-react";
-import { TOKENS, TRADERS, NARRATIVES, fmtPrice, fmtPct } from "@/lib/moby-data";
+import { TOKENS, TRADERS, NARRATIVES, fmtPrice, fmtPct, fmtAge } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Chip } from "./primitives";
 import { motion, AnimatePresence } from "framer-motion";
@@ -106,7 +106,9 @@ export function SearchModal() {
                       <TokenIcon symbol={t.symbol} glyph={t.logoGlyph} color={t.logoColor} size="sm" />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold">{t.symbol}</div>
-                        <div className="text-[11px] text-muted-foreground truncate">{t.name}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          {t.name} · {t.smartMoneyHolders} smart · {fmtAge(t.ageHours)}
+                        </div>
                       </div>
                       <div className="text-right">
                         <div className="text-xs font-semibold tabular">{fmtPrice(t.price)}</div>

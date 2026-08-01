@@ -27,6 +27,7 @@ import {
   fmtPrice,
   fmtPct,
   fmtNum,
+  fmtAge,
   timeLabel,
 } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
@@ -324,9 +325,10 @@ function CryptoHoldings() {
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-sm">{h.token.symbol}</span>
                 <Chip variant="outline">{h.chain}</Chip>
+                <Chip variant="outline">{fmtAge(h.token.ageHours)}</Chip>
               </div>
               <div className="text-[11px] text-muted-foreground tabular">
-                {fmtNum(h.amount)} · avg {fmtPrice(h.avgCost)}
+                {fmtNum(h.amount)} · avg {fmtPrice(h.avgCost)} · {h.token.smartMoneyHolders} smart
               </div>
             </div>
             <div className="text-right">

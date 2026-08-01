@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { X, GitCompareArrows, Plus, Check, Trophy, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { TOKENS, TOKENS_BY_ID, fmtUsd, fmtPrice, fmtNum, fmtPct } from "@/lib/moby-data";
+import { TOKENS, TOKENS_BY_ID, fmtUsd, fmtPrice, fmtNum, fmtPct, fmtAge } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Sparkline, Chip } from "./primitives";
 import { motion, AnimatePresence } from "framer-motion";
@@ -136,7 +136,7 @@ export function CompareModal() {
                       <CompareRow label="Smart money inflow" tokens={tokens} best={best.smart} getValue={(t) => t.smartMoneyInflow24h} format={(v) => `${v >= 0 ? "+" : "-"}${fmtUsd(Math.abs(v), { compact: true })}`} colorize="sign" />
                       <CompareRow label="Smart wallets" tokens={tokens} best={best.holders} getValue={(t) => t.smartMoneyHolders} format={(v) => fmtNum(v)} />
                       <CompareRow label="Holders" tokens={tokens} best={best.holders} getValue={(t) => t.holders} format={(v) => fmtNum(v)} />
-                      <CompareRow label="Age" tokens={tokens} best={null} getValue={(t) => t.ageHours} format={(v) => (v < 24 ? `${v}h` : `${Math.floor(v / 24)}d`)} />
+                      <CompareRow label="Age" tokens={tokens} best={null} getValue={(t) => t.ageHours} format={(v) => fmtAge(v)} />
                       <CompareRow label="Chain" tokens={tokens} best={null} getValue={(t) => t.chain as unknown as number} format={(v) => String(v)} />
                       <CompareRow label="Category" tokens={tokens} best={null} getValue={(t) => t.category as unknown as number} format={(v) => String(v)} last />
                     </div>

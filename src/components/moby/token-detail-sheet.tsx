@@ -31,7 +31,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { TOKENS_BY_ID, fmtUsd, fmtPrice, fmtPct, fmtNum, type Token } from "@/lib/moby-data";
+import { TOKENS_BY_ID, fmtUsd, fmtPrice, fmtPct, fmtNum, fmtAge, type Token } from "@/lib/moby-data";
 import { useMoby, useToken } from "@/lib/moby-store";
 import { TokenIcon, Chip, Sparkline } from "./primitives";
 import { HolderDistributionSection } from "./holder-distribution";
@@ -131,7 +131,7 @@ function TokenDetailContent({ token }: { token: Token }) {
             )}
           </div>
           <div className="text-[11px] text-muted-foreground">
-            {token.chain} · {token.category} · age {token.ageHours < 24 ? `${token.ageHours}h` : `${Math.floor(token.ageHours / 24)}d`}
+            {token.chain} · {token.category} · age {fmtAge(token.ageHours)}
           </div>
         </div>
         <button
@@ -292,6 +292,8 @@ function TokenDetailContent({ token }: { token: Token }) {
         <Stat label="Liquidity" value={fmtUsd(token.liquidity, { compact: true })} />
         <Stat label="24h volume" value={fmtUsd(token.volume24h, { compact: true })} />
         <Stat label="Holders" value={fmtNum(token.holders)} />
+        <Stat label="Age" value={fmtAge(token.ageHours)} />
+        <Stat label="Smart wallets" value={fmtNum(token.smartMoneyHolders)} />
       </div>
 
       {/* Smart money panel */}

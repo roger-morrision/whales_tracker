@@ -1256,6 +1256,47 @@ export function fmtAgo(sec: number): string {
   return agoLabel(sec);
 }
 
+/**
+ * Format a token's age (in hours since mint) as a compact human-readable string.
+ *   - < 1h   → "30m"
+ *   - < 24h  → "2h"
+ *   - < 720h (30d) → "21d"
+ *   - < 8760h (365d) → "3mo"
+ *   - >= 8760h → "1y", "2y"…
+ */
+export function fmtAge(hours: number): string {
+  if (hours < 1) {
+    const mins = Math.max(1, Math.round(hours * 60));
+    return `${mins}m`;
+  }
+  if (hours < 24) {
+    // Show one decimal for < 10h, then integer hours
+    return hours < 10 ? `${hours.toFixed(1).replace(/\.0$/, "")}h` : `${Math.round(hours)}h`;
+  }
+  const days = hours / 24;
+  if (days < 30) return `${Math.round(days)}d`;
+  if (days < 365) {
+    const months = Math.round(days / 30);
+    return `${months}mo`;
+  }
+  const years = days / 365;
+  return years < 10 ? `${years.toFixed(1).replace(/\.0$/, "")}y` : `${Math.round(years)}y`;
+}
+
+/**
+ * Categorize a token's age into a bucket for badges / chips.
+ */
+export function ageBucket(hours: number): { label: string; variant: "bull" | "gold" | "bear" | "default" } {
+  if (hours < 1) return { label: "< 1h", variant: "bear" };
+  if (hours < 6) return { label: "< 6h", variant: "bear" };
+  if (hours < 24) return { label: "< 1d", variant: "gold" };
+  if (hours < 72) return { label: "< 3d", variant: "gold" };
+  if (hours < 168) return { label: "< 1w", variant: "gold" };
+  if (hours < 720) return { label: "< 1mo", variant: "default" };
+  if (hours < 8760) return { label: "< 1y", variant: "default" };
+  return { label: "1y+", variant: "default" };
+}
+
 export function timeLabel(t: number): string {
   return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }

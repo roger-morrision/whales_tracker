@@ -19,7 +19,7 @@ import {
   Gift,
 } from "lucide-react";
 import { useMoby } from "@/lib/moby-store";
-import { TOKENS, fmtUsd, fmtNum, fmtPrice } from "@/lib/moby-data";
+import { TOKENS, fmtUsd, fmtNum, fmtPrice, fmtAge } from "@/lib/moby-data";
 import { TokenIcon, Chip, SectionHeader } from "./primitives";
 import { cn } from "@/lib/utils";
 
@@ -106,6 +106,9 @@ export function ProfileView() {
                   <div className={cn("text-[11px] tabular font-semibold", t.change24h >= 0 ? "text-bull" : "text-bear")}>
                     {t.change24h >= 0 ? "+" : ""}
                     {t.change24h.toFixed(2)}%
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    {t.smartMoneyHolders} smart · {fmtAge(t.ageHours)}
                   </div>
                 </button>
               );

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { X, SlidersHorizontal, RotateCcw, Check } from "lucide-react";
-import { TOKENS, fmtUsd, fmtPrice, fmtNum } from "@/lib/moby-data";
+import { TOKENS, fmtUsd, fmtPrice, fmtNum, fmtAge } from "@/lib/moby-data";
 import { useMoby, type Chain, type Category, type ScreenerFilters } from "@/lib/moby-store";
 import { TokenIcon, Sparkline, Chip } from "./primitives";
 import { motion, AnimatePresence } from "framer-motion";
@@ -259,9 +259,10 @@ export function TokenScreenerModal() {
                         <div className="flex items-center gap-1.5">
                           <span className="font-semibold text-sm">{t.symbol}</span>
                           {t.smartMoneyInflow24h > 1_000_000 && <Chip variant="bull">Smart ↑</Chip>}
+                          <Chip variant="outline">{fmtAge(t.ageHours)}</Chip>
                         </div>
                         <div className="text-[11px] text-muted-foreground truncate">
-                          {t.chain} · {fmtUsd(t.liquidity, { compact: true })} liq · {t.smartMoneyHolders} smart
+                          {t.chain} · {fmtUsd(t.liquidity, { compact: true })} liq · {t.smartMoneyHolders} smart wallets
                         </div>
                       </div>
                       <Sparkline data={t.sparkline} width={50} height={20} bullish={t.change24h >= 0} />

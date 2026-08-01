@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ArrowUpRight, ArrowDownRight, Flame, TrendingUp, Star, StarOff, Calendar, Rocket } from "lucide-react";
-import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, type Token } from "@/lib/moby-data";
+import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, fmtAge, type Token } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Sparkline, Chip, SectionHeader } from "./primitives";
 import { MarketOverview } from "./market-overview";
@@ -310,8 +310,11 @@ export function TokenRow({ token, rank }: { token: Token; rank?: number }) {
           <span className="font-semibold text-sm truncate">{token.symbol}</span>
           {!token.verified && <Chip variant="bear">New</Chip>}
           {token.smartMoneyInflow24h > 1_000_000 && <Chip variant="bull">Smart ↑</Chip>}
+          <Chip variant="outline">{fmtAge(token.ageHours)}</Chip>
         </div>
-        <div className="text-[11px] text-muted-foreground truncate">{token.name}</div>
+        <div className="text-[11px] text-muted-foreground truncate">
+          {token.name} · {token.smartMoneyHolders} smart wallets
+        </div>
       </div>
       <Sparkline data={token.sparkline} width={56} height={24} bullish={isBull} />
       <div className="text-right">
@@ -361,7 +364,9 @@ function SmartMoneyMovers() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-sm">{t.symbol}</span>
-                  <span className="text-[11px] text-muted-foreground">{t.smartMoneyHolders} smart wallets</span>
+                  <span className="text-[11px] text-muted-foreground">{t.smartMoneyHolders} smart</span>
+                  <span className="text-[11px] text-muted-foreground">·</span>
+                  <span className="text-[11px] text-muted-foreground">{fmtAge(t.ageHours)} old</span>
                 </div>
                 <div className="text-[11px] text-muted-foreground truncate">{t.name}</div>
               </div>
