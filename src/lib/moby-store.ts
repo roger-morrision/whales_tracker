@@ -353,6 +353,50 @@ interface MobyState {
   pushPermission: "default" | "granted" | "denied";
   requestPushPermission: () => void;
   setPushPermission: (p: "default" | "granted" | "denied") => void;
+
+  // ===== BATCH 6: Portfolio analytics =====
+  analyticsOpen: boolean;
+  setAnalyticsOpen: (open: boolean) => void;
+
+  // ===== BATCH 6: Yield farming =====
+  yieldOpen: boolean;
+  setYieldOpen: (open: boolean) => void;
+
+  // ===== BATCH 6: Token unlocks =====
+  unlocksOpen: boolean;
+  setUnlocksOpen: (open: boolean) => void;
+
+  // ===== BATCH 6: Governance =====
+  governanceOpen: boolean;
+  setGovernanceOpen: (open: boolean) => void;
+  votedProposals: Record<string, "for" | "against" | "abstain">;
+  vote: (proposalId: string, vote: "for" | "against" | "abstain") => void;
+
+  // ===== BATCH 6: DeFi positions =====
+  defiOpen: boolean;
+  setDefiOpen: (open: boolean) => void;
+
+  // ===== BATCH 6: Market calendar =====
+  calendarOpen: boolean;
+  setCalendarOpen: (open: boolean) => void;
+
+  // ===== BATCH 6: Transaction simulator =====
+  simulatorOpen: boolean;
+  setSimulatorOpen: (open: boolean) => void;
+
+  // ===== BATCH 6: Multi-wallet manager =====
+  multiWalletOpen: boolean;
+  setMultiWalletOpen: (open: boolean) => void;
+  activeWalletId: string;
+  setActiveWalletId: (id: string) => void;
+
+  // ===== BATCH 6: Watchlist performance =====
+  watchlistPerfOpen: boolean;
+  setWatchlistPerfOpen: (open: boolean) => void;
+
+  // ===== BATCH 6: Theme toggle =====
+  theme: "dark" | "light";
+  toggleTheme: () => void;
 }
 
 // ===== BATCH 3 types =====
@@ -1042,6 +1086,63 @@ export const useMoby = create<MobyState>((set, get) => ({
     }
   },
   setPushPermission: (p) => set({ pushPermission: p }),
+
+  // ===== BATCH 6: Portfolio analytics =====
+  analyticsOpen: false,
+  setAnalyticsOpen: (open) => set({ analyticsOpen: open }),
+
+  // ===== BATCH 6: Yield farming =====
+  yieldOpen: false,
+  setYieldOpen: (open) => set({ yieldOpen: open }),
+
+  // ===== BATCH 6: Token unlocks =====
+  unlocksOpen: false,
+  setUnlocksOpen: (open) => set({ unlocksOpen: open }),
+
+  // ===== BATCH 6: Governance =====
+  governanceOpen: false,
+  setGovernanceOpen: (open) => set({ governanceOpen: open }),
+  votedProposals: { g2: "for", g3: "for", g5: "against" },
+  vote: (proposalId, voteChoice) =>
+    set((s) => ({
+      votedProposals: { ...s.votedProposals, [proposalId]: voteChoice },
+      toasts: [
+        {
+          id: `toast-${Date.now()}`,
+          ts: Date.now(),
+          title: "Vote submitted",
+          description: `You voted ${voteChoice} on this proposal.`,
+          type: "success",
+        },
+        ...s.toasts,
+      ],
+    })),
+
+  // ===== BATCH 6: DeFi positions =====
+  defiOpen: false,
+  setDefiOpen: (open) => set({ defiOpen: open }),
+
+  // ===== BATCH 6: Market calendar =====
+  calendarOpen: false,
+  setCalendarOpen: (open) => set({ calendarOpen: open }),
+
+  // ===== BATCH 6: Transaction simulator =====
+  simulatorOpen: false,
+  setSimulatorOpen: (open) => set({ simulatorOpen: open }),
+
+  // ===== BATCH 6: Multi-wallet manager =====
+  multiWalletOpen: false,
+  setMultiWalletOpen: (open) => set({ multiWalletOpen: open }),
+  activeWalletId: "mw1",
+  setActiveWalletId: (id) => set({ activeWalletId: id }),
+
+  // ===== BATCH 6: Watchlist performance =====
+  watchlistPerfOpen: false,
+  setWatchlistPerfOpen: (open) => set({ watchlistPerfOpen: open }),
+
+  // ===== BATCH 6: Theme toggle =====
+  theme: "dark",
+  toggleTheme: () => set((s) => ({ theme: s.theme === "dark" ? "light" : "dark" })),
 }));
 
 // Convenience hook selectors

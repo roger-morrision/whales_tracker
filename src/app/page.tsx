@@ -43,6 +43,7 @@ import { FullChartModal } from "@/components/moby/full-chart-modal";
 import { NarrativeDetailModal } from "@/components/moby/narrative-detail-modal";
 import { SmartMoneyMapModal } from "@/components/moby/smart-money-map-modal";
 import { PushNotificationManager } from "@/components/moby/push-notifications";
+import { PortfolioAnalyticsModal, YieldFarmingModal, UnlocksModal, GovernanceModal, DeFiPositionsModal, CalendarModal, MultiWalletModal, WatchlistPerfModal } from "@/components/moby/batch6-modals";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Home() {
@@ -151,6 +152,16 @@ export default function Home() {
       <NarrativeDetailModal />
       <SmartMoneyMapModal />
       <PushNotificationManager />
+
+      {/* Batch 6: Analytics + Yield + Unlocks + Governance + DeFi + Calendar + MultiWallet + WatchlistPerf */}
+      <PortfolioAnalyticsModal />
+      <YieldFarmingModal />
+      <UnlocksModal />
+      <GovernanceModal />
+      <DeFiPositionsModal />
+      <CalendarModal />
+      <MultiWalletModal />
+      <WatchlistPerfModal />
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />

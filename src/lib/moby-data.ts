@@ -3488,3 +3488,692 @@ export function getSmartMoneyMap(): SmartMoneyMap {
   ];
   return { nodes, edges };
 }
+
+// ---------- PORTFOLIO PERFORMANCE ANALYTICS ----------
+export interface PortfolioAnalytics {
+  totalReturn: number;
+  totalReturnPct: number;
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdown: number;
+  maxDrawdownPct: number;
+  volatility: number;
+  beta: number;
+  alpha: number;
+  correlationBTC: number;
+  correlationETH: number;
+  correlationSOL: number;
+  bestDay: { date: string; return: number };
+  worstDay: { date: string; return: number };
+  winRate: number;
+  avgWin: number;
+  avgLoss: number;
+  profitFactor: number;
+  riskScore: number; // 0-100
+  riskLabel: "Conservative" | "Moderate" | "Aggressive" | "Very Aggressive";
+}
+
+export const PORTFOLIO_ANALYTICS: PortfolioAnalytics = {
+  totalReturn: 142_400,
+  totalReturnPct: 85.4,
+  sharpeRatio: 2.14,
+  sortinoRatio: 3.08,
+  maxDrawdown: -18_200,
+  maxDrawdownPct: -12.4,
+  volatility: 34.2,
+  beta: 1.42,
+  alpha: 8.4,
+  correlationBTC: 0.68,
+  correlationETH: 0.74,
+  correlationSOL: 0.91,
+  bestDay: { date: "2026-07-14", return: 12.4 },
+  worstDay: { date: "2026-06-22", return: -8.2 },
+  winRate: 64,
+  avgWin: 1840,
+  avgLoss: -920,
+  profitFactor: 2.18,
+  riskScore: 72,
+  riskLabel: "Aggressive",
+};
+
+// Correlation matrix data
+export interface CorrelationMatrix {
+  tokens: string[];
+  matrix: number[][];
+}
+
+export function getCorrelationMatrix(): CorrelationMatrix {
+  const tokens = ["SOL", "WIF", "JUP", "BONK", "BTC", "ETH"];
+  // Deterministic correlation matrix (symmetric, 1.0 on diagonal)
+  const matrix: number[][] = [
+    [1.0, 0.82, 0.74, 0.78, 0.68, 0.72],
+    [0.82, 1.0, 0.64, 0.88, 0.42, 0.48],
+    [0.74, 0.64, 1.0, 0.56, 0.52, 0.61],
+    [0.78, 0.88, 0.56, 1.0, 0.38, 0.44],
+    [0.68, 0.42, 0.52, 0.38, 1.0, 0.84],
+    [0.72, 0.48, 0.61, 0.44, 0.84, 1.0],
+  ];
+  return { tokens, matrix };
+}
+
+// ---------- YIELD FARMING ----------
+export interface YieldPosition {
+  id: string;
+  protocol: string;
+  protocolColor: string;
+  protocolGlyph: string;
+  pair: string;
+  type: "LP" | "Lending" | "SingleSided";
+  tvl: number;
+  myPosition: number;
+  apy: number;
+  aprBase: number;
+  aprRewards: number;
+  rewardsToken: string;
+  rewardsEarned: number;
+  rewardsUsd: number;
+  impermanentLoss: number; // percent
+  daysActive: number;
+  chain: Chain;
+}
+
+export const YIELD_POSITIONS: YieldPosition[] = [
+  {
+    id: "yp1",
+    protocol: "Raydium",
+    protocolColor: "from-[#1ABC9C] to-[#16A085]",
+    protocolGlyph: "🔺",
+    pair: "SOL-USDC",
+    type: "LP",
+    tvl: 24_400_000,
+    myPosition: 12_400,
+    apy: 42.8,
+    aprBase: 18.4,
+    aprRewards: 24.4,
+    rewardsToken: "RAY",
+    rewardsEarned: 184.2,
+    rewardsUsd: 446,
+    impermanentLoss: -2.4,
+    daysActive: 42,
+    chain: "SOL",
+  },
+  {
+    id: "yp2",
+    protocol: "Jupiter",
+    protocolColor: "from-[#C7A8FF] to-[#8B5CF6]",
+    protocolGlyph: "🪐",
+    pair: "WIF-SOL",
+    type: "LP",
+    tvl: 8_400_000,
+    myPosition: 8_200,
+    apy: 68.2,
+    aprBase: 22.1,
+    aprRewards: 46.1,
+    rewardsToken: "JUP",
+    rewardsEarned: 412,
+    rewardsUsd: 347,
+    impermanentLoss: -5.8,
+    daysActive: 28,
+    chain: "SOL",
+  },
+  {
+    id: "yp3",
+    protocol: "Kamino",
+    protocolColor: "from-[#F97316] to-[#EF4444]",
+    protocolGlyph: "🦊",
+    pair: "USDC",
+    type: "Lending",
+    tvl: 142_000_000,
+    myPosition: 24_000,
+    apy: 12.4,
+    aprBase: 8.2,
+    aprRewards: 4.2,
+    rewardsToken: "KMNO",
+    rewardsEarned: 82,
+    rewardsUsd: 412,
+    impermanentLoss: 0,
+    daysActive: 84,
+    chain: "SOL",
+  },
+  {
+    id: "yp4",
+    protocol: "Drift",
+    protocolColor: "from-[#2DD4BF] to-[#0D9488]",
+    protocolGlyph: "📉",
+    pair: "SOL",
+    type: "SingleSided",
+    tvl: 32_400_000,
+    myPosition: 6_400,
+    apy: 28.4,
+    aprBase: 14.2,
+    aprRewards: 14.2,
+    rewardsToken: "DRIFT",
+    rewardsEarned: 124,
+    rewardsUsd: 228,
+    impermanentLoss: 0,
+    daysActive: 56,
+    chain: "SOL",
+  },
+];
+
+// ---------- TOKEN UNLOCK SCHEDULE ----------
+export interface UnlockEvent {
+  id: string;
+  tokenSymbol: string;
+  tokenName: string;
+  color: string;
+  glyph: string;
+  date: string;
+  amount: number;
+  amountUsd: number;
+  pctOfSupply: number;
+  type: "Team" | "Investors" | "Community" | "Ecosystem" | "Treasury";
+  status: "upcoming" | "imminent" | "past";
+  daysUntil: number;
+}
+
+export const UNLOCK_SCHEDULE: UnlockEvent[] = [
+  {
+    id: "u1",
+    tokenSymbol: "JUP",
+    tokenName: "Jupiter",
+    color: "from-[#C7A8FF] to-[#8B5CF6]",
+    glyph: "🪐",
+    date: "2026-08-15",
+    amount: 220_000_000,
+    amountUsd: 184_000_000,
+    pctOfSupply: 18.4,
+    type: "Community",
+    status: "imminent",
+    daysUntil: 14,
+  },
+  {
+    id: "u2",
+    tokenSymbol: "JTO",
+    tokenName: "Jito",
+    color: "from-[#22D3EE] to-[#0EA5E9]",
+    glyph: "🌊",
+    date: "2026-09-01",
+    amount: 84_000_000,
+    amountUsd: 262_000_000,
+    pctOfSupply: 8.4,
+    type: "Team",
+    status: "upcoming",
+    daysUntil: 31,
+  },
+  {
+    id: "u3",
+    tokenSymbol: "PYTH",
+    tokenName: "Pyth Network",
+    color: "from-[#A855F7] to-[#6366F1]",
+    glyph: "⚡",
+    date: "2026-08-20",
+    amount: 142_000_000,
+    amountUsd: 54_000_000,
+    pctOfSupply: 5.2,
+    type: "Investors",
+    status: "imminent",
+    daysUntil: 19,
+  },
+  {
+    id: "u4",
+    tokenSymbol: "TNSR",
+    tokenName: "Tensor",
+    color: "from-[#22D3EE] to-[#0EA5E9]",
+    glyph: "📐",
+    date: "2026-10-15",
+    amount: 32_000_000,
+    amountUsd: 16_800_000,
+    pctOfSupply: 4.0,
+    type: "Ecosystem",
+    status: "upcoming",
+    daysUntil: 75,
+  },
+  {
+    id: "u5",
+    tokenSymbol: "DRIFT",
+    tokenName: "Drift Protocol",
+    color: "from-[#2DD4BF] to-[#0D9488]",
+    glyph: "📉",
+    date: "2026-09-10",
+    amount: 62_000_000,
+    amountUsd: 114_000_000,
+    pctOfSupply: 12.0,
+    type: "Community",
+    status: "upcoming",
+    daysUntil: 40,
+  },
+  {
+    id: "u6",
+    tokenSymbol: "IO",
+    tokenName: "io.net",
+    color: "from-[#10B981] to-[#047857]",
+    glyph: "🧠",
+    date: "2026-11-01",
+    amount: 18_000_000,
+    amountUsd: 52_900_000,
+    pctOfSupply: 3.2,
+    type: "Investors",
+    status: "upcoming",
+    daysUntil: 92,
+  },
+];
+
+// ---------- GOVERNANCE / DAO VOTING ----------
+export interface GovernanceProposal {
+  id: string;
+  title: string;
+  description: string;
+  proposer: string;
+  status: "active" | "passed" | "failed" | "pending";
+  type: "Parameter" | "Treasury" | "Upgrade" | "Grant";
+  forVotes: number;
+  againstVotes: number;
+  abstainVotes: number;
+  totalVotes: number;
+  quorum: number;
+  quorumPct: number;
+  daysLeft: number;
+  myVote: "for" | "against" | "abstain" | null;
+  votingPower: number;
+  startTime: string;
+  endTime: string;
+}
+
+export const GOVERNANCE_PROPOSALS: GovernanceProposal[] = [
+  {
+    id: "g1",
+    title: "Increase JLP-SOL pool fee from 0.25% to 0.30%",
+    description: "Proposal to adjust the swap fee on the JLP-SOL liquidity pool to better align with market rates and improve LP returns.",
+    proposer: "0xMoby",
+    status: "active",
+    type: "Parameter",
+    forVotes: 4_200_000,
+    againstVotes: 1_100_000,
+    abstainVotes: 320_000,
+    totalVotes: 5_620_000,
+    quorum: 5_000_000,
+    quorumPct: 96,
+    daysLeft: 2,
+    myVote: null,
+    votingPower: 12_400,
+    startTime: "2026-07-25",
+    endTime: "2026-08-03",
+  },
+  {
+    id: "g2",
+    title: "Allocate 500K JUP to ecosystem grants program",
+    description: "Fund a new round of ecosystem grants to support builders on Solana. Funds will be managed by a 5-person committee.",
+    proposer: "SolanaSage",
+    status: "active",
+    type: "Treasury",
+    forVotes: 6_800_000,
+    againstVotes: 420_000,
+    abstainVotes: 180_000,
+    totalVotes: 7_400_000,
+    quorum: 5_000_000,
+    quorumPct: 100,
+    daysLeft: 5,
+    myVote: "for",
+    votingPower: 12_400,
+    startTime: "2026-07-22",
+    endTime: "2026-08-06",
+  },
+  {
+    id: "g3",
+    title: "Upgrade Jupiter router to v7 with MEV protection",
+    description: "Major upgrade to the routing engine with built-in MEV protection and improved price discovery for large trades.",
+    proposer: "AICopilot",
+    status: "passed",
+    type: "Upgrade",
+    forVotes: 8_200_000,
+    againstVotes: 340_000,
+    abstainVotes: 220_000,
+    totalVotes: 8_760_000,
+    quorum: 5_000_000,
+    quorumPct: 100,
+    daysLeft: 0,
+    myVote: "for",
+    votingPower: 12_400,
+    startTime: "2026-07-10",
+    endTime: "2026-07-24",
+  },
+  {
+    id: "g4",
+    title: "Add BONK as collateral on lending markets",
+    description: "Enable BONK as a borrowable asset with 60% LTV and 70% liquidation threshold on Kamino integration.",
+    proposer: "DegenDiva",
+    status: "active",
+    type: "Parameter",
+    forVotes: 3_100_000,
+    againstVotes: 2_400_000,
+    abstainVotes: 440_000,
+    totalVotes: 5_940_000,
+    quorum: 5_000_000,
+    quorumPct: 100,
+    daysLeft: 1,
+    myVote: null,
+    votingPower: 12_400,
+    startTime: "2026-07-26",
+    endTime: "2026-08-02",
+  },
+  {
+    id: "g5",
+    title: "Reduce validator commission cap from 10% to 8%",
+    description: "Lower the maximum allowed commission for validators in the recommended set to improve staker returns.",
+    proposer: "OnchainOwl",
+    status: "failed",
+    type: "Parameter",
+    forVotes: 2_100_000,
+    againstVotes: 4_800_000,
+    abstainVotes: 580_000,
+    totalVotes: 7_480_000,
+    quorum: 5_000_000,
+    quorumPct: 100,
+    daysLeft: 0,
+    myVote: "against",
+    votingPower: 12_400,
+    startTime: "2026-07-05",
+    endTime: "2026-07-19",
+  },
+];
+
+// ---------- DEFI POSITION TRACKER ----------
+export interface DeFiPosition {
+  id: string;
+  protocol: string;
+  protocolColor: string;
+  protocolGlyph: string;
+  type: "Lending" | "Borrowing" | "LP" | "Staking" | "Farming";
+  asset: string;
+  amount: number;
+  amountUsd: number;
+  apy: number;
+  healthFactor?: number;
+  collateralUsd?: number;
+  debtUsd?: number;
+  liquidationPrice?: number;
+  chain: Chain;
+}
+
+export const DEFI_POSITIONS: DeFiPosition[] = [
+  {
+    id: "dp1",
+    protocol: "Kamino",
+    protocolColor: "from-[#F97316] to-[#EF4444]",
+    protocolGlyph: "🦊",
+    type: "Lending",
+    asset: "USDC",
+    amount: 24_000,
+    amountUsd: 24_000,
+    apy: 8.2,
+    chain: "SOL",
+  },
+  {
+    id: "dp2",
+    protocol: "Kamino",
+    protocolColor: "from-[#F97316] to-[#EF4444]",
+    protocolGlyph: "🦊",
+    type: "Borrowing",
+    asset: "SOL",
+    amount: 84.2,
+    amountUsd: 15_520,
+    apy: 5.4,
+    healthFactor: 2.4,
+    collateralUsd: 36_000,
+    debtUsd: 15_520,
+    liquidationPrice: 84.2,
+    chain: "SOL",
+  },
+  {
+    id: "dp3",
+    protocol: "Marginfi",
+    protocolColor: "from-[#3B82F6] to-[#1D4ED8]",
+    protocolGlyph: "🌊",
+    type: "Lending",
+    asset: "JLP",
+    amount: 1_240,
+    amountUsd: 18_400,
+    apy: 12.4,
+    chain: "SOL",
+  },
+  {
+    id: "dp4",
+    protocol: "Raydium",
+    protocolColor: "from-[#1ABC9C] to-[#16A085]",
+    protocolGlyph: "🔺",
+    type: "LP",
+    asset: "SOL-USDC",
+    amount: 12_400,
+    amountUsd: 12_400,
+    apy: 42.8,
+    chain: "SOL",
+  },
+  {
+    id: "dp5",
+    protocol: "Jito",
+    protocolColor: "from-[#22D3EE] to-[#0EA5E9]",
+    protocolGlyph: "🌊",
+    type: "Staking",
+    asset: "SOL",
+    amount: 42.4,
+    amountUsd: 7_820,
+    apy: 7.18,
+    chain: "SOL",
+  },
+  {
+    id: "dp6",
+    protocol: "Drift",
+    protocolColor: "from-[#2DD4BF] to-[#0D9488]",
+    protocolGlyph: "📉",
+    type: "Farming",
+    asset: "SOL",
+    amount: 6_400,
+    amountUsd: 6_400,
+    apy: 28.4,
+    chain: "SOL",
+  },
+];
+
+// ---------- MARKET CALENDAR ----------
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  time?: string;
+  type: "Economic" | "Token" | "Governance" | "Earnings" | "Conference";
+  importance: "high" | "medium" | "low";
+  description: string;
+  impact: "bullish" | "bearish" | "neutral";
+  source?: string;
+  relatedTokens?: string[];
+}
+
+export const CALENDAR_EVENTS: CalendarEvent[] = [
+  {
+    id: "c1",
+    title: "FOMC Interest Rate Decision",
+    date: "2026-08-14",
+    time: "14:00 ET",
+    type: "Economic",
+    importance: "high",
+    description: "Federal Reserve interest rate decision. Markets expect a 25bps cut.",
+    impact: "bullish",
+    source: "Federal Reserve",
+  },
+  {
+    id: "c2",
+    title: "CPI Inflation Data",
+    date: "2026-08-13",
+    time: "08:30 ET",
+    type: "Economic",
+    importance: "high",
+    description: "US Consumer Price Index release. Core CPI expected at 2.8% YoY.",
+    impact: "neutral",
+    source: "Bureau of Labor Statistics",
+  },
+  {
+    id: "c3",
+    title: "Jupiter (JUP) token unlock",
+    date: "2026-08-15",
+    type: "Token",
+    importance: "high",
+    description: "220M JUP tokens unlock (18.4% of supply) — could create sell pressure.",
+    impact: "bearish",
+    relatedTokens: ["jup"],
+  },
+  {
+    id: "c4",
+    title: "Solana Breakpoint Conference",
+    date: "2026-09-18",
+    type: "Conference",
+    importance: "medium",
+    description: "Annual Solana ecosystem conference. Major announcements expected.",
+    impact: "bullish",
+    relatedTokens: ["sol"],
+  },
+  {
+    id: "c5",
+    title: "NVDA Q3 Earnings",
+    date: "2026-08-28",
+    time: "16:00 ET",
+    type: "Earnings",
+    importance: "medium",
+    description: "NVIDIA earnings — impacts AI token sentiment.",
+    impact: "neutral",
+    relatedTokens: ["io", "rndr"],
+  },
+  {
+    id: "c6",
+    title: "JUP Governance Vote: Pool fee",
+    date: "2026-08-03",
+    type: "Governance",
+    importance: "low",
+    description: "Voting ends on JLP-SOL fee increase proposal.",
+    impact: "neutral",
+    relatedTokens: ["jup"],
+  },
+  {
+    id: "c7",
+    title: "Pyth (PYTH) token unlock",
+    date: "2026-08-20",
+    type: "Token",
+    importance: "medium",
+    description: "142M PYTH tokens unlock (5.2% of supply).",
+    impact: "bearish",
+    relatedTokens: ["pyth"],
+  },
+  {
+    id: "c8",
+    title: "BTC ETF inflows report",
+    date: "2026-08-12",
+    time: "16:00 ET",
+    type: "Economic",
+    importance: "medium",
+    description: "Weekly Bitcoin ETF inflows/outflows report.",
+    impact: "neutral",
+    relatedTokens: ["btc"],
+  },
+];
+
+// ---------- MULTI-WALLET MANAGER ----------
+export interface ManagedWallet {
+  id: string;
+  label: string;
+  address: string;
+  chain: Chain;
+  balanceUsd: number;
+  isPrimary: boolean;
+  isConnected: boolean;
+  color: string;
+  glyph: string;
+}
+
+export const MANAGED_WALLETS: ManagedWallet[] = [
+  {
+    id: "mw1",
+    label: "Main Trading",
+    address: "0x7a3f...b9c2",
+    chain: "SOL",
+    balanceUsd: 84_200,
+    isPrimary: true,
+    isConnected: true,
+    color: "from-[#14F195] to-[#9945FF]",
+    glyph: "Z",
+  },
+  {
+    id: "mw2",
+    label: "DeFi Yield",
+    address: "0x82ad...f1d4",
+    chain: "SOL",
+    balanceUsd: 42_400,
+    isPrimary: false,
+    isConnected: true,
+    color: "from-[#22D3EE] to-[#0EA5E9]",
+    glyph: "D",
+  },
+  {
+    id: "mw3",
+    label: "Cold Storage",
+    address: "0x9bc1...a82e",
+    chain: "SOL",
+    balanceUsd: 184_000,
+    isPrimary: false,
+    isConnected: false,
+    color: "from-[#F59E0B] to-[#EF4444]",
+    glyph: "C",
+  },
+  {
+    id: "mw4",
+    label: "ETH Bridge",
+    address: "0x4f8e...2c3b",
+    chain: "ETH",
+    balanceUsd: 18_400,
+    isPrimary: false,
+    isConnected: false,
+    color: "from-[#627EEA] to-[#3B5BDB]",
+    glyph: "E",
+  },
+];
+
+// ---------- WATCHLIST PERFORMANCE ----------
+export function getWatchlistPerformance(watchlist: string[]): {
+  totalValue: number;
+  totalChange24h: number;
+  totalChange7d: number;
+  bestPerformer: { id: string; symbol: string; change: number } | null;
+  worstPerformer: { id: string; symbol: string; change: number } | null;
+  avgChange: number;
+  allocation: { id: string; symbol: string; pct: number; color: string }[];
+} {
+  const tokens = watchlist.map((id) => TOKENS_BY_ID[id]).filter(Boolean);
+  if (tokens.length === 0) {
+    return {
+      totalValue: 0,
+      totalChange24h: 0,
+      totalChange7d: 0,
+      bestPerformer: null,
+      worstPerformer: null,
+      avgChange: 0,
+      allocation: [],
+    };
+  }
+  const totalValue = tokens.reduce((s, t) => s + t.marketCap, 0);
+  const totalChange24h = tokens.reduce((s, t) => s + t.change24h, 0) / tokens.length;
+  const totalChange7d = tokens.reduce((s, t) => s + (t.change24h * 0.6), 0) / tokens.length;
+  const sorted = [...tokens].sort((a, b) => b.change24h - a.change24h);
+  return {
+    totalValue,
+    totalChange24h,
+    totalChange7d,
+    bestPerformer: sorted[0] ? { id: sorted[0].id, symbol: sorted[0].symbol, change: sorted[0].change24h } : null,
+    worstPerformer: sorted[sorted.length - 1] ? { id: sorted[sorted.length - 1].id, symbol: sorted[sorted.length - 1].symbol, change: sorted[sorted.length - 1].change24h } : null,
+    avgChange: totalChange24h,
+    allocation: tokens.map((t) => ({
+      id: t.id,
+      symbol: t.symbol,
+      pct: (t.marketCap / totalValue) * 100,
+      color: t.logoColor,
+    })),
+  };
+}
