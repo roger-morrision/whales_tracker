@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchNewPairs, type GmgnTrendingToken } from "@/lib/gmgn";
+import { fetchNewPairs, fetchTrenches, type GmgnTrendingToken } from "@/lib/gmgn";
 
 /**
- * GET /api/gmgn/new-pairs?limit=30
+ * GET /api/gmgn/new-pairs?limit=30&type=new_creation
+ *
+ * type: "new_creation" (default), "near_completion", "completed"
  *
  * Returns recently-launched token pairs from GMGN.
  */
@@ -59,6 +61,26 @@ function fallbackNewPairs(limit: number): GmgnTrendingToken[] {
 
 export async function GET(req: NextRequest) {
   const limit = Math.min(parseInt(req.nextUrl.searchParams.get("limit") || "30", 10), 100);
+  const type = (req.nextUrl.searchParams.get("type") || "new_creation") as
+    | "new_creation" | "near_completion" | "completed";
+
+  // For non-default types, prefer fetchTrenches
+  if (type !== "new_creation") {
+    try {
+      const trenches = await fetchTrenches(type, "sol", limit);
+      if (trenches && trenches.length > 0) {
+        return NextResponse.json({
+          tokens: trenches,
+          count: trenches.length,
+          type,
+          source: "gmgn",
+          timestamp: Date.now(),
+        });
+      }
+    } catch {
+      // fall through
+    }
+  }
 
   try {
     const pairs = await fetchNewPairs(limit);
@@ -66,6 +88,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         tokens: pairs,
         count: pairs.length,
+        type,
         source: "gmgn",
         timestamp: Date.now(),
       });
@@ -78,6 +101,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     tokens: fallback,
     count: fallback.length,
+    type,
     source: "simulated",
     timestamp: Date.now(),
     note: "GMGN API unavailable — showing simulated new pairs.",

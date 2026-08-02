@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { X, Shield, TrendingUp, TrendingDown, Flame, ArrowRight, Key, Copy, Check, Activity, Zap, AlertTriangle, Bell } from "lucide-react";
 import {
   TRAILING_STOPS,
@@ -256,15 +256,42 @@ export function WalletImportModal() {
   const [showInput, setShowInput] = useState(false);
   const [importing, setImporting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const importTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear pending import timer when modal closes
+  useEffect(() => {
+    if (!open) {
+      if (importTimerRef.current) {
+        clearTimeout(importTimerRef.current);
+        importTimerRef.current = null;
+      }
+      // Defer setState to avoid synchronous setState in effect
+      Promise.resolve().then(() => setImporting(false));
+      // Don't clear input here — let the submit handler do it to avoid losing
+      // user input if the modal is briefly closed and reopened.
+    }
+  }, [open]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (importTimerRef.current) clearTimeout(importTimerRef.current);
+    };
+  }, []);
 
   const handleImport = () => {
     if (!input.trim()) return;
     setImporting(true);
-    setTimeout(() => {
-      connect("Imported Wallet");
+    // Clear sensitive input immediately on submit
+    const submittedInput = input;
+    setInput("");
+    importTimerRef.current = setTimeout(() => {
+      // For watch-only mode, pass the address through
+      const address = method === "watch" ? submittedInput.trim() : undefined;
+      connect("Imported Wallet", address);
       setImporting(false);
       setOpen(false);
-      setInput("");
+      importTimerRef.current = null;
     }, 1500);
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Settings,
   Star,
@@ -17,6 +17,7 @@ import {
   Plus,
   Trash2,
   Gift,
+  X,
 } from "lucide-react";
 import { useMoby } from "@/lib/moby-store";
 import { TOKENS, fmtUsd, fmtNum, fmtPrice, fmtAge } from "@/lib/moby-data";
@@ -45,6 +46,7 @@ export function ProfileView() {
   return (
     <div className="space-y-5">
       <ProfileHeader />
+      <GmgnSetupBanner />
 
       {/* Quick stats */}
       <div className="grid grid-cols-3 gap-2">
@@ -433,5 +435,75 @@ function CustomAlertsSection() {
         })}
       </div>
     </section>
+  );
+}
+
+// ===== GMGN Setup Banner =====
+function GmgnSetupBanner() {
+  const [status, setStatus] = useState<{
+    installed: boolean;
+    apiKeyConfigured: boolean;
+    binPath?: string;
+    setupInstructions?: string;
+  } | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/gmgn/status")
+      .then((r) => r.json())
+      .then(setStatus)
+      .catch(() => setStatus(null));
+  }, []);
+
+  if (dismissed || !status) return null;
+  // Hide banner if everything is configured
+  if (status.installed && status.apiKeyConfigured) return null;
+
+  const title = !status.installed
+    ? "Install GMGN CLI for real on-chain data"
+    : "Configure GMGN API key";
+  const desc = status.setupInstructions ||
+    "Run `gmgn-cli config` to generate an API key URL, then `gmgn-cli config --apply <KEY>` to enable real smart-money, KOL, and holder data.";
+
+  return (
+    <div className="rounded-2xl p-3 bg-gradient-to-br from-[#14F195]/10 to-transparent border border-bull/30">
+      <div className="flex items-start gap-2.5">
+        <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-[#14F195] to-[#9945FF] grid place-items-center text-xs font-bold text-background shrink-0">
+          G
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold flex items-center gap-1.5">
+            {title}
+            <Chip variant="outline" className="text-[9px]">Optional</Chip>
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">{desc}</div>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <code className="text-[10px] bg-surface-3 px-1.5 py-0.5 rounded font-mono">
+              {!status.installed ? "npm install -g gmgn-cli" : "gmgn-cli config"}
+            </code>
+            <a
+              href="https://gmgn.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-bull hover:opacity-80"
+            >
+              Get API key →
+            </a>
+            {status.binPath && (
+              <span className="text-[9px] text-muted-foreground font-mono">
+                bin: {status.binPath.length > 30 ? "…" + status.binPath.slice(-30) : status.binPath}
+              </span>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="h-6 w-6 grid place-items-center rounded-md hover:bg-surface-3 text-muted-foreground shrink-0"
+          aria-label="Dismiss GMGN setup banner"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
   );
 }

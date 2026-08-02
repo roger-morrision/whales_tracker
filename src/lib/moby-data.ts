@@ -95,6 +95,7 @@ export interface Trader {
   topHoldings: { symbol: string; pct: number }[];
   recentTrades: TraderTrade[];
   isLive: boolean;
+  walletAddress?: string; // Solana wallet address for GMGN portfolio lookup
 }
 
 export interface TraderTrade {

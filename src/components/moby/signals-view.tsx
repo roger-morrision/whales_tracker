@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Zap, Bookmark, BookmarkCheck, X, ShieldCheck, AlertTriangle, ArrowUpRight } from "lucide-react";
 import { fmtUsd, fmtNum, fmtAgo, type SmartSignal } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
+import { useGmgn } from "@/hooks/use-gmgn";
 import { TokenIcon, Chip, SectionHeader } from "./primitives";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +74,9 @@ export function SignalsView() {
           </div>
         )}
       </div>
+
+      {/* GMGN live signals */}
+      <GmgnSignalsSection />
     </div>
   );
 }
@@ -196,5 +200,84 @@ function SignalCard({ signal }: { signal: SmartSignal }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ===== GMGN Live Signals Section =====
+const SIGNAL_TYPE_META: Record<string, { label: string; emoji: string; color: string }> = {
+  smart_money_buy: { label: "Smart money buy", emoji: "🐋", color: "text-bull" },
+  smart_money_sell: { label: "Smart money sell", emoji: "🔥", color: "text-bear" },
+  large_buy: { label: "Large buy", emoji: "🐳", color: "text-bull" },
+  price_spike: { label: "Price spike", emoji: "⚡", color: "text-gold" },
+  new_listing: { label: "New listing", emoji: "🆕", color: "text-bull" },
+};
+
+function GmgnSignalsSection() {
+  const { data, loading, source } = useGmgn<{ signals: any[] }>(
+    "/api/gmgn/signals?chain=sol&limit=15",
+    { refreshMs: 60_000 }
+  );
+
+  return (
+    <section className="rounded-2xl border border-border bg-surface-2/40 overflow-hidden">
+      <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
+        <div className="h-5 w-5 rounded-md bg-gradient-to-br from-[#14F195] to-[#9945FF] grid place-items-center text-[10px] font-bold text-background">
+          G
+        </div>
+        <span className="text-xs font-semibold">GMGN Live Signals</span>
+        {source && (
+          <Chip variant={source === "gmgn" ? "bull" : "outline"} className="text-[9px]">
+            {source === "gmgn" ? "live" : "demo"}
+          </Chip>
+        )}
+        <a
+          href="https://gmgn.ai/solana/signal"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-auto text-[10px] text-muted-foreground hover:text-bull"
+        >
+          View all →
+        </a>
+      </div>
+      <div className="p-3 max-h-[400px] overflow-y-auto scrollbar-thin space-y-1.5">
+        {loading && !data ? (
+          [1, 2, 3].map((i) => <div key={i} className="h-12 rounded-lg bg-surface-3 animate-pulse" />)
+        ) : data?.signals && data.signals.length > 0 ? (
+          data.signals.map((s: any, i: number) => {
+            const meta = SIGNAL_TYPE_META[s.signal_type] || { label: s.signal_type, emoji: "•", color: "" };
+            return (
+              <div
+                key={i}
+                className="rounded-lg border border-border p-2.5 flex items-center gap-2 hover:bg-surface-2 transition-colors cursor-pointer"
+                onClick={() => window.open(`https://gmgn.ai/sol/token/${s.token_address}`, "_blank")}
+              >
+                <div className="h-8 w-8 rounded-lg bg-surface-3 grid place-items-center text-base shrink-0">
+                  {meta.emoji}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold">${s.symbol}</span>
+                    <span className={cn("text-[10px] font-semibold", meta.color)}>{meta.label}</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {s.name} · {fmtUsd(s.amount_usd, { compact: true })} · {fmtAgo(Math.floor((Date.now() - s.ts * 1000) / 1000))}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs font-semibold tabular">{fmtUsd(s.amount_usd, { compact: true })}</div>
+                  {s.change_24h !== undefined && (
+                    <div className={cn("text-[10px] tabular", s.change_24h >= 0 ? "text-bull" : "text-bear")}>
+                      {s.change_24h >= 0 ? "+" : ""}{s.change_24h.toFixed(2)}%
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-xs text-muted-foreground py-6 text-center">No live signals available.</div>
+        )}
+      </div>
+    </section>
   );
 }

@@ -114,7 +114,8 @@ export function WhaleAlertPusher() {
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
 
   useEffect(() => {
-    // Push a whale alert every ~45s
+    // Push a whale alert every ~45s (skipped when tab is hidden to save battery
+    // and avoid notification spam on backgrounded tabs)
     const alerts = [
       { title: "🐋 Whale alert: WIF", description: "0xMoby bought 280K WIF ($795K)", actionId: "wif", actionLabel: "View WIF" },
       { title: "⚡ Smart money entry: MNGO", description: "7 wallets accumulated $1.24M", actionId: "mngo", actionLabel: "View MNGO" },
@@ -123,6 +124,8 @@ export function WhaleAlertPusher() {
     ];
     let idx = 0;
     const interval = setInterval(() => {
+      // Skip when tab is hidden — no visible UI, no haptic, no notification spam
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       const alert = alerts[idx % alerts.length];
       // Haptic feedback on mobile
       if (typeof navigator !== "undefined" && navigator.vibrate) {

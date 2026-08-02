@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Gift, CheckCircle2, Clock, AlertCircle, Lock, Loader2 } from "lucide-react";
 import { AIRDROPS, fmtUsd, fmtNum, type AirdropClaim } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
@@ -24,6 +24,23 @@ export function AirdropModal() {
   const claimedAirdrops = useMoby((s) => s.claimedAirdrops);
   const claimAirdrop = useMoby((s) => s.claimAirdrop);
   const [claiming, setClaiming] = useState<string | null>(null);
+  const claimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear pending claim timer when modal closes
+  useEffect(() => {
+    if (!open && claimTimerRef.current) {
+      clearTimeout(claimTimerRef.current);
+      claimTimerRef.current = null;
+      // Defer setState to avoid synchronous setState in effect
+      Promise.resolve().then(() => setClaiming(null));
+    }
+  }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (claimTimerRef.current) clearTimeout(claimTimerRef.current);
+    };
+  }, []);
 
   const totalEligible = AIRDROPS.filter(
     (a) => (a.status === "eligible" || (a.status === "claimed")) && a.estimatedValue > 0
@@ -35,9 +52,10 @@ export function AirdropModal() {
 
   const handleClaim = (id: string) => {
     setClaiming(id);
-    setTimeout(() => {
+    claimTimerRef.current = setTimeout(() => {
       claimAirdrop(id);
       setClaiming(null);
+      claimTimerRef.current = null;
     }, 1800);
   };
 

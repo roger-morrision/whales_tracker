@@ -135,3 +135,78 @@ Stage Summary:
 - Real on-chain data flows for token info, trending, new pairs, search
 - Simulated fallbacks (clearly tagged) for holders/traders/smart-money/kol/security/chart (GMGN proper is behind Cloudflare challenge — would need a headless browser to bypass)
 - All existing endpoints and functionality preserved
+
+---
+Task ID: 3
+Agent: main (orchestrator)
+Task: Switch GMGN integration to use gmgn-cli (not browser), continue enhancement phases & bug fixes
+
+Work Log:
+- Installed `gmgn-cli` (npm package v1.5.6) — official GMGN OpenAPI CLI with skill docs for token, market, portfolio, track, swap, cooking commands
+- Completely rewrote `src/lib/gmgn.ts` to invoke `gmgn-cli` via `child_process.execFile` instead of HTTP fetches to gmgn.ai (which were being blocked by Cloudflare's "Just a moment" JS challenge)
+- Added `resolveGmgnCliBin()` that auto-discovers the CLI binary at common install locations (`~/.npm-global/bin/gmgn-cli`, `~/.npm-global/lib/node_modules/gmgn-cli/dist/index.js`, `/usr/local/bin/gmgn-cli`, etc.) or via `GMGN_CLI_BIN` env var
+- `runGmgnCli(args)` invokes `gmgn-cli <args> --raw` via Node, parses JSON output, returns null on any error (CLI missing, API key not configured, network error, etc.)
+- `checkGmgnCliStatus()` reports `installed`, `apiKeyConfigured`, and `binPath` so the UI can show an accurate setup banner
+
+New API Routes (7 added, 17 total GMGN endpoints now):
+- `/api/gmgn/status` — reports CLI installation + API key configuration status
+- `/api/gmgn/portfolio?wallet=<addr>` — wallet holdings + trading stats (realized PnL, unrealized PnL, win rate, 30d trades)
+- `/api/gmgn/wallet-activity?wallet=<addr>` — wallet's recent buy/sell/transfer history
+- `/api/gmgn/signals?chain=sol` — market-wide smart-money buys, large buys, price spikes, new listings
+- `/api/gmgn/hot-searches?chain=sol&interval=1h` — most-searched tokens on gmgn.ai
+- `/api/gmgn/smart-money-feed?chain=sol` — recent trades from GMGN-tagged smart money wallets
+- `/api/gmgn/kol-feed?chain=sol` — recent trades from GMGN-tagged KOL wallets
+- Extended `/api/gmgn/new-pairs?type=new_creation|near_completion|completed` — now supports all 3 trenches lifecycle stages
+
+New fetchers in gmgn.ts:
+- `fetchWalletHoldings(wallet, chain)` — `gmgn-cli portfolio holdings`
+- `fetchWalletStats(wallet, chain)` — `gmgn-cli portfolio stats`
+- `fetchWalletActivity(wallet, limit, chain)` — `gmgn-cli portfolio activity`
+- `fetchMarketSignals(chain, limit)` — `gmgn-cli market signal`
+- `fetchHotSearches(chains, interval, limit)` — `gmgn-cli market hot-searches`
+- `fetchTrenches(type, chain, limit)` — `gmgn-cli market trenches` (with the data.pump quirk for near_completion)
+- `fetchSmartMoneyTrades(chain, limit)` — `gmgn-cli track smartmoney`
+- `fetchKolTrades(chain, limit)` — `gmgn-cli track kol`
+
+UI Wiring:
+- page.tsx: wallet-balance fetch now prefers /api/gmgn/portfolio first, falls back to /api/wallet; AbortController added; visibility check added to all intervals (price tick, real-prices, refresh-feeds)
+- profile-view.tsx: `GmgnSetupBanner` shows when CLI is missing or API key not configured; includes copyable commands and detected binPath
+- signals-view.tsx: new `GmgnSignalsSection` at the bottom showing live smart-money / large-buy / price-spike signals with auto-refresh
+- discover-view.tsx: new `GmgnHotSearchesRow` between GmgnTrendingRow and NarrativesRow showing most-searched tokens
+- trader-detail-sheet.tsx: new `GmgnTraderPortfolio` section showing real wallet holdings, PnL, win rate, top holdings — only renders when the trader's walletAddress looks like a real Solana address
+- pumpfun-explorer.tsx: AbortController on fetchTokens to prevent stale fetches; visibility check on auto-refresh; abort on unmount
+
+Quick-Win Bug Fixes (round 3 audit):
+- moby-store.ts: alerts array capped at 50 entries (was growing unbounded); dismissedSignals capped at 200 entries (was bloating localStorage)
+- page.tsx: removed unnecessary 1s polling interval in BackToTopButton (scroll listener already handles it)
+- /api/gmgn/kol/route.ts: fixed leading-space typo in "Pentosh1" handle
+- layout.tsx: added `viewportFit: "cover"` to viewport export — enables iOS safe-area-inset-bottom env() values
+- onboarding.tsx: moved `if (onboarded) return null` check inside <AnimatePresence> so the exit animation plays when onboarded flips to true
+
+Race Condition / Memory Leak Fixes:
+- toast-system.tsx WhaleAlertPusher: skips toast push when document.hidden (no more notification spam on backgrounded tabs)
+- use-gmgn.ts: auto-refresh interval skips when document.hidden (saves CLI subprocess spawns)
+- airdrop-modal.tsx: claim setTimeout stored in `claimTimerRef`, cleared on modal close + unmount
+- batch8-modals.tsx WalletImportModal: import setTimeout stored in `importTimerRef`, cleared on close + unmount; sensitive input cleared immediately on submit (not after delay); watch-only wallet address passed through to connect()
+- trade-modal.tsx: submit + success setTimeouts stored in refs, cleared on modal close + unmount; refs declared before early return to satisfy rules-of-hooks
+- pumpfun-explorer.tsx: AbortController on fetchTokens prevents stale fetches on rapid tab switches; cleanup on unmount
+
+Type System Updates:
+- moby-data.ts: Added `walletAddress?: string` field to Trader interface (for GMGN portfolio lookup)
+
+Verification:
+- TypeScript: 0 errors in src/
+- ESLint: clean
+- Production build: ✓ Compiled successfully, 17 GMGN routes registered
+- Smoke test: all 17 /api/gmgn/* endpoints return 200 (token, holders, traders, smart-money, kol, security, chart, trending, new-pairs, search, portfolio, wallet-activity, signals, hot-searches, smart-money-feed, kol-feed, status)
+- Existing endpoints unaffected: /api/quote, /api/pumpfun, /api/prices, /api/chat, /api/wallet all still 200
+- /api/gmgn/status reports: installed=true, binPath=/home/z/.npm-global/bin/gmgn-cli (CLI is detected)
+
+Stage Summary:
+- Switched from cloudflare-blocked HTTP fetches to gmgn-cli subprocess invocation
+- 7 new GMGN API endpoints (17 total)
+- 4 new UI components wired (GmgnTraderPortfolio, GmgnSignalsSection, GmgnHotSearchesRow, GmgnSetupBanner)
+- 6 quick-win bug fixes (alerts cap, dismissedSignals cap, BackToTop interval, kol typo, viewport-fit, onboarding exit anim)
+- 5 race condition / memory leak fixes (WhaleAlertPusher visibility, useGmgn visibility, 3 modal setTimeout cleanups, AbortController on pumpfun)
+- All real GMGN data will flow the moment the user runs `gmgn-cli config` and `gmgn-cli config --apply <KEY>` (one-time setup)
+- Until then, DexScreener continues to provide real token/trending/search data, and other endpoints show clearly-tagged simulated fallbacks

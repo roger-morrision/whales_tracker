@@ -114,6 +114,35 @@ export function TradeModal() {
   const routeStr = quote ? quote.route.join(" → ") : "";
   const platformFee = quote?.platformFeeUsd ?? 0;
 
+  const submitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear pending submit/success timers when modal closes
+  useEffect(() => {
+    if (!open) {
+      if (submitTimerRef.current) {
+        clearTimeout(submitTimerRef.current);
+        submitTimerRef.current = null;
+      }
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+        successTimerRef.current = null;
+      }
+      // Defer setState to avoid synchronous setState in effect
+      Promise.resolve().then(() => {
+        setSubmitting(false);
+        setSuccess(false);
+      });
+    }
+  }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (submitTimerRef.current) clearTimeout(submitTimerRef.current);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    };
+  }, []);
+
   if (!token) return null;
 
   const isBuy = side === "BUY";
@@ -126,7 +155,7 @@ export function TradeModal() {
       return;
     }
     setSubmitting(true);
-    setTimeout(() => {
+    submitTimerRef.current = setTimeout(() => {
       setSubmitting(false);
       setSuccess(true);
       // Haptic feedback on trade confirmation
@@ -157,12 +186,14 @@ export function TradeModal() {
         description: `${isBuy ? "Bought" : "Sold"} ${fmtNum(amountOut)} ${token.symbol} for $${amount} USDC${quote ? ` · Quote: ${quote.quoteId.slice(0, 12)}` : ""}`,
         type: "success",
       });
-      setTimeout(() => {
+      submitTimerRef.current = null;
+      successTimerRef.current = setTimeout(() => {
         setSuccess(false);
         close();
         setAmount("");
         setQuote(null);
         setShowSettings(false);
+        successTimerRef.current = null;
       }, 1500);
     }, 1800);
   };

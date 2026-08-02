@@ -24,6 +24,7 @@ export function DiscoverView() {
       <HeroBanner />
       <MarketOverview />
       <GmgnTrendingRow />
+      <GmgnHotSearchesRow />
       <NarrativesRow />
       <LaunchCalendar />
 
@@ -484,6 +485,61 @@ function GmgnTrendingRow() {
       {source && (
         <div className="text-[10px] text-muted-foreground mt-1 px-1">
           Source: <span className={source === "gmgn" ? "text-bull" : ""}>{source === "gmgn" ? "GMGN live data" : "simulated (GMGN unavailable)"}</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ===== GMGN Hot Searches Row =====
+function GmgnHotSearchesRow() {
+  const { data, loading, source } = useGmgn<{ hotSearches: any[] }>(
+    "/api/gmgn/hot-searches?chain=sol&interval=1h&limit=6",
+    { refreshMs: 120_000 }
+  );
+
+  return (
+    <section>
+      <SectionHeader
+        title="GMGN Hot Searches"
+        emoji="🔍"
+        action="View all"
+        onAction={() => window.open("https://gmgn.ai/solana/hot-searches", "_blank")}
+      />
+      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+        {loading && !data ? (
+          [1, 2, 3, 4].map((i) => (
+            <div key={i} className="shrink-0 w-32 h-28 rounded-xl bg-surface-2 animate-pulse" />
+          ))
+        ) : data?.hotSearches && data.hotSearches.length > 0 ? (
+          data.hotSearches.map((h: any, i: number) => (
+            <div
+              key={h.token_address || i}
+              className="shrink-0 w-32 rounded-xl border border-border bg-surface-2/50 p-2.5 hover:bg-surface-2 transition-colors"
+            >
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FF6347] grid place-items-center text-[10px] font-bold text-background shrink-0">
+                  #{h.rank ?? i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold truncate">{h.symbol}</div>
+                  <div className="text-[9px] text-muted-foreground truncate">{h.search_count_24h.toLocaleString()} searches</div>
+                </div>
+              </div>
+              <div className="text-xs font-semibold tabular">{fmtPrice(h.price)}</div>
+              <div className={cn("text-[10px] tabular flex items-center gap-0.5", h.change_24h >= 0 ? "text-bull" : "text-bear")}>
+                {h.change_24h >= 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                {Math.abs(h.change_24h).toFixed(2)}%
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-xs text-muted-foreground py-8">No hot searches available.</div>
+        )}
+      </div>
+      {source && (
+        <div className="text-[10px] text-muted-foreground mt-1 px-1">
+          Source: <span className={source === "gmgn" ? "text-bull" : ""}>{source === "gmgn" ? "GMGN live" : "simulated (GMGN unavailable)"}</span>
         </div>
       )}
     </section>

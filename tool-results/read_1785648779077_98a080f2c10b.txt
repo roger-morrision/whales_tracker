@@ -1,0 +1,934 @@
+     1→     1→/**
+     2→     2→ * GMGN client — fetches token metadata, holders, traders, smart money, KOL,
+     3→     3→ * security, and chart data via the official `gmgn-cli` (npm package).
+     4→     4→ *
+     5→     5→ * Architecture (in priority order):
+     6→     6→ *   1. **gmgn-cli** (preferred) — invokes the official GMGN OpenAPI via the CLI.
+     7→     7→ *      Requires `GMGN_API_KEY` configured in `~/.config/gmgn/.env` (one-time setup
+     8→     8→ *      via `gmgn-cli config` and `gmgn-cli config --apply <KEY>`).
+     9→     9→ *      Returns real on-chain data including smart_degen, renowned (KOL), sniper,
+    10→    10→ *      bundler, rat_trader wallet tags, real holder lists, real trade history.
+    11→    11→ *   2. **DexScreener API** (fallback for some endpoints) — no auth required,
+    12→    12→ *      returns real price/marketCap/volume/liquidity/pair data.
+    13→    13→ *   3. **Simulated data** (last resort) — deterministic stubs so the UI always
+    14→    14→ *      has something to render. Tagged with `source: "simulated"`.
+    15→    15→ *
+    16→    16→ * All requests are server-side only — never called from the browser.
+    17→    17→ */
+    18→    18→
+    19→    19→import { execFile } from "child_process";
+    20→    20→import { promisify } from "util";
+    21→    21→
+    22→    22→const execFileAsync = promisify(execFile);
+    23→    23→
+    24→    24→const GMGN_CLI_BIN = process.env.GMGN_CLI_BIN || "gmgn-cli";
+    25→    25→const DEFAULT_TIMEOUT_MS = 12_000; // CLI startup is slower than HTTP
+    26→    26→
+    27→    27→// ===== Cache =====
+    28→    28→interface CacheEntry {
+    29→    29→  ts: number;
+    30→    30→  data: any;
+    31→    31→}
+    32→    32→const cache = new Map<string, CacheEntry>();
+    33→    33→
+    34→    34→function getCached<T>(key: string, ttlMs: number): T | null {
+    35→    35→  const e = cache.get(key);
+    36→    36→  if (!e) return null;
+    37→    37→  if (Date.now() - e.ts > ttlMs) {
+    38→    38→    cache.delete(key);
+    39→    39→    return null;
+    40→    40→  }
+    41→    41→  return e.data as T;
+    42→    42→}
+    43→    43→
+    44→    44→function setCached(key: string, data: any) {
+    45→    45→  if (cache.size > 500) {
+    46→    46→    const oldest = [...cache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
+    47→    47→    if (oldest) cache.delete(oldest[0]);
+    48→    48→  }
+    49→    49→  cache.set(key, { ts: Date.now(), data });
+    50→    50→}
+    51→    51→
+    52→    52→// ===== CLI availability check (memoized) =====
+    53→    53→let cliAvailableCache: boolean | null = null;
+    54→    54→let cliAvailableCheckedAt = 0;
+    55→    55→async function isGmgnCliAvailable(): Promise<boolean> {
+    56→    56→  // Re-check every 5 minutes
+    57→    57→  if (cliAvailableCache !== null && Date.now() - cliAvailableCheckedAt < 5 * 60_000) {
+    58→    58→    return cliAvailableCache;
+    59→    59→  }
+    60→    60→  try {
+    61→    61→    const { stdout } = await execFileAsync(GMGN_CLI_BIN, ["config", "--check"], {
+    62→    62→      timeout: 5000,
+    63→    63→    });
+    64→    64→    // exit code 0 = configured; CLI prints nothing on success
+    65→    65→    cliAvailableCache = stdout.includes("configured") || stdout.includes("OK") || stdout.trim() === "" || true;
+    66→    66→    // Re-check via actual exit code by running a tiny call
+    67→    67→    cliAvailableCheckedAt = Date.now();
+    68→    68→    return cliAvailableCache;
+    69→    69→  } catch {
+    70→    70→    cliAvailableCache = false;
+    71→    71→    cliAvailableCheckedAt = Date.now();
+    72→    72→    return false;
+    73→    73→  }
+    74→    74→}
+    75→    75→
+    76→    76→/**
+    77→    77→ * Run `gmgn-cli <args> --raw` and parse the JSON output.
+    78→    78→ * Returns null on any error (CLI not installed, missing API key, network error, etc.)
+    79→    79→ */
+    80→    80→async function runGmgnCli(args: string[]): Promise<any | null> {
+    81→    81→  try {
+    82→    82→    // Check API key configured first
+    83→    83→    const isAvailable = await isGmgnCliAvailable();
+    84→    84→    if (!isAvailable) return null;
+    85→    85→
+    86→    86→    const { stdout } = await execFileAsync(GMGN_CLI_BIN, [...args, "--raw"], {
+    87→    87→      timeout: DEFAULT_TIMEOUT_MS,
+    88→    88→      maxBuffer: 5 * 1024 * 1024, // 5MB
+    89→    89→      env: { ...process.env },
+    90→    90→    });
+    91→    91→
+    92→    92→    // CLI may print notice lines on stderr; we only care about stdout
+    93→    93→    const trimmed = stdout.trim();
+    94→    94→    if (!trimmed) return null;
+    95→    95→    // Find the first JSON object in the output
+    96→    96→    const jsonStart = trimmed.indexOf("{");
+    97→    97→    const jsonStartArr = trimmed.indexOf("[");
+    98→    98→    let start = -1;
+    99→    99→    if (jsonStart >= 0 && (jsonStartArr < 0 || jsonStart < jsonStartArr)) start = jsonStart;
+   100→   100→    else if (jsonStartArr >= 0) start = jsonStartArr;
+   101→   101→    if (start < 0) return null;
+   102→   102→    const jsonStr = trimmed.slice(start);
+   103→   103→    try {
+   104→   104→      return JSON.parse(jsonStr);
+   105→   105→    } catch {
+   106→   106→      return null;
+   107→   107→    }
+   108→   108→  } catch {
+   109→   109→    return null;
+   110→   110→  }
+   111→   111→}
+   112→   112→
+   113→   113→// ===== DexScreener fallback =====
+   114→   114→async function fetchJson(url: string, timeoutMs = 8000): Promise<any | null> {
+   115→   115→  try {
+   116→   116→    const controller = new AbortController();
+   117→   117→    const timer = setTimeout(() => controller.abort(), timeoutMs);
+   118→   118→    const res = await fetch(url, {
+   119→   119→      signal: controller.signal,
+   120→   120→      headers: {
+   121→   121→        "User-Agent":
+   122→   122→          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+   123→   123→        Accept: "application/json, text/plain, */*",
+   124→   124→      },
+   125→   125→      cache: "no-store",
+   126→   126→    });
+   127→   127→    clearTimeout(timer);
+   128→   128→    if (!res.ok) return null;
+   129→   129→    const text = await res.text();
+   130→   130→    try {
+   131→   131→      return JSON.parse(text);
+   132→   132→    } catch {
+   133→   133→      return null;
+   134→   134→    }
+   135→   135→  } catch {
+   136→   136→    return null;
+   137→   137→  }
+   138→   138→}
+   139→   139→
+   140→   140→// ===== Public typed interfaces =====
+   141→   141→
+   142→   142→export interface GmgnTokenInfo {
+   143→   143→  address: string;
+   144→   144→  symbol: string;
+   145→   145→  name: string;
+   146→   146→  decimals: number;
+   147→   147→  price: number;
+   148→   148→  price_change_1h: number;
+   149→   149→  price_change_24h: number;
+   150→   150→  price_change_6h?: number;
+   151→   151→  volume_24h: number;
+   152→   152→  market_cap: number;
+   153→   153→  fdv?: number;
+   154→   154→  liquidity: number;
+   155→   155→  holders: number;
+   156→   156→  total_supply: number;
+   157→   157→  top_10_holder_rate?: number;
+   158→   158→  dev_holder_rate?: number;
+   159→   159→  create_timestamp?: number;
+   160→   160→  last_trade_timestamp?: number;
+   161→   161→  tx_24h_buy?: number;
+   162→   162→  tx_24h_sell?: number;
+   163→   163→  is_alive?: boolean;
+   164→   164→  twitter?: string;
+   165→   165→  website?: string;
+   166→   166→  telegram?: string;
+   167→   167→  image_uri?: string;
+   168→   168→  // Extended fields from gmgn-cli
+   169→   169→  smart_degen_count?: number;
+   170→   170→  renowned_count?: number;
+   171→   171→  sniper_count?: number;
+   172→   172→  bundler_rate?: number;
+   173→   173→  rat_trader_amount_rate?: number;
+   174→   174→  rug_ratio?: number;
+   175→   175→  is_honeypot?: boolean;
+   176→   176→  renounced_mint?: boolean;
+   177→   177→  renounced_freeze_account?: boolean;
+   178→   178→  is_on_curve?: boolean;
+   179→   179→  cto_flag?: number;
+   180→   180→}
+   181→   181→
+   182→   182→export interface GmgnSecurity {
+   183→   183→  address: string;
+   184→   184→  is_mint_authority_revoked: boolean;
+   185→   185→  is_freeze_authority_revoked: boolean;
+   186→   186→  is_token_mintable: boolean;
+   187→   187→  is_honeypot: boolean;
+   188→   188→  is_open_source: boolean;
+   189→   189→  is_proxy: boolean;
+   190→   190→  is_canonical: boolean;
+   191→   191→  personal_holder_rate?: number;
+   192→   192→  top10_holder_rate: number;
+   193→   193→  top10_holder_value_usd?: number;
+   194→   194→  dev_holder_rate: number;
+   195→   195→  dev_buy_tax_rate?: number;
+   196→   196→  dev_sell_tax_rate?: number;
+   197→   197→  lp_holder_rate?: number;
+   198→   198→  liquidity_locked?: boolean;
+   199→   199→  lp_locked_ratio?: number;
+   200→   200→  risks: string[];
+   201→   201→}
+   202→   202→
+   203→   203→export interface GmgnHolder {
+   204→   204→  address: string;
+   205→   205→  balance: number;
+   206→   206→  value_usd: number;
+   207→   207→  holder_rate: number;
+   208→   208→  is_dev?: boolean;
+   209→   209→  is_top10?: boolean;
+   210→   210→  is_smart_money?: boolean;
+   211→   211→  is_kol?: boolean;
+   212→   212→  is_celebrity?: boolean;
+   213→   213→  is_fund?: boolean;
+   214→   214→  is_sniper?: boolean;
+   215→   215→  is_bundler?: boolean;
+   216→   216→  is_rat_trader?: boolean;
+   217→   217→  is_fresh_wallet?: boolean;
+   218→   218→  tags?: string[];
+   219→   219→}
+   220→   220→
+   221→   221→export interface GmgnTrader {
+   222→   222→  address: string;
+   223→   223→  pnl: number;
+   224→   224→  pnl_rate?: number;
+   225→   225→  buy_usd: number;
+   226→   226→  sell_usd: number;
+   227→   227→  tx_count?: number;
+   228→   228→  is_smart_money?: boolean;
+   229→   229→  is_kol?: boolean;
+   230→   230→  is_sniper?: boolean;
+   231→   231→  is_bundler?: boolean;
+   232→   232→  first_buy_time?: number;
+   233→   233→  last_active_time?: number;
+   234→   234→  tags?: string[];
+   235→   235→}
+   236→   236→
+   237→   237→export interface GmgnSmartMoneyActivity {
+   238→   238→  address: string;
+   239→   239→  type: "buy" | "sell";
+   240→   240→  amount_usd: number;
+   241→   241→  amount_token: number;
+   242→   242→  ts: number;
+   243→   243→  wallet_tag?: string;
+   244→   244→  wallet_label?: string;
+   245→   245→  pnl_30d_usd?: number;
+   246→   246→}
+   247→   247→
+   248→   248→export interface GmgnKolHolder {
+   249→   249→  address: string;
+   250→   250→  twitter_handle: string;
+   251→   251→  twitter_name: string;
+   252→   252→  followers: number;
+   253→   253→  balance: number;
+   254→   254→  value_usd: number;
+   255→   255→  buy_usd?: number;
+   256→   256→  avg_buy_price?: number;
+   257→   257→  pnl_usd?: number;
+   258→   258→  last_buy_ts?: number;
+   259→   259→}
+   260→   260→
+   261→   261→export interface GmgnCandle {
+   262→   262→  t: number;
+   263→   263→  o: number;
+   264→   264→  h: number;
+   265→   265→  l: number;
+   266→   266→  c: number;
+   267→   267→  v: number;
+   268→   268→}
+   269→   269→
+   270→   270→export interface GmgnTrendingToken extends GmgnTokenInfo {
+   271→   271→  rank: number;
+   272→   272→  chain: string;
+   273→   273→  launched_at?: number;
+   274→   274→  swaps_24h?: number;
+   275→   275→  buyers_24h?: number;
+   276→   276→  sellers_24h?: number;
+   277→   277→  smart_money_holders?: number;
+   278→   278→  smart_money_inflow_24h?: number;
+   279→   279→  hot_level?: number;
+   280→   280→}
+   281→   281→
+   282→   282→// ===== Fetch implementations =====
+   283→   283→
+   284→   284→export async function fetchTokenInfo(address: string): Promise<GmgnTokenInfo | null> {
+   285→   285→  const cacheKey = `token:${address}`;
+   286→   286→  const cached = getCached<GmgnTokenInfo>(cacheKey, 60_000);
+   287→   287→  if (cached) return cached;
+   288→   288→
+   289→   289→  // 1. Try gmgn-cli
+   290→   290→  const cliData = await runGmgnCli(["token", "info", "--chain", "sol", "--address", address]);
+   291→   291→  if (cliData) {
+   292→   292→    const token = mapCliTokenInfo(cliData, address);
+   293→   293→    if (token) {
+   294→   294→      setCached(cacheKey, token);
+   295→   295→      return token;
+   296→   296→    }
+   297→   297→  }
+   298→   298→
+   299→   299→  // 2. Fall back to DexScreener
+   300→   300→  const ds = await fetchDexScreenerToken(address);
+   301→   301→  if (ds) {
+   302→   302→    setCached(cacheKey, ds);
+   303→   303→    return ds;
+   304→   304→  }
+   305→   305→
+   306→   306→  return null;
+   307→   307→}
+   308→   308→
+   309→   309→function mapCliTokenInfo(data: any, address: string): GmgnTokenInfo | null {
+   310→   310→  // gmgn-cli `token info` returns nested objects like { price: { price, change_1h, ... }, ... }
+   311→   311→  if (!data) return null;
+   312→   312→  try {
+   313→   313→    const p = data.price || {};
+   314→   314→    const liquidity = data.liquidity || {};
+   315→   315→    const holders = data.holders || {};
+   316→   316→    const totalSupply = data.total_supply || holders.total_supply || 0;
+   317→   317→    const supply = data.circulating_supply || totalSupply;
+   318→   318→    const price = parseFloat(p.price ?? "0");
+   319→   319→    const links = data.links || data.link || {};
+   320→   320→    return {
+   321→   321→      address,
+   322→   322→      symbol: data.symbol || data.base_symbol || "",
+   323→   323→      name: data.name || "",
+   324→   324→      decimals: data.decimals ?? 9,
+   325→   325→      price,
+   326→   326→      price_change_1h: parseFloat(p.change_1h ?? "0"),
+   327→   327→      price_change_24h: parseFloat(p.change_24h ?? "0"),
+   328→   328→      price_change_6h: parseFloat(p.change_6h ?? "0"),
+   329→   329→      volume_24h: parseFloat(p.volume_24h ?? "0"),
+   330→   330→      market_cap: price * (supply || 0),
+   331→   331→      fdv: data.fdv ? parseFloat(data.fdv) : undefined,
+   332→   332→      liquidity: parseFloat(liquidity.usd ?? "0"),
+   333→   333→      holders: holders.holder_count ?? holders.total ?? 0,
+   334→   334→      total_supply: totalSupply,
+   335→   335→      top_10_holder_rate: data.top_10_holder_rate ? parseFloat(data.top_10_holder_rate) : undefined,
+   336→   336→      dev_holder_rate: data.dev_team_hold_rate ? parseFloat(data.dev_team_hold_rate) : undefined,
+   337→   337→      create_timestamp: data.create_timestamp,
+   338→   338→      last_trade_timestamp: data.last_trade_timestamp,
+   339→   339→      tx_24h_buy: data.swaps?.buys?.h24,
+   340→   340→      tx_24h_sell: data.swaps?.sells?.h24,
+   341→   341→      is_alive: data.is_alive,
+   342→   342→      twitter: links.twitter_username ? `https://x.com/${links.twitter_username}` : links.twitter,
+   343→   343→      website: links.website,
+   344→   344→      telegram: links.telegram,
+   345→   345→      image_uri: data.image_uri || data.logo,
+   346→   346→      smart_degen_count: data.smart_degen_count,
+   347→   347→      renowned_count: data.renowned_count,
+   348→   348→      sniper_count: data.sniper_count,
+   349→   349→      bundler_rate: data.bundler_rate ? parseFloat(data.bundler_rate) : undefined,
+   350→   350→      rat_trader_amount_rate: data.rat_trader_amount_rate ? parseFloat(data.rat_trader_amount_rate) : undefined,
+   351→   351→      rug_ratio: data.rug_ratio ? parseFloat(data.rug_ratio) : undefined,
+   352→   352→      is_honeypot: data.is_honeypot,
+   353→   353→      renounced_mint: data.renounced_mint === 1 || data.renounced_mint === true,
+   354→   354→      renounced_freeze_account: data.renounced_freeze_account === 1 || data.renounced_freeze_account === true,
+   355→   355→      is_on_curve: data.is_on_curve,
+   356→   356→      cto_flag: data.cto_flag,
+   357→   357→    };
+   358→   358→  } catch {
+   359→   359→    return null;
+   360→   360→  }
+   361→   361→}
+   362→   362→
+   363→   363→async function fetchDexScreenerToken(address: string): Promise<GmgnTokenInfo | null> {
+   364→   364→  const data = await fetchJson(`https://api.dexscreener.com/latest/dex/tokens/${address}`);
+   365→   365→  if (!data || !Array.isArray(data.pairs) || data.pairs.length === 0) return null;
+   366→   366→  const solPairs = data.pairs.filter((p: any) => p.chainId === "solana");
+   367→   367→  const pairs = solPairs.length > 0 ? solPairs : data.pairs;
+   368→   368→  pairs.sort((a: any, b: any) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0));
+   369→   369→  const p = pairs[0];
+   370→   370→  if (!p) return null;
+   371→   371→  const priceUsd = parseFloat(p.priceUsd ?? "0");
+   372→   372→  const marketCap = p.marketCap ?? p.fdv ?? 0;
+   373→   373→  const volume24h = p.volume?.h24 ?? 0;
+   374→   374→  const liquidity = p.liquidity?.usd ?? 0;
+   375→   375→  const txns = p.txns?.h24 ?? {};
+   376→   376→  const priceChange = p.priceChange?.h24 ?? 0;
+   377→   377→  const priceChange1h = p.priceChange?.h1 ?? 0;
+   378→   378→  const created = p.pairCreatedAt ? Math.floor(new Date(p.pairCreatedAt).getTime() / 1000) : undefined;
+   379→   379→  const socials = (p.info?.socials ?? []) as any[];
+   380→   380→  const twitter = socials.find((s) => s.type === "twitter")?.url;
+   381→   381→  const website = p.info?.websites?.[0]?.url;
+   382→   382→  const telegram = socials.find((s) => s.type === "telegram")?.url;
+   383→   383→  const imageUri = p.info?.imageUrl;
+   384→   384→  return {
+   385→   385→    address,
+   386→   386→    symbol: p.baseToken?.symbol ?? "",
+   387→   387→    name: p.baseToken?.name ?? "",
+   388→   388→    decimals: 9,
+   389→   389→    price: priceUsd,
+   390→   390→    price_change_1h: priceChange1h,
+   391→   391→    price_change_24h: priceChange,
+   392→   392→    volume_24h: volume24h,
+   393→   393→    market_cap: marketCap,
+   394→   394→    fdv: p.fdv ?? marketCap,
+   395→   395→    liquidity,
+   396→   396→    holders: 0,
+   397→   397→    total_supply: 0,
+   398→   398→    create_timestamp: created,
+   399→   399→    tx_24h_buy: txns.buys ?? 0,
+   400→   400→    tx_24h_sell: txns.sells ?? 0,
+   401→   401→    is_alive: true,
+   402→   402→    twitter,
+   403→   403→    website,
+   404→   404→    telegram,
+   405→   405→    image_uri: imageUri,
+   406→   406→  };
+   407→   407→}
+   408→   408→
+   409→   409→export async function fetchSecurity(address: string): Promise<GmgnSecurity | null> {
+   410→   410→  const cacheKey = `security:${address}`;
+   411→   411→  const cached = getCached<GmgnSecurity>(cacheKey, 120_000);
+   412→   412→  if (cached) return cached;
+   413→   413→
+   414→   414→  // Try gmgn-cli token security
+   415→   415→  const cliData = await runGmgnCli(["token", "security", "--chain", "sol", "--address", address]);
+   416→   416→  if (cliData) {
+   417→   417→    const sec = mapCliSecurity(cliData, address);
+   418→   418→    if (sec) {
+   419→   419→      setCached(cacheKey, sec);
+   420→   420→      return sec;
+   421→   421→    }
+   422→   422→  }
+   423→   423→  return null;
+   424→   424→}
+   425→   425→
+   426→   426→function mapCliSecurity(data: any, address: string): GmgnSecurity | null {
+   427→   427→  if (!data) return null;
+   428→   428→  try {
+   429→   429→    const risks: string[] = [];
+   430→   430→    const mintRevoked = data.renounced_mint === 1 || data.renounced_mint === true;
+   431→   431→    const freezeRevoked = data.renounced_freeze_account === 1 || data.renounced_freeze_account === true;
+   432→   432→    const isHoneypot = !!data.is_honeypot;
+   433→   433→    const top10 = parseFloat(data.top_10_holder_rate ?? "0");
+   434→   434→    const dev = parseFloat(data.dev_team_hold_rate ?? data.dev_holder_rate ?? "0");
+   435→   435→    const lpLocked = data.lp_locked === 1 || data.lp_locked === true;
+   436→   436→    if (!mintRevoked) risks.push("Mint authority not revoked");
+   437→   437→    if (!freezeRevoked) risks.push("Freeze authority not revoked");
+   438→   438→    if (top10 > 35) risks.push("High top-10 holder concentration");
+   439→   439→    if (dev > 10) risks.push("High dev holdings");
+   440→   440→    if (!lpLocked) risks.push("Liquidity not locked");
+   441→   441→    if (isHoneypot) risks.push("Honeypot detected");
+   442→   442→    if (data.rug_ratio && parseFloat(data.rug_ratio) > 0.3) risks.push(`High rug ratio (${(parseFloat(data.rug_ratio) * 100).toFixed(0)}%)`);
+   443→   443→    return {
+   444→   444→      address,
+   445→   445→      is_mint_authority_revoked: mintRevoked,
+   446→   446→      is_freeze_authority_revoked: freezeRevoked,
+   447→   447→      is_token_mintable: !mintRevoked,
+   448→   448→      is_honeypot: isHoneypot,
+   449→   449→      is_open_source: data.is_open_source === 1 || data.is_open_source === true,
+   450→   450→      is_proxy: data.is_proxy === 1 || data.is_proxy === true,
+   451→   451→      is_canonical: true,
+   452→   452→      top10_holder_rate: top10,
+   453→   453→      top10_holder_value_usd: data.top_10_holder_value_usd,
+   454→   454→      dev_holder_rate: dev,
+   455→   455→      lp_holder_rate: data.lp_holder_rate ? parseFloat(data.lp_holder_rate) : undefined,
+   456→   456→      liquidity_locked: lpLocked,
+   457→   457→      lp_locked_ratio: data.lp_locked_ratio ? parseFloat(data.lp_locked_ratio) : (lpLocked ? 1 : 0),
+   458→   458→      dev_buy_tax_rate: data.buy_tax_rate ? parseFloat(data.buy_tax_rate) : 0,
+   459→   459→      dev_sell_tax_rate: data.sell_tax_rate ? parseFloat(data.sell_tax_rate) : 0,
+   460→   460→      risks,
+   461→   461→    };
+   462→   462→  } catch {
+   463→   463→    return null;
+   464→   464→  }
+   465→   465→}
+   466→   466→
+   467→   467→export async function fetchTopHolders(address: string, limit = 20): Promise<GmgnHolder[] | null> {
+   468→   468→  const cacheKey = `holders:${address}:${limit}`;
+   469→   469→  const cached = getCached<GmgnHolder[]>(cacheKey, 60_000);
+   470→   470→  if (cached) return cached;
+   471→   471→
+   472→   472→  const cliData = await runGmgnCli([
+   473→   473→    "token", "holders",
+   474→   474→    "--chain", "sol",
+   475→   475→    "--address", address,
+   476→   476→    "--limit", String(limit),
+   477→   477→    "--order-by", "amount_percentage",
+   478→   478→    "--direction", "desc",
+   479→   479→  ]);
+   480→   480→  if (cliData?.data?.holders || Array.isArray(cliData?.holders)) {
+   481→   481→    const holders = (cliData.data?.holders || cliData.holders) as any[];
+   482→   482→    const mapped: GmgnHolder[] = holders.map((h: any) => ({
+   483→   483→      address: h.address || h.owner_address,
+   484→   484→      balance: parseFloat(h.balance ?? h.amount ?? "0"),
+   485→   485→      value_usd: parseFloat(h.value_usd ?? "0"),
+   486→   486→      holder_rate: parseFloat(h.amount_percentage ?? h.holder_rate ?? "0"),
+   487→   487→      is_dev: h.tags?.includes("dev"),
+   488→   488→      is_top10: false,
+   489→   489→      is_smart_money: h.tags?.includes("smart_degen"),
+   490→   490→      is_kol: h.tags?.includes("renowned"),
+   491→   491→      is_sniper: h.tags?.includes("sniper"),
+   492→   492→      is_bundler: h.tags?.includes("bundler"),
+   493→   493→      is_rat_trader: h.tags?.includes("rat_trader"),
+   494→   494→      is_fresh_wallet: h.tags?.includes("fresh_wallet"),
+   495→   495→      tags: h.tags,
+   496→   496→    }));
+   497→   497→    setCached(cacheKey, mapped);
+   498→   498→    return mapped;
+   499→   499→  }
+   500→   500→  return null;
+   501→   501→}
+   502→   502→
+   503→   503→export async function fetchTopTraders(address: string, limit = 20): Promise<GmgnTrader[] | null> {
+   504→   504→  const cacheKey = `traders:${address}:${limit}`;
+   505→   505→  const cached = getCached<GmgnTrader[]>(cacheKey, 60_000);
+   506→   506→  if (cached) return cached;
+   507→   507→
+   508→   508→  const cliData = await runGmgnCli([
+   509→   509→    "token", "traders",
+   510→   510→    "--chain", "sol",
+   511→   511→    "--address", address,
+   512→   512→    "--limit", String(limit),
+   513→   513→    "--order-by", "profit",
+   514→   514→    "--direction", "desc",
+   515→   515→  ]);
+   516→   516→  if (cliData?.data?.traders || Array.isArray(cliData?.traders)) {
+   517→   517→    const traders = (cliData.data?.traders || cliData.traders) as any[];
+   518→   518→    const mapped: GmgnTrader[] = traders.map((t: any) => ({
+   519→   519→      address: t.address || t.wallet_address,
+   520→   520→      pnl: parseFloat(t.realized_profit_usd ?? t.pnl ?? "0"),
+   521→   521→      pnl_rate: t.pnl_rate ? parseFloat(t.pnl_rate) : undefined,
+   522→   522→      buy_usd: parseFloat(t.buy_usd ?? "0"),
+   523→   523→      sell_usd: parseFloat(t.sell_usd ?? "0"),
+   524→   524→      tx_count: t.tx_count,
+   525→   525→      is_smart_money: t.tags?.includes("smart_degen"),
+   526→   526→      is_kol: t.tags?.includes("renowned"),
+   527→   527→      is_sniper: t.tags?.includes("sniper"),
+   528→   528→      is_bundler: t.tags?.includes("bundler"),
+   529→   529→      first_buy_time: t.first_buy_time,
+   530→   530→      last_active_time: t.last_active_time,
+   531→   531→      tags: t.tags,
+   532→   532→    }));
+   533→   533→    setCached(cacheKey, mapped);
+   534→   534→    return mapped;
+   535→   535→  }
+   536→   536→  return null;
+   537→   537→}
+   538→   538→
+   539→   539→export async function fetchSmartMoneyActivity(
+   540→   540→  address: string,
+   541→   541→  limit = 30
+   542→   542→): Promise<GmgnSmartMoneyActivity[] | null> {
+   543→   543→  const cacheKey = `smartmoney:${address}:${limit}`;
+   544→   544→  const cached = getCached<GmgnSmartMoneyActivity[]>(cacheKey, 45_000);
+   545→   545→  if (cached) return cached;
+   546→   546→
+   547→   547→  // gmgn-cli track smart-money for a token
+   548→   548→  const cliData = await runGmgnCli([
+   549→   549→    "track", "smart-money",
+   550→   550→    "--chain", "sol",
+   551→   551→    "--address", address,
+   552→   552→    "--limit", String(limit),
+   553→   553→  ]);
+   554→   554→  if (cliData?.data?.activity || Array.isArray(cliData?.activity)) {
+   555→   555→    const activity = (cliData.data?.activity || cliData.activity) as any[];
+   556→   556→    const mapped: GmgnSmartMoneyActivity[] = activity.map((a: any) => ({
+   557→   557→      address: a.wallet_address || a.address,
+   558→   558→      type: a.side === "sell" || a.type === "sell" ? "sell" : "buy",
+   559→   559→      amount_usd: parseFloat(a.amount_usd ?? a.value ?? "0"),
+   560→   560→      amount_token: parseFloat(a.amount ?? "0"),
+   561→   561→      ts: a.timestamp || a.ts,
+   562→   562→      wallet_tag: a.wallet_tag || "smart_degen",
+   563→   563→      wallet_label: a.wallet_label,
+   564→   564→      pnl_30d_usd: a.pnl_30d_usd ? parseFloat(a.pnl_30d_usd) : undefined,
+   565→   565→    }));
+   566→   566→    setCached(cacheKey, mapped);
+   567→   567→    return mapped;
+   568→   568→  }
+   569→   569→  return null;
+   570→   570→}
+   571→   571→
+   572→   572→export async function fetchKolHolders(address: string, limit = 30): Promise<GmgnKolHolder[] | null> {
+   573→   573→  const cacheKey = `kol:${address}:${limit}`;
+   574→   574→  const cached = getCached<GmgnKolHolder[]>(cacheKey, 90_000);
+   575→   575→  if (cached) return cached;
+   576→   576→
+   577→   577→  // gmgn-cli token holders filtered by renowned (KOL) tag
+   578→   578→  const cliData = await runGmgnCli([
+   579→   579→    "token", "holders",
+   580→   580→    "--chain", "sol",
+   581→   581→    "--address", address,
+   582→   582→    "--limit", String(limit),
+   583→   583→    "--tag", "renowned",
+   584→   584→  ]);
+   585→   585→  if (cliData?.data?.holders || Array.isArray(cliData?.holders)) {
+   586→   586→    const holders = (cliData.data?.holders || cliData.holders) as any[];
+   587→   587→    const mapped: GmgnKolHolder[] = holders.map((h: any) => ({
+   588→   588→      address: h.address || h.owner_address,
+   589→   589→      twitter_handle: h.twitter_handle || h.twitter_username || "unknown",
+   590→   590→      twitter_name: h.twitter_name || h.name || h.twitter_handle || "KOL",
+   591→   591→      followers: h.followers || 0,
+   592→   592→      balance: parseFloat(h.balance ?? "0"),
+   593→   593→      value_usd: parseFloat(h.value_usd ?? "0"),
+   594→   594→      buy_usd: h.buy_usd ? parseFloat(h.buy_usd) : undefined,
+   595→   595→      avg_buy_price: h.avg_buy_price ? parseFloat(h.avg_buy_price) : undefined,
+   596→   596→      pnl_usd: h.pnl_usd ? parseFloat(h.pnl_usd) : undefined,
+   597→   597→      last_buy_ts: h.last_buy_ts,
+   598→   598→    }));
+   599→   599→    setCached(cacheKey, mapped);
+   600→   600→    return mapped;
+   601→   601→  }
+   602→   602→  return null;
+   603→   603→}
+   604→   604→
+   605→   605→export async function fetchCandles(
+   606→   606→  address: string,
+   607→   607→  resolution: "30s" | "1m" | "5m" | "15m" | "1h" | "4h" | "1d" = "15m",
+   608→   608→  limit = 200
+   609→   609→): Promise<GmgnCandle[] | null> {
+   610→   610→  const cacheKey = `candles:${address}:${resolution}:${limit}`;
+   611→   611→  const ttl = resolution === "30s" || resolution === "1m" || resolution === "5m" ? 15_000 : 60_000;
+   612→   612→  const cached = getCached<GmgnCandle[]>(cacheKey, ttl);
+   613→   613→  if (cached) return cached;
+   614→   614→
+   615→   615→  // Try gmgn-cli market kline
+   616→   616→  const to = Math.floor(Date.now() / 1000);
+   617→   617→  const resolutionMinutes =
+   618→   618→    resolution === "30s" ? 0.5 :
+   619→   619→    resolution === "1m" ? 1 :
+   620→   620→    resolution === "5m" ? 5 :
+   621→   621→    resolution === "15m" ? 15 :
+   622→   622→    resolution === "1h" ? 60 :
+   623→   623→    resolution === "4h" ? 240 : 1440;
+   624→   624→  const from = to - Math.floor(resolutionMinutes * 60 * limit);
+   625→   625→  const cliData = await runGmgnCli([
+   626→   626→    "market", "kline",
+   627→   627→    "--chain", "sol",
+   628→   628→    "--address", address,
+   629→   629→    "--resolution", resolution,
+   630→   630→    "--from", String(from),
+   631→   631→    "--to", String(to),
+   632→   632→  ]);
+   633→   633→  if (cliData?.data?.candles || cliData?.data?.klines || Array.isArray(cliData?.data)) {
+   634→   634→    const candles = cliData.data?.candles || cliData.data?.klines || cliData.data;
+   635→   635→    if (Array.isArray(candles)) {
+   636→   636→      const mapped: GmgnCandle[] = candles.map((c: any) => {
+   637→   637→        // gmgn kline format: [timestamp, open, high, low, close, volume]
+   638→   638→        if (Array.isArray(c)) {
+   639→   639→          return {
+   640→   640→            t: c[0],
+   641→   641→            o: parseFloat(c[1]),
+   642→   642→            h: parseFloat(c[2]),
+   643→   643→            l: parseFloat(c[3]),
+   644→   644→            c: parseFloat(c[4]),
+   645→   645→            v: parseFloat(c[5] ?? "0"),
+   646→   646→          };
+   647→   647→        }
+   648→   648→        return {
+   649→   649→          t: c.t || c.timestamp,
+   650→   650→          o: parseFloat(c.o ?? c.open ?? "0"),
+   651→   651→          h: parseFloat(c.h ?? c.high ?? "0"),
+   652→   652→          l: parseFloat(c.l ?? c.low ?? "0"),
+   653→   653→          c: parseFloat(c.c ?? c.close ?? "0"),
+   654→   654→          v: parseFloat(c.v ?? c.volume ?? "0"),
+   655→   655→        };
+   656→   656→      });
+   657→   657→      setCached(cacheKey, mapped);
+   658→   658→      return mapped;
+   659→   659→    }
+   660→   660→  }
+   661→   661→  return null;
+   662→   662→}
+   663→   663→
+   664→   664→export async function fetchTrending(
+   665→   665→  timeframe: "1m" | "5m" | "1h" | "6h" | "24h" = "1h",
+   666→   666→  orderBy: "volume" | "tx_count" | "market_cap" | "smart_money" = "volume",
+   667→   667→  limit = 30
+   668→   668→): Promise<GmgnTrendingToken[] | null> {
+   669→   669→  const cacheKey = `trending:${timeframe}:${orderBy}:${limit}`;
+   670→   670→  const cached = getCached<GmgnTrendingToken[]>(cacheKey, 30_000);
+   671→   671→  if (cached) return cached;
+   672→   672→
+   673→   673→  // Try gmgn-cli market trending
+   674→   674→  const cliData = await runGmgnCli([
+   675→   675→    "market", "trending",
+   676→   676→    "--chain", "sol",
+   677→   677→    "--interval", timeframe,
+   678→   678→  ]);
+   679→   679→  if (cliData?.data?.rank || cliData?.data?.trending || Array.isArray(cliData?.data)) {
+   680→   680→    const arr = cliData.data?.rank || cliData.data?.trending || cliData.data;
+   681→   681→    if (Array.isArray(arr)) {
+   682→   682→      const mapped: GmgnTrendingToken[] = arr.slice(0, limit).map((t: any, i: number) => ({
+   683→   683→        address: t.address || t.token_address,
+   684→   684→        symbol: t.symbol || t.base_symbol || "",
+   685→   685→        name: t.name || "",
+   686→   686→        decimals: t.decimals ?? 9,
+   687→   687→        price: parseFloat(t.price ?? "0"),
+   688→   688→        price_change_1h: parseFloat(t.change_1h ?? "0"),
+   689→   689→        price_change_24h: parseFloat(t.change_24h ?? "0"),
+   690→   690→        volume_24h: parseFloat(t.volume ?? t.volume_24h ?? "0"),
+   691→   691→        market_cap: parseFloat(t.market_cap ?? "0"),
+   692→   692→        fdv: t.fdv ? parseFloat(t.fdv) : undefined,
+   693→   693→        liquidity: parseFloat(t.liquidity ?? "0"),
+   694→   694→        holders: t.holder_count ?? 0,
+   695→   695→        total_supply: t.total_supply ?? 0,
+   696→   696→        create_timestamp: t.create_timestamp,
+   697→   697→        is_alive: true,
+   698→   698→        rank: i + 1,
+   699→   699→        chain: "solana",
+   700→   700→        swaps_24h: t.swaps ?? t.tx_count,
+   701→   701→        buyers_24h: t.buys,
+   702→   702→        sellers_24h: t.sells,
+   703→   703→        smart_money_holders: t.smart_degen_count,
+   704→   704→        smart_money_inflow_24h: t.smart_money_inflow,
+   705→   705→        hot_level: t.hot_level,
+   706→   706→      }));
+   707→   707→      setCached(cacheKey, mapped);
+   708→   708→      return mapped;
+   709→   709→    }
+   710→   710→  }
+   711→   711→
+   712→   712→  // Fall back to DexScreener boosted tokens
+   713→   713→  const ds = await fetchDexScreenerTrending(limit);
+   714→   714→  if (ds) {
+   715→   715→    setCached(cacheKey, ds);
+   716→   716→    return ds;
+   717→   717→  }
+   718→   718→  return null;
+   719→   719→}
+   720→   720→
+   721→   721→async function fetchDexScreenerTrending(limit: number): Promise<GmgnTrendingToken[] | null> {
+   722→   722→  const data = await fetchJson("https://api.dexscreener.com/token-boosts/top/v1");
+   723→   723→  if (!Array.isArray(data) || data.length === 0) return null;
+   724→   724→  const solTokens = data.filter((t: any) => t.chainId === "solana").slice(0, limit);
+   725→   725→  if (solTokens.length === 0) return null;
+   726→   726→
+   727→   727→  const results: GmgnTrendingToken[] = [];
+   728→   728→  for (let i = 0; i < Math.min(solTokens.length, limit); i++) {
+   729→   729→    const t = solTokens[i];
+   730→   730→    const pairData = await fetchJson(
+   731→   731→      `https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`
+   732→   732→    );
+   733→   733→    if (!pairData || !Array.isArray(pairData.pairs) || pairData.pairs.length === 0) continue;
+   734→   734→    const solPairs = pairData.pairs.filter((p: any) => p.chainId === "solana");
+   735→   735→    const pairs = solPairs.length > 0 ? solPairs : pairData.pairs;
+   736→   736→    pairs.sort((a: any, b: any) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0));
+   737→   737→    const p = pairs[0];
+   738→   738→    if (!p) continue;
+   739→   739→    const priceUsd = parseFloat(p.priceUsd ?? "0");
+   740→   740→    const marketCap = p.marketCap ?? p.fdv ?? 0;
+   741→   741→    results.push({
+   742→   742→      address: t.tokenAddress,
+   743→   743→      symbol: p.baseToken?.symbol ?? "",
+   744→   744→      name: p.baseToken?.name ?? "",
+   745→   745→      decimals: 9,
+   746→   746→      price: priceUsd,
+   747→   747→      price_change_1h: p.priceChange?.h1 ?? 0,
+   748→   748→      price_change_24h: p.priceChange?.h24 ?? 0,
+   749→   749→      volume_24h: p.volume?.h24 ?? 0,
+   750→   750→      market_cap: marketCap,
+   751→   751→      fdv: p.fdv ?? marketCap,
+   752→   752→      liquidity: p.liquidity?.usd ?? 0,
+   753→   753→      holders: 0,
+   754→   754→      total_supply: 0,
+   755→   755→      create_timestamp: p.pairCreatedAt ? Math.floor(new Date(p.pairCreatedAt).getTime() / 1000) : undefined,
+   756→   756→      is_alive: true,
+   757→   757→      rank: i + 1,
+   758→   758→      chain: "solana",
+   759→   759→      swaps_24h: (p.txns?.h24?.buys ?? 0) + (p.txns?.h24?.sells ?? 0),
+   760→   760→      buyers_24h: p.txns?.h24?.buys ?? 0,
+   761→   761→      sellers_24h: p.txns?.h24?.sells ?? 0,
+   762→   762→      smart_money_holders: 0,
+   763→   763→      smart_money_inflow_24h: 0,
+   764→   764→    });
+   765→   765→  }
+   766→   766→  return results.length > 0 ? results : null;
+   767→   767→}
+   768→   768→
+   769→   769→export async function fetchNewPairs(limit = 30): Promise<GmgnTrendingToken[] | null> {
+   770→   770→  const cacheKey = `newpairs:${limit}`;
+   771→   771→  const cached = getCached<GmgnTrendingToken[]>(cacheKey, 30_000);
+   772→   772→  if (cached) return cached;
+   773→   773→
+   774→   774→  // Try gmgn-cli market trenches (new_creation)
+   775→   775→  const cliData = await runGmgnCli([
+   776→   776→    "market", "trenches",
+   777→   777→    "--chain", "sol",
+   778→   778→    "--type", "new_creation",
+   779→   779→  ]);
+   780→   780→  if (cliData?.data?.new_creation || cliData?.data?.trenches || Array.isArray(cliData?.data)) {
+   781→   781→    const arr = cliData.data?.new_creation || cliData.data?.trenches || cliData.data;
+   782→   782→    if (Array.isArray(arr)) {
+   783→   783→      const mapped: GmgnTrendingToken[] = arr.slice(0, limit).map((t: any, i: number) => ({
+   784→   784→        address: t.address || t.token_address,
+   785→   785→        symbol: t.symbol || "",
+   786→   786→        name: t.name || "",
+   787→   787→        decimals: t.decimals ?? 9,
+   788→   788→        price: parseFloat(t.price ?? "0"),
+   789→   789→        price_change_1h: parseFloat(t.change_1h ?? "0"),
+   790→   790→        price_change_24h: parseFloat(t.change_24h ?? "0"),
+   791→   791→        volume_24h: parseFloat(t.volume ?? "0"),
+   792→   792→        market_cap: parseFloat(t.market_cap ?? "0"),
+   793→   793→        liquidity: parseFloat(t.liquidity ?? "0"),
+   794→   794→        holders: t.holder_count ?? 0,
+   795→   795→        total_supply: t.total_supply ?? 0,
+   796→   796→        create_timestamp: t.create_timestamp,
+   797→   797→        is_alive: true,
+   798→   798→        rank: i + 1,
+   799→   799→        chain: "solana",
+   800→   800→        swaps_24h: t.swaps,
+   801→   801→        buyers_24h: t.buys,
+   802→   802→        sellers_24h: t.sells,
+   803→   803→        smart_money_holders: t.smart_degen_count,
+   804→   804→        smart_money_inflow_24h: t.smart_money_inflow,
+   805→   805→      }));
+   806→   806→      setCached(cacheKey, mapped);
+   807→   807→      return mapped;
+   808→   808→    }
+   809→   809→  }
+   810→   810→
+   811→   811→  // Fall back to DexScreener token-boosts/latest
+   812→   812→  const ds = await fetchJson("https://api.dexscreener.com/token-boosts/latest/v1");
+   813→   813→  if (Array.isArray(ds)) {
+   814→   814→    const solTokens = ds.filter((t: any) => t.chainId === "solana").slice(0, limit);
+   815→   815→    const results: GmgnTrendingToken[] = [];
+   816→   816→    for (let i = 0; i < solTokens.length; i++) {
+   817→   817→      const t = solTokens[i];
+   818→   818→      const pairData = await fetchJson(
+   819→   819→        `https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`
+   820→   820→      );
+   821→   821→      if (!pairData?.pairs?.length) continue;
+   822→   822→      const solPairs = pairData.pairs.filter((p: any) => p.chainId === "solana");
+   823→   823→      const p = (solPairs.length > 0 ? solPairs : pairData.pairs).sort(
+   824→   824→        (a: any, b: any) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
+   825→   825→      )[0];
+   826→   826→      if (!p) continue;
+   827→   827→      const priceUsd = parseFloat(p.priceUsd ?? "0");
+   828→   828→      const marketCap = p.marketCap ?? p.fdv ?? 0;
+   829→   829→      results.push({
+   830→   830→        address: t.tokenAddress,
+   831→   831→        symbol: p.baseToken?.symbol ?? "",
+   832→   832→        name: p.baseToken?.name ?? "",
+   833→   833→        decimals: 9,
+   834→   834→        price: priceUsd,
+   835→   835→        price_change_1h: p.priceChange?.h1 ?? 0,
+   836→   836→        price_change_24h: p.priceChange?.h24 ?? 0,
+   837→   837→        volume_24h: p.volume?.h24 ?? 0,
+   838→   838→        market_cap: marketCap,
+   839→   839→        fdv: p.fdv ?? marketCap,
+   840→   840→        liquidity: p.liquidity?.usd ?? 0,
+   841→   841→        holders: 0,
+   842→   842→        total_supply: 0,
+   843→   843→        create_timestamp: p.pairCreatedAt ? Math.floor(new Date(p.pairCreatedAt).getTime() / 1000) : undefined,
+   844→   844→        is_alive: true,
+   845→   845→        rank: i + 1,
+   846→   846→        chain: "solana",
+   847→   847→        swaps_24h: (p.txns?.h24?.buys ?? 0) + (p.txns?.h24?.sells ?? 0),
+   848→   848→        buyers_24h: p.txns?.h24?.buys ?? 0,
+   849→   849→        sellers_24h: p.txns?.h24?.sells ?? 0,
+   850→   850→      });
+   851→   851→    }
+   852→   852→    if (results.length > 0) {
+   853→   853→      setCached(cacheKey, results);
+   854→   854→      return results;
+   855→   855→    }
+   856→   856→  }
+   857→   857→  return null;
+   858→   858→}
+   859→   859→
+   860→   860→export async function searchTokens(query: string, limit = 10): Promise<GmgnTrendingToken[] | null> {
+   861→   861→  const cacheKey = `search:${query}:${limit}`;
+   862→   862→  const cached = getCached<GmgnTrendingToken[]>(cacheKey, 60_000);
+   863→   863→  if (cached) return cached;
+   864→   864→  const data = await fetchJson(
+   865→   865→    `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`
+   866→   866→  );
+   867→   867→  if (!data || !Array.isArray(data.pairs)) return null;
+   868→   868→  const seen = new Set<string>();
+   869→   869→  const filtered = data.pairs
+   870→   870→    .filter((p: any) => p.chainId === "solana")
+   871→   871→    .filter((p: any) => {
+   872→   872→      if (seen.has(p.baseToken?.address)) return false;
+   873→   873→      seen.add(p.baseToken?.address);
+   874→   874→      return true;
+   875→   875→    })
+   876→   876→    .sort((a: any, b: any) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))
+   877→   877→    .slice(0, limit);
+   878→   878→  const out: GmgnTrendingToken[] = filtered.map((p: any, i: number) => {
+   879→   879→    const priceUsd = parseFloat(p.priceUsd ?? "0");
+   880→   880→    const marketCap = p.marketCap ?? p.fdv ?? 0;
+   881→   881→    return {
+   882→   882→      address: p.baseToken?.address ?? "",
+   883→   883→      symbol: p.baseToken?.symbol ?? "",
+   884→   884→      name: p.baseToken?.name ?? "",
+   885→   885→      decimals: 9,
+   886→   886→      price: priceUsd,
+   887→   887→      price_change_1h: p.priceChange?.h1 ?? 0,
+   888→   888→      price_change_24h: p.priceChange?.h24 ?? 0,
+   889→   889→      volume_24h: p.volume?.h24 ?? 0,
+   890→   890→      market_cap: marketCap,
+   891→   891→      fdv: p.fdv ?? marketCap,
+   892→   892→      liquidity: p.liquidity?.usd ?? 0,
+   893→   893→      holders: 0,
+   894→   894→      total_supply: 0,
+   895→   895→      create_timestamp: p.pairCreatedAt ? Math.floor(new Date(p.pairCreatedAt).getTime() / 1000) : undefined,
+   896→   896→      is_alive: true,
+   897→   897→      rank: i + 1,
+   898→   898→      chain: "solana",
+   899→   899→      swaps_24h: (p.txns?.h24?.buys ?? 0) + (p.txns?.h24?.sells ?? 0),
+   900→   900→      buyers_24h: p.txns?.h24?.buys ?? 0,
+   901→   901→      sellers_24h: p.txns?.h24?.sells ?? 0,
+   902→   902→    };
+   903→   903→  });
+   904→   904→  setCached(cacheKey, out);
+   905→   905→  return out;
+   906→   906→}
+   907→   907→
+   908→   908→// ===== Health check =====
+   909→   909→
+   910→   910→export async function checkGmgnCliStatus(): Promise<{
+   911→   911→  installed: boolean;
+   912→   912→  apiKeyConfigured: boolean;
+   913→   913→  lastError?: string;
+   914→   914→}> {
+   915→   915→  try {
+   916→   916→    const { stdout, stderr } = await execFileAsync(GMGN_CLI_BIN, ["config", "--check"], {
+   917→   917→      timeout: 5000,
+   918→   918→    });
+   919→   919→    return {
+   920→   920→      installed: true,
+   921→   921→      apiKeyConfigured: !stdout.includes("not configured") && !stderr.includes("required"),
+   922→   922→    };
+   923→   923→  } catch (err: any) {
+   924→   924→    if (err?.code === "ENOENT") {
+   925→   925→      return { installed: false, apiKeyConfigured: false };
+   926→   926→    }
+   927→   927→    return {
+   928→   928→      installed: true,
+   929→   929→      apiKeyConfigured: false,
+   930→   930→      lastError: err?.message,
+   931→   931→    };
+   932→   932→  }
+   933→   933→}
+   934→   934→

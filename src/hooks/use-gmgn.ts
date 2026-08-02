@@ -64,10 +64,13 @@ export function useGmgn<T>(url: string | null, opts?: { refreshMs?: number }): G
     };
   }, [url, nonce]);
 
-  // Optional auto-refresh
+  // Optional auto-refresh (skipped when tab is hidden to avoid wasted CLI subprocess spawns)
   useEffect(() => {
     if (!url || !opts?.refreshMs) return;
-    const id = setInterval(() => setNonce((n) => n + 1), opts.refreshMs);
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      setNonce((n) => n + 1);
+    }, opts.refreshMs);
     return () => clearInterval(id);
   }, [url, opts?.refreshMs]);
 

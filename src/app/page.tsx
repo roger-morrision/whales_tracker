@@ -67,19 +67,17 @@ export default function Home() {
     }
   }, []);
 
-  // Live price ticking — every 2.5s (local simulation for smooth UI)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      tickPrices();
-    }, 2500);
-    return () => clearInterval(interval);
-  }, [tickPrices]);
+  // Live price ticking — every 2.5s (moved below with visibility check)
 
   // Fetch real prices from /api/prices every 15s (overrides local tick)
   useEffect(() => {
+    const controller = new AbortController();
     const fetchRealPrices = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
-        const res = await fetch("/api/prices?symbols=SOL,WIF,JUP,BONK,JTO,PYTH,DRIFT,IO,RNDR,POPCAT,HNT,TNSR,MNGO,MOON,ETH,BTC,NEON,RAY");
+        const res = await fetch("/api/prices?symbols=SOL,WIF,JUP,BONK,JTO,PYTH,DRIFT,IO,RNDR,POPCAT,HNT,TNSR,MNGO,MOON,ETH,BTC,NEON,RAY", {
+          signal: controller.signal,
+        });
         const data = await res.json();
         if (data.prices) {
           Object.entries(data.prices).forEach(([symbol, info]: [string, any]) => {
@@ -95,15 +93,39 @@ export default function Home() {
     };
     fetchRealPrices();
     const interval = setInterval(fetchRealPrices, 15_000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      controller.abort();
+    };
   }, []);
 
   // Fetch real wallet balance when wallet connects
+  // Prefer GMGN portfolio (real on-chain data when API key configured);
+  // fall back to /api/wallet (which uses Helius RPC + DexScreener pricing).
   useEffect(() => {
     if (!wallet?.connected) return;
+    const controller = new AbortController();
     const fetchBalance = async () => {
       try {
-        const res = await fetch(`/api/wallet?address=${encodeURIComponent(wallet.address)}`);
+        // Try GMGN portfolio first
+        const gmgnRes = await fetch(
+          `/api/gmgn/portfolio?wallet=${encodeURIComponent(wallet.address)}`,
+          { signal: controller.signal }
+        );
+        const gmgnData = await gmgnRes.json();
+        if (gmgnData?.source === "gmgn" && gmgnData?.totalValue) {
+          useMoby.setState((s) => ({
+            wallet: s.wallet ? { ...s.wallet, balanceUsd: gmgnData.totalValue } : null,
+          }));
+          return;
+        }
+      } catch {
+        // fall through to /api/wallet
+      }
+      try {
+        const res = await fetch(`/api/wallet?address=${encodeURIComponent(wallet.address)}`, {
+          signal: controller.signal,
+        });
         const data = await res.json();
         if (data.totalUsd) {
           useMoby.setState((s) => ({
@@ -115,15 +137,26 @@ export default function Home() {
       }
     };
     fetchBalance();
+    return () => controller.abort();
   }, [wallet?.connected, wallet?.address]);
 
-  // Periodic feed refresh — every 30s
+  // Periodic feed refresh — every 30s (skipped when tab hidden)
   useEffect(() => {
     const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
       refreshFeeds();
     }, 30_000);
     return () => clearInterval(interval);
   }, [refreshFeeds]);
+
+  // Live price ticking — every 2.5s (skipped when tab hidden to save CPU)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      tickPrices();
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [tickPrices]);
 
   // Scroll to top on tab change
   useEffect(() => {
@@ -342,11 +375,10 @@ function BackToTopButton() {
   useEffect(() => {
     const handler = () => setVisible(window.scrollY > 400);
     window.addEventListener("scroll", handler, { passive: true });
-    // Also poll as fallback
-    const interval = setInterval(handler, 1000);
+    // Initial check
+    handler();
     return () => {
       window.removeEventListener("scroll", handler);
-      clearInterval(interval);
     };
   }, []);
 

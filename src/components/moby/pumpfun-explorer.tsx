@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { X, Flame, Rocket, Zap, ExternalLink, RefreshCw, Filter, TrendingUp, AlertTriangle } from "lucide-react";
 import { useMoby } from "@/lib/moby-store";
 import { Chip, Sparkline } from "./primitives";
@@ -92,13 +92,22 @@ export function PumpFunExplorerModal() {
   const [loading, setLoading] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
+  // Track the active fetch to abort stale requests on rapid tab/filter switches
+  const abortRef = useRef<AbortController | null>(null);
+
   const fetchTokens = useCallback(async () => {
+    // Abort any in-flight fetch
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     try {
       if (tab === "gmgn") {
         // GMGN new-pairs endpoint
-        const res = await fetch(`/api/gmgn/new-pairs?limit=30`);
+        const res = await fetch(`/api/gmgn/new-pairs?limit=30`, { signal: controller.signal });
         const data = await res.json();
+        if (controller.signal.aborted) return;
         // Convert GmgnTrendingToken shape to PumpFunToken
         const mapped: PumpFunToken[] = (data.tokens || []).map((t: any, i: number) => {
           const ageMin = t.create_timestamp
@@ -135,14 +144,16 @@ export function PumpFunExplorerModal() {
         return;
       }
       const lpParam = launchpad !== "all" ? `&launchpad=${encodeURIComponent(launchpad)}` : "";
-      const res = await fetch(`/api/pumpfun?type=${tab}&limit=30${lpParam}`);
+      const res = await fetch(`/api/pumpfun?type=${tab}&limit=30${lpParam}`, { signal: controller.signal });
       const data = await res.json();
+      if (controller.signal.aborted) return;
       setTokens(data.tokens || []);
       setCounts(data.launchpads || {});
-    } catch {
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
       setTokens([]);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [tab, launchpad]);
 
@@ -150,12 +161,22 @@ export function PumpFunExplorerModal() {
     if (open) fetchTokens();
   }, [open, fetchTokens]);
 
-  // Auto-refresh every 30s
+  // Auto-refresh every 30s (skipped when tab is hidden to save CLI subprocess spawns)
   useEffect(() => {
     if (!open) return;
-    const interval = setInterval(fetchTokens, 30_000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchTokens();
+    }, 30_000);
     return () => clearInterval(interval);
   }, [open, fetchTokens]);
+
+  // Cleanup: abort any in-flight fetch on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   return (
     <AnimatePresence>

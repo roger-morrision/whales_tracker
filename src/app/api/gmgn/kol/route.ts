@@ -13,7 +13,7 @@ const SAMPLE_TWITTERS = [
   { handle: "HsakaTrades", name: "Hsaka", followers: 312_000 },
   { handle: "CryptoCobain", name: "Cobie", followers: 742_000 },
   { handle: "LightCrypto", name: "Light", followers: 145_000 },
-  { handle: " Pentosh1", name: "Pentoshi", followers: 521_000 },
+  { handle: "Pentosh1", name: "Pentoshi", followers: 521_000 },
   { handle: "CoinMamba", name: "CoinMamba", followers: 92_000 },
   { handle: "0xMert", name: "Mert", followers: 168_000 },
   { handle: "Bluntz_Capital", name: "Bluntz", followers: 84_000 },

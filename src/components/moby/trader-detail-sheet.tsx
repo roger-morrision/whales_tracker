@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { TRADERS, fmtUsd, fmtPct, fmtAgo, fmtNum } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
+import { useGmgn } from "@/hooks/use-gmgn";
 import { Chip, SectionHeader } from "./primitives";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -170,6 +171,9 @@ function TraderDetailContent({ traderId, onClose }: { traderId: string; onClose:
         </div>
       </div>
 
+      {/* GMGN Live portfolio */}
+      {trader.walletAddress && <GmgnTraderPortfolio walletAddress={trader.walletAddress} />}
+
       {/* Recent trades */}
       <div className="px-4 mt-4 pb-6">
         <SectionHeader title="Recent trades" emoji="⚡" action="All" />
@@ -224,6 +228,93 @@ function Stat({
       {icon && <div className={cn("inline-flex items-center justify-center mb-1", color)}>{icon}</div>}
       <div className={cn("text-sm font-bold tabular", color)}>{value}</div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+// ===== GMGN Live Trader Portfolio =====
+function GmgnTraderPortfolio({ walletAddress }: { walletAddress: string }) {
+  // Use a sanitized wallet address for the URL — static demo traders have placeholder
+  // addresses like "0x7a3f...b9c2" which won't work with GMGN. Only fetch if it looks
+  // like a real address (32-44 char base58 for Solana).
+  const isRealAddress = /^[A-Za-z0-9]{32,44}$/.test(walletAddress);
+  const url = isRealAddress
+    ? `/api/gmgn/portfolio?wallet=${walletAddress}`
+    : null;
+  const { data, loading, source } = useGmgn<any>(url);
+
+  if (!isRealAddress) return null;
+  return (
+    <div className="px-4 mt-4">
+      <div className="rounded-2xl border border-border bg-surface-2/40 overflow-hidden">
+        <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
+          <div className="h-5 w-5 rounded-md bg-gradient-to-br from-[#14F195] to-[#9945FF] grid place-items-center text-[10px] font-bold text-background">
+            G
+          </div>
+          <span className="text-xs font-semibold">GMGN Live Portfolio</span>
+          {source && (
+            <Chip variant={source === "gmgn" ? "bull" : "outline"} className="text-[9px]">
+              {source === "gmgn" ? "live" : "demo"}
+            </Chip>
+          )}
+          <a
+            href={`https://gmgn.ai/sol/address/${walletAddress}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto text-[10px] text-muted-foreground hover:text-bull"
+          >
+            View on GMGN →
+          </a>
+        </div>
+        <div className="p-3">
+          {loading && !data ? (
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-14 rounded-lg bg-surface-3 animate-pulse" />
+              ))}
+            </div>
+          ) : data && data.source === "gmgn" && data.stats ? (
+            <>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="rounded-lg border border-border p-2">
+                  <div className="text-[9px] text-muted-foreground uppercase">Total value</div>
+                  <div className="text-sm font-bold tabular">{fmtUsd(data.stats.total_value, { compact: true })}</div>
+                </div>
+                <div className="rounded-lg border border-bull/30 bg-bull/5 p-2">
+                  <div className="text-[9px] text-muted-foreground uppercase">Realized P&L</div>
+                  <div className={cn("text-sm font-bold tabular", data.stats.realized_profit >= 0 ? "text-bull" : "text-bear")}>
+                    {data.stats.realized_profit >= 0 ? "+" : ""}{fmtUsd(data.stats.realized_profit, { compact: true })}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border p-2">
+                  <div className="text-[9px] text-muted-foreground uppercase">Win rate</div>
+                  <div className="text-sm font-bold tabular">{(data.stats.winrate * 100).toFixed(0)}%</div>
+                </div>
+              </div>
+              {data.holdings && data.holdings.length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">Top holdings</div>
+                  <div className="space-y-1 max-h-40 overflow-y-auto scrollbar-thin">
+                    {data.holdings.slice(0, 5).map((h: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-[11px]">
+                        <span className="font-semibold w-12 truncate">{h.symbol}</span>
+                        <span className="text-muted-foreground tabular">{fmtUsd(h.usd_value, { compact: true })}</span>
+                        <span className={cn("ml-auto tabular", h.profit >= 0 ? "text-bull" : "text-bear")}>
+                          {h.profit >= 0 ? "+" : ""}{fmtUsd(h.profit, { compact: true })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-[11px] text-muted-foreground py-3 text-center">
+              GMGN portfolio unavailable for this wallet.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

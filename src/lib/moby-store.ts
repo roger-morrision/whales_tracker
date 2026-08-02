@@ -834,7 +834,7 @@ export const useMoby = create<MobyState>()(
     }
   },
   dismissSignal: (id) =>
-    set((s) => ({ dismissedSignals: [...s.dismissedSignals, id] })),
+    set((s) => ({ dismissedSignals: [...s.dismissedSignals, id].slice(-200) })),
 
   copilotOpen: false,
   setCopilotOpen: (open) => set({ copilotOpen: open }),
@@ -932,7 +932,7 @@ export const useMoby = create<MobyState>()(
   ],
   pushAlert: (a) =>
     set((s) => ({
-      alerts: [{ ...a, id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }, ...s.alerts],
+      alerts: [{ ...a, id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }, ...s.alerts].slice(0, 50),
     })),
   dismissAlert: (id) =>
     set((s) => ({ alerts: s.alerts.filter((x) => x.id !== id) })),
