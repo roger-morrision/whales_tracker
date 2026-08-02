@@ -44,6 +44,7 @@ import {
 } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { useGmgn } from "@/hooks/use-gmgn";
+import { LightweightChart } from "./lightweight-chart";
 import { TokenIcon, Chip, Sparkline } from "./primitives";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -248,52 +249,43 @@ export function FullChartModal() {
 
               {/* Main chart */}
               <div className="rounded-xl border border-border p-2">
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    {indicator === "candles" ? (
-                      <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
-                        <XAxis dataKey="t" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => new Date(v).toLocaleTimeString("en-US", { hour: "numeric" })} />
-                        <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} domain={["dataMin", "dataMax"]} orientation="right" />
-                        <Tooltip content={<CandleTooltip />} />
-                        {/* High-Low bars */}
-                        <Bar dataKey="h" fill="transparent" />
-                        {/* Candle bodies using open-close as bars */}
-                        <Bar dataKey={(d) => d.c >= d.o ? d.c - d.o : 0} fill="var(--bull)" radius={[1, 1, 0, 0]} />
-                        <Bar dataKey={(d) => d.c < d.o ? d.o - d.c : 0} fill="var(--bear)" radius={[1, 1, 0, 0]} />
-                      </ComposedChart>
-                    ) : indicator === "line" ? (
-                      <AreaChart data={chartData}>
-                        <defs>
-                          <linearGradient id="chart-area" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={isBull ? "var(--bull)" : "var(--bear)"} stopOpacity="0.3" />
-                            <stop offset="100%" stopColor={isBull ? "var(--bull)" : "var(--bear)"} stopOpacity="0" />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
-                        <XAxis dataKey="t" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => new Date(v).toLocaleTimeString("en-US", { hour: "numeric" })} />
-                        <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} domain={["dataMin", "dataMax"]} orientation="right" />
-                        <Tooltip content={<PriceTooltip />} />
-                        <Area type="monotone" dataKey="c" stroke={isBull ? "var(--bull)" : "var(--bear)"} strokeWidth={2} fill="url(#chart-area)" isAnimationActive={false} />
-                      </AreaChart>
-                    ) : indicator === "bb" ? (
-                      <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
-                        <XAxis dataKey="t" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => new Date(v).toLocaleTimeString("en-US", { hour: "numeric" })} />
-                        <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} domain={["dataMin", "dataMax"]} orientation="right" />
-                        <Tooltip content={<PriceTooltip />} />
-                        <Area type="monotone" dataKey="bbUpper" stroke="#64748B" strokeWidth={1} strokeDasharray="4 4" fill="transparent" isAnimationActive={false} />
-                        <Area type="monotone" dataKey="bbLower" stroke="#64748B" strokeWidth={1} strokeDasharray="4 4" fill="transparent" isAnimationActive={false} />
-                        <Area type="monotone" dataKey="c" stroke={isBull ? "var(--bull)" : "var(--bear)"} strokeWidth={2} fill="transparent" isAnimationActive={false} />
-                        <Line type="monotone" dataKey="bbMiddle" stroke="#64748B" strokeWidth={1} dot={false} isAnimationActive={false} />
-                      </ComposedChart>
-                    ) : (
-                      <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
-                        <XAxis dataKey="t" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => new Date(v).toLocaleTimeString("en-US", { hour: "numeric" })} />
-                        <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} domain={["dataMin", "dataMax"]} orientation="right" />
-                        <Tooltip content={<PriceTooltip />} />
-                        <Area type="monotone" dataKey="c" stroke={isBull ? "var(--bull)" : "var(--bear)"} strokeWidth={2} fill="transparent" isAnimationActive={false} />
+                {indicator === "candles" ? (
+                  <LightweightChart candles={candles} height={256} showVolume={showVolume} />
+                ) : (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      {indicator === "line" ? (
+                        <AreaChart data={chartData}>
+                          <defs>
+                            <linearGradient id="chart-area" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={isBull ? "var(--bull)" : "var(--bear)"} stopOpacity="0.3" />
+                              <stop offset="100%" stopColor={isBull ? "var(--bull)" : "var(--bear)"} stopOpacity="0" />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
+                          <XAxis dataKey="t" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => new Date(v).toLocaleTimeString("en-US", { hour: "numeric" })} />
+                          <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} domain={["dataMin", "dataMax"]} orientation="right" />
+                          <Tooltip content={<PriceTooltip />} />
+                          <Area type="monotone" dataKey="c" stroke={isBull ? "var(--bull)" : "var(--bear)"} strokeWidth={2} fill="url(#chart-area)" isAnimationActive={false} />
+                        </AreaChart>
+                      ) : indicator === "bb" ? (
+                        <ComposedChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
+                          <XAxis dataKey="t" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => new Date(v).toLocaleTimeString("en-US", { hour: "numeric" })} />
+                          <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} domain={["dataMin", "dataMax"]} orientation="right" />
+                          <Tooltip content={<PriceTooltip />} />
+                          <Area type="monotone" dataKey="bbUpper" stroke="#64748B" strokeWidth={1} strokeDasharray="4 4" fill="transparent" isAnimationActive={false} />
+                          <Area type="monotone" dataKey="bbLower" stroke="#64748B" strokeWidth={1} strokeDasharray="4 4" fill="transparent" isAnimationActive={false} />
+                          <Area type="monotone" dataKey="c" stroke={isBull ? "var(--bull)" : "var(--bear)"} strokeWidth={2} fill="transparent" isAnimationActive={false} />
+                          <Line type="monotone" dataKey="bbMiddle" stroke="#64748B" strokeWidth={1} dot={false} isAnimationActive={false} />
+                        </ComposedChart>
+                      ) : (
+                        <ComposedChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
+                          <XAxis dataKey="t" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => new Date(v).toLocaleTimeString("en-US", { hour: "numeric" })} />
+                          <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} domain={["dataMin", "dataMax"]} orientation="right" />
+                          <Tooltip content={<PriceTooltip />} />
+                          <Area type="monotone" dataKey="c" stroke={isBull ? "var(--bull)" : "var(--bear)"} strokeWidth={2} fill="transparent" isAnimationActive={false} />
                         <Line type="monotone" dataKey="ema12" stroke="var(--bull)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
                         <Line type="monotone" dataKey="ema26" stroke="var(--bear)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
                         <Line type="monotone" dataKey="sma50" stroke="#F59E0B" strokeWidth={1.5} dot={false} isAnimationActive={false} />
@@ -301,10 +293,11 @@ export function FullChartModal() {
                     )}
                   </ResponsiveContainer>
                 </div>
+                )}
               </div>
 
-              {/* Volume */}
-              {showVolume && (
+              {/* Volume — hidden when using LightweightChart (it includes volume) */}
+              {showVolume && indicator !== "candles" && (
                 <div className="rounded-xl border border-border p-2">
                   <div className="text-[10px] text-muted-foreground mb-1">Volume</div>
                   <div className="h-16">

@@ -652,7 +652,9 @@ function GmgnHoldersView({ holders }: { holders: any[] }) {
       {(bundled.length > 0 || snipers.length > 0 || ratTraders.length > 0 || freshWallets.length > 0) && (
         <div className="rounded-lg border border-border bg-surface-2/50 p-2.5">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Wallet exposure</div>
-          <div className="grid grid-cols-2 gap-1.5">
+          {/* Donut: top-10 vs next-10 vs rest */}
+          <HolderConcentrationDonut holders={holders} />
+          <div className="grid grid-cols-2 gap-1.5 mt-2">
             <ExposureMetric label="Bundlers" count={bundled.length} pct={totalBundlerPct} tone={totalBundlerPct > 20 ? "bear" : "muted"} tip="Bundler bots that bought in coordinated batches at launch" />
             <ExposureMetric label="Snipers" count={snipers.length} pct={totalSniperPct} tone={totalSniperPct > 20 ? "bear" : "muted"} tip="Wallets that bought in the first blocks after launch" />
             <ExposureMetric label="Rat traders" count={ratTraders.length} pct={0} tone="muted" tip="Insider/sneak trading wallets" />
@@ -1205,5 +1207,68 @@ function FollowWalletButton({ address, label }: { address: string; label?: strin
     >
       {isFollowing ? "✓ Following" : "+ Follow"}
     </button>
+  );
+}
+
+// ===== Holder Concentration Donut =====
+function HolderConcentrationDonut({ holders }: { holders: any[] }) {
+  if (holders.length === 0) return null;
+
+  // Compute top-10 vs next-10 vs rest
+  const top10 = holders.slice(0, 10).reduce((s, h) => s + (h.holder_rate || 0), 0);
+  const next10 = holders.slice(10, 20).reduce((s, h) => s + (h.holder_rate || 0), 0);
+  const rest = Math.max(0, 100 - top10 - next10);
+
+  // SVG donut (no recharts needed — keeps bundle small)
+  const radius = 32;
+  const stroke = 10;
+  const circumference = 2 * Math.PI * radius;
+  const top10Offset = 0;
+  const next10Offset = (top10 / 100) * circumference;
+  const restOffset = ((top10 + next10) / 100) * circumference;
+
+  const segments = [
+    { label: "Top 10", pct: top10, offset: top10Offset, color: "#EF4444" }, // red — high concentration
+    { label: "Next 10", pct: next10, offset: next10Offset, color: "#F59E0B" }, // gold
+    { label: "Rest", pct: rest, offset: restOffset, color: "#14F195" }, // green — distributed
+  ].filter((s) => s.pct > 0.5);
+
+  const riskLabel = top10 > 50 ? "High concentration" : top10 > 30 ? "Moderate concentration" : "Well distributed";
+  const riskColor = top10 > 50 ? "text-bear" : top10 > 30 ? "text-gold" : "text-bull";
+
+  return (
+    <div className="flex items-center gap-3 my-2">
+      <div className="relative h-20 w-20 shrink-0">
+        <svg className="h-20 w-20 -rotate-90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r={radius} fill="none" stroke="var(--surface-3)" strokeWidth={stroke} />
+          {segments.map((s, i) => (
+            <circle
+              key={i}
+              cx="40" cy="40" r={radius} fill="none"
+              stroke={s.color}
+              strokeWidth={stroke}
+              strokeDasharray={`${(s.pct / 100) * circumference} ${circumference}`}
+              strokeDashoffset={-s.offset}
+            />
+          ))}
+        </svg>
+        <div className="absolute inset-0 grid place-items-center">
+          <div className="text-center">
+            <div className={cn("text-sm font-bold tabular", riskColor)}>{top10.toFixed(0)}%</div>
+            <div className="text-[8px] text-muted-foreground uppercase">top 10</div>
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 space-y-1">
+        <div className={cn("text-[11px] font-semibold", riskColor)}>{riskLabel}</div>
+        {segments.map((s, i) => (
+          <div key={i} className="flex items-center gap-1.5 text-[10px]">
+            <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: s.color }} />
+            <span className="text-muted-foreground flex-1">{s.label}</span>
+            <span className="font-semibold tabular">{s.pct.toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

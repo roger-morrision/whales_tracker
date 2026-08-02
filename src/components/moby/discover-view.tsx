@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ArrowUpRight, ArrowDownRight, Flame, TrendingUp, Star, StarOff, Calendar, Rocket } from "lucide-react";
 import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, fmtAge, type Token } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
@@ -499,6 +499,27 @@ function GmgnHotSearchesRow() {
     { refreshMs: 120_000 }
   );
 
+  // Track search_count_24h history per token for sparkline rendering.
+  // Each refresh appends a data point (capped at 8 per token).
+  const [history, setHistory] = useState<Record<string, number[]>>({});
+  useEffect(() => {
+    if (!data?.hotSearches) return;
+    // Defer setState to avoid synchronous setState in effect
+    Promise.resolve().then(() => {
+      setHistory((prev) => {
+        const next = { ...prev };
+        for (const h of data.hotSearches) {
+          const key = h.token_address || h.symbol;
+          const arr = next[key] || [];
+          arr.push(h.search_count_24h || 0);
+          if (arr.length > 8) arr.shift();
+          next[key] = arr;
+        }
+        return next;
+      });
+    });
+  }, [data]);
+
   return (
     <section>
       <SectionHeader
@@ -513,27 +534,44 @@ function GmgnHotSearchesRow() {
             <div key={i} className="shrink-0 w-32 h-28 rounded-xl bg-surface-2 animate-pulse" />
           ))
         ) : data?.hotSearches && data.hotSearches.length > 0 ? (
-          data.hotSearches.map((h: any, i: number) => (
-            <div
-              key={h.token_address || i}
-              className="shrink-0 w-32 rounded-xl border border-border bg-surface-2/50 p-2.5 hover:bg-surface-2 transition-colors"
-            >
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FF6347] grid place-items-center text-[10px] font-bold text-background shrink-0">
-                  #{h.rank ?? i + 1}
+          data.hotSearches.map((h: any, i: number) => {
+            const key = h.token_address || h.symbol;
+            const sparkData = history[key] || [];
+            const trend = sparkData.length >= 2 ? sparkData[sparkData.length - 1] - sparkData[0] : 0;
+            const trendColor = trend > 0 ? "text-bull" : trend < 0 ? "text-bear" : "text-muted-foreground";
+            return (
+              <div
+                key={key || i}
+                className="shrink-0 w-32 rounded-xl border border-border bg-surface-2/50 p-2.5 hover:bg-surface-2 transition-colors"
+              >
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FF6347] grid place-items-center text-[10px] font-bold text-background shrink-0">
+                    #{h.rank ?? i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold truncate">{h.symbol}</div>
+                    <div className="text-[9px] text-muted-foreground truncate">{h.search_count_24h.toLocaleString()} searches</div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-bold truncate">{h.symbol}</div>
-                  <div className="text-[9px] text-muted-foreground truncate">{h.search_count_24h.toLocaleString()} searches</div>
+                {/* Sparkline showing search-volume trend */}
+                {sparkData.length >= 2 && (
+                  <div className="h-6 my-1">
+                    <Sparkline data={sparkData} height={24} bullish={trend >= 0} />
+                  </div>
+                )}
+                <div className="text-xs font-semibold tabular">{fmtPrice(h.price)}</div>
+                <div className={cn("text-[10px] tabular flex items-center gap-0.5", h.change_24h >= 0 ? "text-bull" : "text-bear")}>
+                  {h.change_24h >= 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                  {Math.abs(h.change_24h).toFixed(2)}%
+                  {sparkData.length >= 2 && (
+                    <span className={cn("ml-auto", trendColor)}>
+                      {trend > 0 ? "▲" : trend < 0 ? "▼" : "■"}
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="text-xs font-semibold tabular">{fmtPrice(h.price)}</div>
-              <div className={cn("text-[10px] tabular flex items-center gap-0.5", h.change_24h >= 0 ? "text-bull" : "text-bear")}>
-                {h.change_24h >= 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
-                {Math.abs(h.change_24h).toFixed(2)}%
-              </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="text-xs text-muted-foreground py-8">No hot searches available.</div>
         )}

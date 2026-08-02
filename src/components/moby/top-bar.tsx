@@ -1,11 +1,19 @@
 "use client";
 
-import { Search, Bell, Sparkles, SlidersHorizontal, FileText } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Search, Bell, Sparkles, SlidersHorizontal, FileText, ChevronDown } from "lucide-react";
 import { useMoby } from "@/lib/moby-store";
 import { MobyLogo } from "./primitives";
 import { WalletButton } from "./wallet-modal";
 import { TOKENS, fmtPrice, fmtPct } from "@/lib/moby-data";
 import { cn } from "@/lib/utils";
+
+const CHAINS: { key: "sol" | "base" | "eth" | "bsc"; label: string; emoji: string; color: string }[] = [
+  { key: "sol", label: "Solana", emoji: "◎", color: "from-[#9945FF] to-[#14F195]" },
+  { key: "base", label: "Base", emoji: "🔵", color: "from-[#0052FF] to-[#0066FF]" },
+  { key: "eth", label: "Ethereum", emoji: "♦", color: "from-[#627EEA] to-[#8A92B2]" },
+  { key: "bsc", label: "BNB", emoji: "🟡", color: "from-[#F3BA2F] to-[#F0B90B]" },
+];
 
 /**
  * Top bar with logo, search, screener, tax, wallet, alerts, AI copilot trigger.
@@ -19,13 +27,73 @@ export function TopBar() {
   const setTaxOpen = useMoby((s) => s.setTaxOpen);
   const alerts = useMoby((s) => s.alerts);
   const setActiveTab = useMoby((s) => s.setActiveTab);
+  const selectedChain = useMoby((s) => s.selectedChain);
+  const setSelectedChain = useMoby((s) => s.setSelectedChain);
+  const [chainOpen, setChainOpen] = useState(false);
+  const chainRef = useRef<HTMLDivElement>(null);
+
+  // Close chain dropdown on outside click
+  useEffect(() => {
+    if (!chainOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (chainRef.current && !chainRef.current.contains(e.target as Node)) {
+        setChainOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [chainOpen]);
+
+  const currentChain = CHAINS.find((c) => c.key === selectedChain) ?? CHAINS[0];
 
   return (
     <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2">
-        <button onClick={() => setActiveTab("discover")} aria-label="Moby home">
-          <MobyLogo />
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setActiveTab("discover")} aria-label="Moby home">
+            <MobyLogo />
+          </button>
+          {/* Chain switcher */}
+          <div className="relative" ref={chainRef}>
+            <button
+              onClick={() => setChainOpen((v) => !v)}
+              className="h-8 px-2 inline-flex items-center gap-1 rounded-lg border border-border hover:bg-surface-3 transition-colors"
+              aria-label="Switch chain"
+            >
+              <span className={cn("h-4 w-4 rounded-full bg-gradient-to-br grid place-items-center text-[9px] font-bold text-background", currentChain.color)}>
+                {currentChain.emoji}
+              </span>
+              <span className="text-xs font-semibold hidden sm:inline">{currentChain.label}</span>
+              <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform", chainOpen && "rotate-180")} />
+            </button>
+            {chainOpen && (
+              <div className="absolute top-full left-0 mt-1 w-40 rounded-xl border border-border bg-background shadow-2xl overflow-hidden z-50">
+                {CHAINS.map((c) => (
+                  <button
+                    key={c.key}
+                    onClick={() => {
+                      setSelectedChain(c.key);
+                      setChainOpen(false);
+                    }}
+                    className={cn(
+                      "w-full px-3 py-2 flex items-center gap-2 hover:bg-surface-2 transition-colors text-left",
+                      c.key === selectedChain && "bg-surface-2"
+                    )}
+                  >
+                    <span className={cn("h-5 w-5 rounded-full bg-gradient-to-br grid place-items-center text-[9px] font-bold text-background", c.color)}>
+                      {c.emoji}
+                    </span>
+                    <span className="text-xs font-semibold flex-1">{c.label}</span>
+                    {c.key === selectedChain && <span className="text-bull text-xs">✓</span>}
+                  </button>
+                ))}
+                <div className="px-3 py-1.5 border-t border-border text-[9px] text-muted-foreground">
+                  Chain affects GMGN data + DEX pairs.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setSearchOpen(true)}

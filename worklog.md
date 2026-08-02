@@ -407,3 +407,103 @@ Stage Summary:
 - 4 new persisted store slices (snipeRules, trailingStops + already-shipped followedWallets, etc.)
 - 6 new UI components (TrenchFilterSlider, UserSnipeRuleCard, SnipeRuleBuilder, SnipeSlider, NewTrailingStopPicker, CookingOrderToggle)
 - All persisted in localStorage — survives page reloads
+
+---
+Task ID: 6
+Agent: main (orchestrator)
+Task: Continue all enhancements and bug fixes (round 6)
+
+Features Shipped:
+
+#16 TradingView-style chart (lightweight-charts integration)
+- Installed `lightweight-charts@5.2.0` (TradingView's OSS lib, ~45KB gzipped)
+- Created new `LightweightChart` component (`src/components/moby/lightweight-chart.tsx`)
+  - Uses v5 API: `chart.addSeries(CandlestickSeries, options)` + `chart.addSeries(HistogramSeries, options)`
+  - Pinch-to-zoom, drag-to-pan, crosshair with dashed lines + label backgrounds
+  - Volume histogram on bottom 25% (priceScaleId="volume" with scaleMargins top:0.75)
+  - Bullish candles green (#14F195), bearish red (#EF4444)
+  - Volume bars colored by candle direction (green for up, red for down)
+  - ResizeObserver auto-resizes chart to container width
+  - Proper cleanup on unmount (chart.remove(), disconnect observer)
+- Wired into `full-chart-modal.tsx` as the primary chart for the "candles" indicator
+  - Other indicators (line/bb/ema) still use recharts (different visual treatments)
+  - Volume section hidden when using LightweightChart (it includes volume inline)
+  - "GMGN live"/"GMGN demo" badge preserved in chart header
+
+#20 Holder concentration donut (token-detail-sheet.tsx — HolderConcentrationDonut)
+- SVG donut chart showing top-10 vs next-10 vs rest distribution
+- 3 colored segments: red (top 10 — high concentration), gold (next 10), green (rest — distributed)
+- Center shows top-10 % with risk color
+- Risk verdict label: "High concentration" (>50%) / "Moderate" (>30%) / "Well distributed"
+- Legend with per-segment percentages
+- Pure SVG (no recharts dependency for this widget)
+
+#23 Hot searches sparkline (discover-view.tsx — GmgnHotSearchesRow enhancement)
+- Tracks `search_count_24h` history per token in component state
+- Each refresh (every 2 min) appends a data point (capped at 8 per token)
+- Renders Sparkline showing search-volume trend (bullish green / bearish red)
+- Trend arrow (▲/▼/■) showing whether searches are rising/falling/stable
+- Sparkline only renders when ≥2 data points collected
+
+#24 Copy-trade real execution (store + page.tsx poller)
+- New `executeCopyTrade` action in store:
+  - Validates config is enabled
+  - Caps at `maxPerTradeUsd`
+  - Calls `applyTrade` (mutates portfolio) + `recordTrade` (adds to history)
+  - Updates copy-trade stats (totalCopiedUsd, tradesCopied)
+  - Pushes success toast with "View {symbol}" action
+- Background poller in page.tsx (every 45s, when enabled configs exist):
+  - Fetches `/api/gmgn/smart-money-feed?limit=5`
+  - Takes the latest trade as the signal
+  - Finds token in local registry (only mirrors known tokens)
+  - For each enabled config, calls `executeCopyTrade` (respects `onlyBuy` setting)
+  - Skips when tab hidden
+  - Initial poll after 15s delay
+
+#14 Multi-wallet batch trade UI (batch6-modals.tsx — BatchTradeSheet)
+- New "Batch trade across all wallets" button in MultiWalletModal
+- BatchTradeSheet component with:
+  - Token dropdown (12 tokens from local registry)
+  - Buy/Sell side toggle
+  - Total amount slider ($10-$1000)
+  - Per-wallet amount auto-calculated (total / selected wallets)
+  - Wallet multi-select (toggle individual wallets on/off)
+  - Execute button with progress per wallet (pending → success/failed)
+  - Async execution: 400ms delay per wallet (simulates parallel swaps)
+  - Each wallet executes via `applyTrade` + `recordTrade`
+  - Success toast: "Batch BUY complete — 4 wallets · $100 total · $25 each"
+- Status icons per wallet: Loader2 spinner (pending), CheckCircle2 (success), AlertCircle (failed)
+
+#18 Chain switcher (top-bar.tsx + store)
+- New `selectedChain` store slice (persisted): "sol" | "base" | "eth" | "bsc"
+- `setSelectedChain` action with toast notification describing the chain
+- Chain switcher button in top-bar next to logo:
+  - Shows current chain emoji + label + chevron
+  - Dropdown with 4 chains (Solana, Base, Ethereum, BSC)
+  - Each chain has gradient color + emoji
+  - Outside-click closes dropdown
+  - Checkmark on current chain
+  - Footer note: "Chain affects GMGN data + DEX pairs"
+
+Type System / Infrastructure:
+- moby-store.ts: Added `selectedChain` + `setSelectedChain` slice (persisted), `executeCopyTrade` action with full interface declaration, imported `fmtPrice`
+- lightweight-chart.tsx: New component with v5 API (CandlestickSeries/HistogramSeries exports)
+- top-bar.tsx: Added useState/useRef/useEffect imports, ChevronDown icon, chain dropdown
+- batch6-modals.tsx: Added Zap, Loader2, CheckCircle2, AlertCircle imports, BatchTradeSheet component
+- discover-view.tsx: Added useEffect import, hot-search history tracking
+
+Verification:
+- TypeScript: 0 errors in src/
+- ESLint: clean
+- Production build: ✓ Compiled successfully, all routes registered
+- All 22 endpoints return 200 (5 original + 17 GMGN/DexScreener)
+- Home page renders
+- lightweight-charts v5.2.0 integrated successfully
+
+Stage Summary:
+- 6 features shipped (TradingView charts, holder donut, hot-search sparklines, copy-trade execution, multi-wallet batch trade, chain switcher)
+- 1 new npm dependency (lightweight-charts@5.2.0)
+- 2 new background pollers (copy-trade 45s, existing snipe-bot 60s, trailing-stop 2.5s, followed-wallet 30s)
+- 4 new UI components (LightweightChart, HolderConcentrationDonut, BatchTradeSheet, chain dropdown)
+- 1 new persisted store slice (selectedChain)
+- All TypeScript / ESLint / build checks pass

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { X, TrendingUp, TrendingDown, Activity, AlertTriangle, BarChart3 } from "lucide-react";
+import { X, TrendingUp, TrendingDown, Activity, AlertTriangle, BarChart3, Zap, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import {
   PORTFOLIO_ANALYTICS,
   getCorrelationMatrix,
@@ -501,6 +501,7 @@ export function MultiWalletModal() {
   const setActiveWalletId = useMoby((s) => s.setActiveWalletId);
   const wallets: typeof MANAGED_WALLETS[number][] = MANAGED_WALLETS;
   const totalBalance = wallets.reduce((s: number, w: any) => s + w.balanceUsd, 0);
+  const [showBatchTrade, setShowBatchTrade] = useState(false);
 
   return (
     <AnimatePresence>
@@ -519,6 +520,15 @@ export function MultiWalletModal() {
                 <div className="text-3xl font-bold tabular">{fmtUsd(totalBalance)}</div>
                 <div className="text-[11px] text-muted-foreground">{wallets.length} wallets · {wallets.filter((w: any) => w.isConnected).length} connected</div>
               </div>
+
+              {/* Batch trade button — opens batch-trade sheet */}
+              <button
+                onClick={() => setShowBatchTrade(true)}
+                className="w-full py-2.5 rounded-xl bg-bull/15 text-bull border border-bull/30 text-xs font-bold hover:bg-bull/20 flex items-center justify-center gap-1.5"
+              >
+                <Zap className="h-3.5 w-3.5" /> Batch trade across all wallets
+              </button>
+
               {wallets.map((w: any) => (
                 <button key={w.id} onClick={() => setActiveWalletId(w.id)} className={cn("w-full rounded-xl border p-3 text-left transition-colors", activeWalletId === w.id ? "border-bull/30 bg-bull/5" : "border-border hover:bg-surface-2")}>
                   <div className="flex items-center gap-2.5">
@@ -536,11 +546,190 @@ export function MultiWalletModal() {
                 </button>
               ))}
               <button onClick={() => useMoby.getState().setWalletOpen(true)} className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5">+ Add wallet</button>
+
+              {/* Batch trade sheet */}
+              {showBatchTrade && (
+                <BatchTradeSheet
+                  wallets={wallets}
+                  onClose={() => setShowBatchTrade(false)}
+                />
+              )}
             </div>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function BatchTradeSheet({
+  wallets,
+  onClose,
+}: {
+  wallets: any[];
+  onClose: () => void;
+}) {
+  const [tokenId, setTokenId] = useState("wif");
+  const [side, setSide] = useState<"BUY" | "SELL">("BUY");
+  const [totalUsd, setTotalUsd] = useState(100);
+  const [selectedWalletIds, setSelectedWalletIds] = useState<string[]>(wallets.map((w) => w.id));
+  const [executing, setExecuting] = useState(false);
+  const [results, setResults] = useState<Record<string, "pending" | "success" | "failed">>({});
+
+  const connectedWallets = wallets.filter((w) => selectedWalletIds.includes(w.id));
+  const perWallet = connectedWallets.length > 0 ? totalUsd / connectedWallets.length : 0;
+
+  const toggleWallet = (id: string) => {
+    setSelectedWalletIds((prev) =>
+      prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id]
+    );
+  };
+
+  const handleExecute = async () => {
+    setExecuting(true);
+    const state = useMoby.getState();
+    const token = TOKENS_BY_ID[tokenId];
+    if (!token) {
+      setExecuting(false);
+      return;
+    }
+    const livePrice = state.prices[token.id]?.price ?? token.price;
+    for (const w of connectedWallets) {
+      setResults((r) => ({ ...r, [w.id]: "pending" }));
+      // Simulate async execution per wallet (in production this would fire parallel swaps)
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      try {
+        state.applyTrade({
+          tokenId: token.id,
+          side,
+          usdAmount: perWallet,
+          tokenAmount: perWallet / Math.max(0.000001, livePrice),
+          price: livePrice,
+        });
+        state.recordTrade({
+          tokenId: token.id,
+          tokenSymbol: token.symbol,
+          side,
+          usdAmount: perWallet,
+          tokenAmount: perWallet / Math.max(0.000001, livePrice),
+          price: livePrice,
+          txHash: `batch_${w.id}_${Date.now()}`,
+        });
+        setResults((r) => ({ ...r, [w.id]: "success" }));
+      } catch {
+        setResults((r) => ({ ...r, [w.id]: "failed" }));
+      }
+    }
+    setExecuting(false);
+    state.pushToast({
+      title: `Batch ${side} complete`,
+      description: `${connectedWallets.length} wallets · ${fmtUsd(totalUsd)} total · ${fmtUsd(perWallet)} each`,
+      type: "success",
+      actionLabel: `View ${token.symbol}`,
+      actionId: token.id,
+    });
+  };
+
+  return (
+    <div className="rounded-xl border border-bull/30 bg-bull/5 p-3 space-y-3 mt-2">
+      <div className="flex items-center gap-2">
+        <Zap className="h-3.5 w-3.5 text-bull" />
+        <span className="text-xs font-semibold flex-1">Batch trade</span>
+        <button onClick={onClose} className="text-[10px] text-muted-foreground hover:text-foreground">Close</button>
+      </div>
+
+      {/* Token + side selectors */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Token</div>
+          <select
+            value={tokenId}
+            onChange={(e) => setTokenId(e.target.value)}
+            className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-bull/40"
+          >
+            {Object.values(TOKENS_BY_ID).slice(0, 12).map((t: any) => (
+              <option key={t.id} value={t.id}>{t.symbol}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Side</div>
+          <div className="flex gap-1 bg-surface-2 rounded-md p-0.5">
+            <button
+              onClick={() => setSide("BUY")}
+              className={cn("flex-1 py-1 rounded text-[11px] font-bold", side === "BUY" ? "bg-bull text-background" : "text-muted-foreground")}
+            >Buy</button>
+            <button
+              onClick={() => setSide("SELL")}
+              className={cn("flex-1 py-1 rounded text-[11px] font-bold", side === "SELL" ? "bg-bear text-background" : "text-muted-foreground")}
+            >Sell</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Total amount slider */}
+      <div>
+        <div className="flex items-center justify-between text-[11px] mb-1">
+          <span className="text-muted-foreground">Total amount</span>
+          <span className="font-semibold tabular">{fmtUsd(totalUsd)}</span>
+        </div>
+        <input type="range" min={10} max={1000} step={10} value={totalUsd} onChange={(e) => setTotalUsd(parseInt(e.target.value, 10))} className="w-full h-1.5 rounded-full bg-surface-3 accent-bull cursor-pointer" />
+        <div className="text-[10px] text-muted-foreground mt-0.5">
+          {connectedWallets.length} wallets · {fmtUsd(perWallet, { compact: true })} each
+        </div>
+      </div>
+
+      {/* Wallet multi-select */}
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Wallets ({selectedWalletIds.length}/{wallets.length})</div>
+        <div className="space-y-1 max-h-32 overflow-y-auto scrollbar-thin">
+          {wallets.map((w) => {
+            const isSelected = selectedWalletIds.includes(w.id);
+            const status = results[w.id];
+            return (
+              <button
+                key={w.id}
+                onClick={() => toggleWallet(w.id)}
+                disabled={executing}
+                className={cn(
+                  "w-full rounded-md border p-1.5 flex items-center gap-2 text-left transition-colors",
+                  isSelected ? "border-bull/30 bg-bull/10" : "border-border opacity-50",
+                  executing && "cursor-wait"
+                )}
+              >
+                <div className={cn("h-6 w-6 rounded-full bg-gradient-to-br grid place-items-center text-[10px] font-bold text-white", w.color)}>{w.glyph}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] font-semibold truncate">{w.label}</div>
+                  <div className="text-[9px] text-muted-foreground tabular">{fmtUsd(w.balanceUsd, { compact: true })}</div>
+                </div>
+                {status === "pending" && <Loader2 className="h-3 w-3 animate-spin text-gold" />}
+                {status === "success" && <CheckCircle2 className="h-3 w-3 text-bull" />}
+                {status === "failed" && <AlertCircle className="h-3 w-3 text-bear" />}
+                {!status && isSelected && <span className="text-bull text-xs">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <button
+        onClick={handleExecute}
+        disabled={executing || connectedWallets.length === 0 || totalUsd <= 0}
+        className={cn(
+          "w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50",
+          side === "BUY" ? "bg-bull text-background" : "bg-bear text-white"
+        )}
+      >
+        {executing ? (
+          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Executing across {connectedWallets.length} wallets…</>
+        ) : (
+          <><Zap className="h-3.5 w-3.5" /> {side} {fmtUsd(totalUsd)} across {connectedWallets.length} wallets</>
+        )}
+      </button>
+      <div className="text-[9px] text-muted-foreground">
+        Each wallet executes {fmtUsd(perWallet, { compact: true })} in parallel. Trades are simulated (no real on-chain submission).
+      </div>
+    </div>
   );
 }
 

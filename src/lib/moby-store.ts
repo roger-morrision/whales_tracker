@@ -8,6 +8,7 @@ import {
   WHALE_FLOWS,
   PORTFOLIO,
   fmtUsd,
+  fmtPrice,
   type Token,
   type Trader,
   type SmartSignal,
@@ -260,6 +261,10 @@ interface MobyState {
   activeTab: TabKey;
   setActiveTab: (t: TabKey) => void;
 
+  // ===== Enhancement #18: Chain switcher =====
+  selectedChain: "sol" | "base" | "eth" | "bsc";
+  setSelectedChain: (chain: "sol" | "base" | "eth" | "bsc") => void;
+
   // live prices keyed by token id
   prices: Record<string, { price: number; prev: number; ts: number }>;
   tickPrices: () => void;
@@ -381,6 +386,14 @@ interface MobyState {
   addCopyTrade: (c: Omit<CopyTradeConfig, "id" | "createdAt">) => void;
   removeCopyTrade: (id: string) => void;
   toggleCopyTrade: (id: string) => void;
+  executeCopyTrade: (input: {
+    copyTradeId: string;
+    tokenId: string;
+    tokenSymbol: string;
+    side: "BUY" | "SELL";
+    usdAmount: number;
+    price: number;
+  }) => boolean;
 
   // ===== BATCH 3: Limit orders =====
   limitOrdersOpen: boolean;
@@ -795,6 +808,23 @@ export const useMoby = create<MobyState>()(
     (set, get) => ({
   activeTab: "discover",
   setActiveTab: (t) => set({ activeTab: t }),
+
+  // ===== Enhancement #18: Chain switcher =====
+  selectedChain: "sol",
+  setSelectedChain: (chain) => {
+    set({ selectedChain: chain });
+    get().pushToast({
+      title: `Switched to ${chain.toUpperCase()}`,
+      description: chain === "sol"
+        ? "Solana chain — pump.fun, Raydium, Orca"
+        : chain === "base"
+        ? "Base chain — Aerodrome, Uniswap V3"
+        : chain === "eth"
+        ? "Ethereum mainnet — Uniswap, Sushi"
+        : "BSC — PancakeSwap, Four.meme",
+      type: "info",
+    });
+  },
 
   prices: initialPrices,
   tickPrices: () => {
@@ -1233,6 +1263,60 @@ export const useMoby = create<MobyState>()(
         x.id === id ? { ...x, enabled: !x.enabled } : x
       ),
     })),
+  // ===== Enhancement #24: Copy-trade real execution =====
+  // Mirrors a smart-money trade: applies the trade to portfolio + records history.
+  // Respects maxPerTradeUsd cap. Returns true if executed, false if skipped.
+  executeCopyTrade: (input: {
+    copyTradeId: string;
+    tokenId: string;
+    tokenSymbol: string;
+    side: "BUY" | "SELL";
+    usdAmount: number;
+    price: number;
+  }) => {
+    const cfg = get().copyTrades.find((c) => c.id === input.copyTradeId && c.enabled);
+    if (!cfg) return false;
+    // Cap at maxPerTradeUsd
+    const actualUsd = Math.min(input.usdAmount, cfg.maxPerTradeUsd);
+    if (actualUsd < 1) return false;
+    // Apply the trade
+    get().applyTrade({
+      tokenId: input.tokenId,
+      side: input.side,
+      usdAmount: actualUsd,
+      tokenAmount: actualUsd / Math.max(0.000001, input.price),
+      price: input.price,
+    });
+    get().recordTrade({
+      tokenId: input.tokenId,
+      tokenSymbol: input.tokenSymbol,
+      side: input.side,
+      usdAmount: actualUsd,
+      tokenAmount: actualUsd / Math.max(0.000001, input.price),
+      price: input.price,
+      txHash: `copy_${input.copyTradeId}_${Date.now()}`,
+    });
+    // Update copy-trade stats
+    set((s) => ({
+      copyTrades: s.copyTrades.map((c) =>
+        c.id === input.copyTradeId
+          ? {
+              ...c,
+              totalCopiedUsd: c.totalCopiedUsd + actualUsd,
+              tradesCopied: c.tradesCopied + 1,
+            }
+          : c
+      ),
+    }));
+    get().pushToast({
+      title: `📋 Copied trade: ${input.tokenSymbol}`,
+      description: `${input.side} ${fmtUsd(actualUsd)} at ${fmtPrice(input.price)} · via ${cfg.traderHandle}`,
+      type: "success",
+      actionLabel: `View ${input.tokenSymbol}`,
+      actionId: input.tokenId,
+    });
+    return true;
+  },
 
   // ===== BATCH 3: Limit orders =====
   limitOrdersOpen: false,
@@ -1881,6 +1965,7 @@ export const useMoby = create<MobyState>()(
       followedWalletLabels: s.followedWalletLabels,
       snipeRules: s.snipeRules,
       trailingStops: s.trailingStops,
+      selectedChain: s.selectedChain,
     }),
   }
   )
