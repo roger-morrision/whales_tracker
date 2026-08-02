@@ -27,6 +27,7 @@ import {
 } from "recharts";
 import { TOKENS_BY_ID, fmtUsd, fmtPrice, fmtPct, fmtNum, fmtAge, type Token } from "@/lib/moby-data";
 import { useMoby, useToken } from "@/lib/moby-store";
+import { useGmgn } from "@/hooks/use-gmgn";
 import { TokenIcon, Chip, Sparkline } from "./primitives";
 import { HolderDistributionSection } from "./holder-distribution";
 import { WalletLink } from "./wallet-link";
@@ -375,6 +376,11 @@ function TokenDetailContent({ token }: { token: Token }) {
         <HolderDistributionSection tokenId={token.id} />
       </div>
 
+      {/* GMGN live data: security + smart money + KOL + top holders */}
+      {token.mint && token.mint !== "0x0000000000000000000000000000000000000000" && (
+        <GmgnPanel mint={token.mint} symbol={token.symbol} />
+      )}
+
       {/* External links + tools */}
       <div className="px-4 mt-4 pb-6 space-y-2">
         <div className="grid grid-cols-3 gap-2">
@@ -461,6 +467,279 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-border p-2.5">
       <div className="text-[10px] text-muted-foreground">{label}</div>
       <div className="text-sm font-semibold tabular">{value}</div>
+    </div>
+  );
+}
+
+// ===== GMGN Live Data Panel =====
+function GmgnPanel({ mint, symbol }: { mint: string; symbol: string }) {
+  const [tab, setTab] = useState<"security" | "holders" | "smart" | "kol" | "traders">("security");
+  const apiUrl = `/api/gmgn/${tab === "smart" ? "smart-money" : tab}?address=${mint}&limit=15`;
+  const { data, loading, source } = useGmgn<any>(apiUrl, { refreshMs: 60_000 });
+
+  return (
+    <div className="px-4 mt-4">
+      <div className="rounded-2xl border border-border bg-surface-2/50 overflow-hidden">
+        {/* Header */}
+        <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <div className="h-5 w-5 rounded-md bg-gradient-to-br from-[#14F195] to-[#9945FF] grid place-items-center text-[10px] font-bold text-background">
+              G
+            </div>
+            <span className="text-xs font-semibold">GMGN Live</span>
+            {source && (
+              <Chip variant={source === "gmgn" ? "bull" : "outline"} className="text-[9px]">
+                {source === "gmgn" ? "live" : "demo"}
+              </Chip>
+            )}
+          </div>
+          <div className="ml-auto text-[10px] text-muted-foreground font-mono truncate max-w-[140px]">
+            {mint.slice(0, 6)}...{mint.slice(-4)}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-0.5 p-2 border-b border-border bg-surface-3/30">
+          {[
+            { k: "security", label: "Security" },
+            { k: "holders", label: "Holders" },
+            { k: "smart", label: "Smart" },
+            { k: "kol", label: "KOL" },
+            { k: "traders", label: "Traders" },
+          ].map((t) => (
+            <button
+              key={t.k}
+              onClick={() => setTab(t.k as any)}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors",
+                tab === t.k
+                  ? "bg-bull/15 text-bull"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="p-3 max-h-[300px] overflow-y-auto scrollbar-thin">
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-10 rounded-lg bg-surface-3 animate-pulse" />
+              ))}
+            </div>
+          ) : !data ? (
+            <div className="text-center py-6 text-xs text-muted-foreground">
+              Failed to load GMGN data. Try again later.
+            </div>
+          ) : (
+            <>
+              {tab === "security" && <GmgnSecurityView data={data.security} />}
+              {tab === "holders" && <GmgnHoldersView holders={data.holders || []} />}
+              {tab === "smart" && <GmgnSmartView activity={data.activity || []} />}
+              {tab === "kol" && <GmgnKolView kols={data.kols || []} />}
+              {tab === "traders" && <GmgnTradersView traders={data.traders || []} />}
+            </>
+          )}
+        </div>
+
+        {/* Footer link to GMGN */}
+        <div className="px-3 py-2 border-t border-border bg-surface-3/20">
+          <a
+            href={`https://gmgn.ai/sol/token/${mint}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-muted-foreground hover:text-bull inline-flex items-center gap-1"
+          >
+            <ExternalLink className="h-2.5 w-2.5" />
+            View full report on gmgn.ai
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GmgnSecurityView({ data }: { data: any }) {
+  if (!data) return <div className="text-xs text-muted-foreground py-4 text-center">No security data</div>;
+  const checks: { label: string; ok: boolean; value?: string }[] = [
+    { label: "Mint authority revoked", ok: data.is_mint_authority_revoked },
+    { label: "Freeze authority revoked", ok: data.is_freeze_authority_revoked },
+    { label: "Not honeypot", ok: !data.is_honeypot },
+    { label: "LP locked", ok: !!data.liquidity_locked, value: data.lp_locked_ratio ? `${(data.lp_locked_ratio * 100).toFixed(0)}%` : undefined },
+    { label: "Open source", ok: data.is_open_source },
+    { label: "Not proxy", ok: !data.is_proxy },
+  ];
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-1.5">
+        {checks.map((c) => (
+          <div key={c.label} className="rounded-lg border border-border p-2 flex items-center gap-1.5">
+            <span className={cn("h-2 w-2 rounded-full shrink-0", c.ok ? "bg-bull" : "bg-bear")} />
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-medium truncate">{c.label}</div>
+              {c.value && <div className="text-[10px] text-muted-foreground tabular">{c.value}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <div className="rounded-lg border border-border p-2">
+          <div className="text-[9px] text-muted-foreground uppercase">Top 10 holders</div>
+          <div className={cn("text-sm font-bold tabular", (data.top10_holder_rate ?? 0) > 35 ? "text-bear" : "text-foreground")}>
+            {(data.top10_holder_rate ?? 0).toFixed(2)}%
+          </div>
+        </div>
+        <div className="rounded-lg border border-border p-2">
+          <div className="text-[9px] text-muted-foreground uppercase">Dev holdings</div>
+          <div className={cn("text-sm font-bold tabular", (data.dev_holder_rate ?? 0) > 10 ? "text-bear" : "text-foreground")}>
+            {(data.dev_holder_rate ?? 0).toFixed(2)}%
+          </div>
+        </div>
+      </div>
+      {data.risks && data.risks.length > 0 && (
+        <div className="rounded-lg border border-bear/30 bg-bear/5 p-2">
+          <div className="text-[10px] font-semibold text-bear mb-1">⚠ Risks identified</div>
+          <ul className="text-[10px] text-muted-foreground list-disc list-inside space-y-0.5">
+            {data.risks.map((r: string, i: number) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GmgnHoldersView({ holders }: { holders: any[] }) {
+  if (holders.length === 0) return <div className="text-xs text-muted-foreground py-4 text-center">No holder data</div>;
+  return (
+    <div className="space-y-1">
+      {holders.slice(0, 15).map((h, i) => (
+        <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
+          <div className="text-[10px] font-semibold text-muted-foreground w-5">{i + 1}</div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-mono truncate">{h.address}</span>
+              {h.is_dev && <Chip variant="bear" className="text-[9px]">DEV</Chip>}
+              {h.is_smart_money && <Chip variant="bull" className="text-[9px]">SMART</Chip>}
+              {h.is_kol && <Chip variant="gold" className="text-[9px]">KOL</Chip>}
+            </div>
+            <div className="text-[10px] text-muted-foreground tabular">
+              {fmtNum(h.balance)} · {fmtUsd(h.value_usd, { compact: true })}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className={cn("text-xs font-bold tabular", h.holder_rate > 5 ? "text-bear" : "text-foreground")}>
+              {h.holder_rate.toFixed(2)}%
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GmgnSmartView({ activity }: { activity: any[] }) {
+  if (activity.length === 0) return <div className="text-xs text-muted-foreground py-4 text-center">No smart money activity</div>;
+  return (
+    <div className="space-y-1">
+      {activity.slice(0, 15).map((a, i) => {
+        const isBuy = a.type === "buy";
+        return (
+          <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
+            <div className={cn("h-7 w-7 rounded-lg grid place-items-center shrink-0", isBuy ? "bg-bull/15" : "bg-bear/15")}>
+              {isBuy ? <ArrowUpRight className="h-3.5 w-3.5 text-bull" /> : <ArrowDownRight className="h-3.5 w-3.5 text-bear" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-mono truncate">{a.address}</span>
+                {a.wallet_tag && <Chip variant="outline" className="text-[9px]">{a.wallet_tag}</Chip>}
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                {a.wallet_label || "Smart wallet"} · {new Date(a.ts * 1000).toLocaleTimeString()}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className={cn("text-xs font-bold tabular", isBuy ? "text-bull" : "text-bear")}>
+                {isBuy ? "+" : "-"}{fmtUsd(a.amount_usd, { compact: true })}
+              </div>
+              {a.pnl_30d_usd !== undefined && (
+                <div className={cn("text-[10px] tabular", a.pnl_30d_usd >= 0 ? "text-bull" : "text-bear")}>
+                  30d: {a.pnl_30d_usd >= 0 ? "+" : ""}{fmtUsd(a.pnl_30d_usd, { compact: true })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function GmgnKolView({ kols }: { kols: any[] }) {
+  if (kols.length === 0) return <div className="text-xs text-muted-foreground py-4 text-center">No KOL holders</div>;
+  return (
+    <div className="space-y-1">
+      {kols.slice(0, 15).map((k, i) => (
+        <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
+          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#22D3EE] to-[#9945FF] grid place-items-center text-[10px] font-bold text-background shrink-0">
+            {k.twitter_name?.[0] ?? "?"}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-semibold truncate">@{k.twitter_handle}</span>
+              <Chip variant="gold" className="text-[9px]">KOL</Chip>
+            </div>
+            <div className="text-[10px] text-muted-foreground">
+              {fmtNum(k.followers)} followers · {fmtUsd(k.value_usd, { compact: true })}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className={cn("text-xs font-bold tabular", (k.pnl_usd ?? 0) >= 0 ? "text-bull" : "text-bear")}>
+              {k.pnl_usd >= 0 ? "+" : ""}{fmtUsd(k.pnl_usd, { compact: true })}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GmgnTradersView({ traders }: { traders: any[] }) {
+  if (traders.length === 0) return <div className="text-xs text-muted-foreground py-4 text-center">No trader data</div>;
+  return (
+    <div className="space-y-1">
+      {traders.slice(0, 15).map((t, i) => {
+        const isWin = t.pnl >= 0;
+        return (
+          <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
+            <div className="text-[10px] font-semibold text-muted-foreground w-5">{i + 1}</div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-mono truncate">{t.address}</span>
+                {t.is_smart_money && <Chip variant="bull" className="text-[9px]">SMART</Chip>}
+                {t.is_kol && <Chip variant="gold" className="text-[9px]">KOL</Chip>}
+              </div>
+              <div className="text-[10px] text-muted-foreground tabular">
+                Buy {fmtUsd(t.buy_usd, { compact: true })} · Sell {fmtUsd(t.sell_usd, { compact: true })}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className={cn("text-xs font-bold tabular", isWin ? "text-bull" : "text-bear")}>
+                {isWin ? "+" : ""}{fmtUsd(t.pnl, { compact: true })}
+              </div>
+              {t.pnl_rate !== undefined && (
+                <div className={cn("text-[10px] tabular", isWin ? "text-bull" : "text-bear")}>
+                  {isWin ? "+" : ""}{t.pnl_rate.toFixed(1)}%
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

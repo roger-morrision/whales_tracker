@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ArrowUpRight, ArrowDownRight, Flame, TrendingUp, Star, StarOff, Calendar, Rocket } from "lucide-react";
 import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, fmtAge, type Token } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
+import { useGmgn } from "@/hooks/use-gmgn";
 import { TokenIcon, Sparkline, Chip, SectionHeader } from "./primitives";
 import { MarketOverview } from "./market-overview";
 import { NewsFeed } from "./news-feed";
@@ -22,6 +23,7 @@ export function DiscoverView() {
     <div className="space-y-6">
       <HeroBanner />
       <MarketOverview />
+      <GmgnTrendingRow />
       <NarrativesRow />
       <LaunchCalendar />
 
@@ -423,6 +425,67 @@ function SmartMoneyMovers() {
           );
         })}
       </div>
+    </section>
+  );
+}
+
+// ===== GMGN Trending Row =====
+function GmgnTrendingRow() {
+  const { data, loading, source } = useGmgn<{ tokens: any[] }>(
+    "/api/gmgn/trending?timeframe=1h&orderBy=volume&limit=8",
+    { refreshMs: 60_000 }
+  );
+
+  return (
+    <section>
+      <SectionHeader
+        title="GMGN Trending"
+        emoji="🔥"
+        action="View all"
+        onAction={() => window.open("https://gmgn.ai/solana/rank/swaps/1h?orderby=volume", "_blank")}
+      />
+      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+        {loading && !data ? (
+          [1, 2, 3, 4].map((i) => (
+            <div key={i} className="shrink-0 w-32 h-32 rounded-xl bg-surface-2 animate-pulse" />
+          ))
+        ) : data?.tokens && data.tokens.length > 0 ? (
+          data.tokens.map((t: any, i: number) => (
+            <div
+              key={t.address || i}
+              className="shrink-0 w-32 rounded-xl border border-border bg-surface-2/50 p-2.5 hover:bg-surface-2 transition-colors"
+            >
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#14F195] to-[#9945FF] grid place-items-center text-[10px] font-bold text-background shrink-0">
+                  {t.symbol?.[0] ?? "?"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold truncate">{t.symbol}</div>
+                  <div className="text-[9px] text-muted-foreground">#{t.rank ?? i + 1}</div>
+                </div>
+              </div>
+              <div className="text-xs font-semibold tabular">{fmtPrice(t.price)}</div>
+              <div className={cn("text-[10px] tabular flex items-center gap-0.5", t.price_change_24h >= 0 ? "text-bull" : "text-bear")}>
+                {t.price_change_24h >= 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                {Math.abs(t.price_change_24h).toFixed(2)}%
+              </div>
+              <div className="mt-1.5 pt-1.5 border-t border-border text-[9px] text-muted-foreground tabular">
+                MC {fmtUsd(t.market_cap, { compact: true })}
+              </div>
+              <div className="text-[9px] text-muted-foreground tabular">
+                Vol {fmtUsd(t.volume_24h, { compact: true })}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-xs text-muted-foreground py-8">No trending tokens available.</div>
+        )}
+      </div>
+      {source && (
+        <div className="text-[10px] text-muted-foreground mt-1 px-1">
+          Source: <span className={source === "gmgn" ? "text-bull" : ""}>{source === "gmgn" ? "GMGN live data" : "simulated (GMGN unavailable)"}</span>
+        </div>
+      )}
     </section>
   );
 }

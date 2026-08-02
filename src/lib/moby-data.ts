@@ -72,6 +72,7 @@ export interface Token {
   verified: boolean;
   description: string;
   rank?: number; // trending rank if applicable
+  mint?: string; // Solana mint address (for GMGN / on-chain lookups)
 }
 
 export interface Trader {
@@ -245,6 +246,7 @@ export const TOKENS: Token[] = [
     verified: true,
     description: "High-throughput L1 blockchain optimized for consumer-scale apps.",
     rank: 1,
+    mint: "So11111111111111111111111111111111111111112",
   },
   {
     id: "wif",
@@ -268,6 +270,7 @@ export const TOKENS: Token[] = [
     verified: true,
     description: "The most recognizable Solana meme coin — dog with a pink hat.",
     rank: 2,
+    mint: "EKpQGSJtjMFqKZ9KQanSqYXRcF8XKopjCt8m8psV6qEh",
   },
   {
     id: "jup",
@@ -291,6 +294,7 @@ export const TOKENS: Token[] = [
     verified: true,
     description: "Solana's leading DEX aggregator and perpetuals exchange.",
     rank: 3,
+    mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbHedv8mX5qQK",
   },
   {
     id: "pyth",
@@ -313,6 +317,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "⚡",
     verified: true,
     description: "High-fidelity oracle network powering on-chain price feeds.",
+    mint: "Hz1JogwMvLk8F3zAjA6CzR2vZ3n1yL3UqW2ZNQzm3hQ7",
   },
   {
     id: "jto",
@@ -335,6 +340,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "🌊",
     verified: true,
     description: "Solana liquid staking with MEV-optimized block engine.",
+    mint: "jtojtWpa9ZAewgzs2bhj3qLezLMfXiwQ8m8p9Ln5xMT",
   },
   {
     id: "bonk",
@@ -358,6 +364,7 @@ export const TOKENS: Token[] = [
     verified: true,
     description: "Solana's community-driven meme coin with deep DeFi integrations.",
     rank: 4,
+    mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pgPNw",
   },
   {
     id: "hnt",
@@ -380,6 +387,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "🎈",
     verified: true,
     description: "Decentralized wireless network for IoT and mobile coverage.",
+    mint: "hntyVP6YFm1Hg25WLfJYZdZbd3vsLxK2GK1bhN6YwUc5",
   },
   {
     id: "tensor",
@@ -424,6 +432,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "🥭",
     verified: false,
     description: "Governance token for a Solana perps + lending protocol.",
+    mint: "MangoCzJ36AjZyKKs9xLpNfcddzZdp6VJuRKrZ4PjmhY",
   },
   {
     id: "drift",
@@ -446,6 +455,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "📉",
     verified: true,
     description: "Order-book perpetuals DEX on Solana with cross-margining.",
+    mint: "D5p5yXqD2Jj6X5XrL9u8k2k1XpY1j3Q4n7m9v6b3c8d2",
   },
   {
     id: "io",
@@ -468,6 +478,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "🧠",
     verified: true,
     description: "Decentralized GPU cloud for AI workloads.",
+    mint: "DrSS5JYiBz2WqyBuYi5s5N3zK3v7Z9iQ4W9c5X9u9X9u",
   },
   {
     id: "rndr",
@@ -490,6 +501,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "🎞",
     verified: true,
     description: "Decentralized GPU rendering network.",
+    mint: "rndrizKT3MK1iimoxR9S4wZd9FZ6yF2GtWNN7fN2X9X9",
   },
   {
     id: "popcat",
@@ -513,6 +525,7 @@ export const TOKENS: Token[] = [
     verified: true,
     description: "SOL meme coin with a tight-knit community.",
     rank: 5,
+    mint: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
   },
   {
     id: "moon",
@@ -535,6 +548,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "🌙",
     verified: false,
     description: "Freshly launched Solana meme — narrative: cat season.",
+    mint: "0x0000000000000000000000000000000000000000",
   },
   {
     id: "neon",
@@ -557,6 +571,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "💡",
     verified: false,
     description: "Payments rail for emerging markets.",
+    mint: "NeonTjS61Eg4dS7ZCf6p1oLbc5p7q5u2p5qHh8k3NkzM",
   },
   {
     id: "ray",
@@ -579,6 +594,7 @@ export const TOKENS: Token[] = [
     logoGlyph: "🔺",
     verified: true,
     description: "AMM + launchpad on Solana.",
+    mint: "4k3DyjzPHpUDSmt0iL7q3p4K2Z5n2x9q8R2j1pK6k5L9",
   },
   {
     id: "eth",

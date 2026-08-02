@@ -34,13 +34,14 @@ interface PumpFunToken {
   isLive: boolean;
 }
 
-type TabKey = "new" | "graduating" | "graduated" | "migrating";
+type TabKey = "new" | "graduating" | "graduated" | "migrating" | "gmgn";
 
 const TABS: { key: TabKey; label: string; emoji: string }[] = [
   { key: "new", label: "New launches", emoji: "🆕" },
   { key: "graduating", label: "Graduating", emoji: "🎓" },
   { key: "graduated", label: "Graduated", emoji: "✅" },
   { key: "migrating", label: "Migrated", emoji: "🔀" },
+  { key: "gmgn", label: "GMGN", emoji: "🟢" },
 ];
 
 const LAUNCHPAD_FILTERS = ["all", "pump.fun", "letsbonk.fun", "Raydium Launch Lab", "Moonshot"] as const;
@@ -94,6 +95,45 @@ export function PumpFunExplorerModal() {
   const fetchTokens = useCallback(async () => {
     setLoading(true);
     try {
+      if (tab === "gmgn") {
+        // GMGN new-pairs endpoint
+        const res = await fetch(`/api/gmgn/new-pairs?limit=30`);
+        const data = await res.json();
+        // Convert GmgnTrendingToken shape to PumpFunToken
+        const mapped: PumpFunToken[] = (data.tokens || []).map((t: any, i: number) => {
+          const ageMin = t.create_timestamp
+            ? Math.max(1, Math.floor((Date.now() / 1000 - t.create_timestamp) / 60))
+            : 1;
+          return {
+            id: `gmgn-${t.address}-${i}`,
+            symbol: t.symbol,
+            name: t.name,
+            mint: t.address,
+            launchpad: "GMGN",
+            status: "bonding",
+            marketCap: t.market_cap ?? 0,
+            bondingCurveProgress: Math.min(100, Math.floor(((t.liquidity ?? 0) / Math.max(1, t.market_cap ?? 1)) * 100)),
+            price: t.price ?? 0,
+            priceChange1h: t.price_change_1h ?? 0,
+            priceChange24h: t.price_change_24h ?? 0,
+            volume24h: t.volume_24h ?? 0,
+            liquidity: t.liquidity ?? 0,
+            holders: t.holders ?? 0,
+            ageMinutes: ageMin,
+            creator: "gmgn.ai",
+            creatorVerified: true,
+            description: `Live from GMGN — ${t.symbol} on Solana`,
+            migratedTo: null,
+            socials: {},
+            topHolderPct: 0,
+            devHoldingPct: 0,
+            isLive: ageMin < 30,
+          };
+        });
+        setTokens(mapped);
+        setCounts({ GMGN: mapped.length });
+        return;
+      }
       const lpParam = launchpad !== "all" ? `&launchpad=${encodeURIComponent(launchpad)}` : "";
       const res = await fetch(`/api/pumpfun?type=${tab}&limit=30${lpParam}`);
       const data = await res.json();

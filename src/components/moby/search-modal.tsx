@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Search, X, TrendingUp, Hash, Clock } from "lucide-react";
-import { TOKENS, TRADERS, NARRATIVES, TOKENS_BY_ID, fmtPrice, fmtPct, fmtAge } from "@/lib/moby-data";
+import { TOKENS, TRADERS, NARRATIVES, TOKENS_BY_ID, fmtPrice, fmtPct, fmtAge, fmtUsd } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
+import { useGmgn } from "@/hooks/use-gmgn";
 import { TokenIcon, Chip } from "./primitives";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -213,6 +214,27 @@ export function SearchModal() {
                   No results for "{q}"
                 </div>
               )}
+
+              {/* GMGN live search (Solana tokens via DexScreener) */}
+              {q.trim().length >= 2 && (
+                <GmgnSearchResults
+                  query={q.trim()}
+                  onSelect={(mint) => {
+                    const tk = TOKENS.find((t) => t.mint === mint);
+                    if (tk) {
+                      openToken(tk.id);
+                    } else {
+                      useMoby.getState().pushToast({
+                        title: "External token",
+                        description: `Mint: ${mint.slice(0, 8)}...${mint.slice(-4)} — opening on GMGN.`,
+                        type: "info",
+                      });
+                      window.open(`https://gmgn.ai/sol/token/${mint}`, "_blank");
+                    }
+                    setOpen(false);
+                  }}
+                />
+              )}
             </div>
           </motion.div>
         </motion.div>
@@ -314,5 +336,68 @@ export function NotificationsPanel() {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+// ===== GMGN Search Results =====
+function GmgnSearchResults({ query, onSelect }: { query: string; onSelect: (mint: string) => void }) {
+  // Debounce query
+  const [debounced, setDebounced] = useState(query);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query), 350);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const url = debounced.length >= 2 ? `/api/gmgn/search?q=${encodeURIComponent(debounced)}&limit=8` : null;
+  const { data, loading, source } = useGmgn<{ tokens: any[] }>(url);
+
+  if (!debounced || debounced.length < 2) return null;
+  if (loading && !data) {
+    return (
+      <div className="px-2 pt-3">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 flex items-center gap-1">
+          <div className="h-3 w-3 rounded bg-gradient-to-br from-[#14F195] to-[#9945FF]" /> GMGN live · searching...
+        </div>
+        <div className="space-y-1">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-10 rounded-lg bg-surface-2 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (!data || data.tokens.length === 0) {
+    return null;
+  }
+  return (
+    <div className="px-2 pt-3">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 flex items-center gap-1">
+        <div className="h-3 w-3 rounded bg-gradient-to-br from-[#14F195] to-[#9945FF]" />
+        GMGN live {source === "gmgn" ? null : "(demo)"}
+      </div>
+      {data.tokens.map((t: any, i: number) => (
+        <button
+          key={`${t.address}-${i}`}
+          onClick={() => onSelect(t.address)}
+          className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-surface-2 transition-colors text-left"
+        >
+          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#14F195] to-[#9945FF] grid place-items-center text-[10px] font-bold text-background shrink-0">
+            {t.symbol?.[0] ?? "?"}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold truncate">{t.symbol}</div>
+            <div className="text-[11px] text-muted-foreground truncate">
+              {t.name} · {fmtUsd(t.liquidity, { compact: true })} liq
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs font-semibold tabular">{fmtPrice(t.price)}</div>
+            <div className={cn("text-[10px] tabular", t.price_change_24h >= 0 ? "text-bull" : "text-bear")}>
+              {t.price_change_24h >= 0 ? "+" : ""}{t.price_change_24h.toFixed(2)}%
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
   );
 }

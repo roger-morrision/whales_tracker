@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Trophy,
   TrendingUp,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { TRADERS, TOKENS, fmtUsd, fmtNum, fmtAgo, fmtPct, type Trader, type WhaleFlow } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
+import { useGmgn } from "@/hooks/use-gmgn";
 import { TokenIcon, Chip, SectionHeader } from "./primitives";
 import { WalletLink } from "./wallet-link";
 import { cn } from "@/lib/utils";
@@ -25,7 +26,7 @@ const FLOW_TYPE_LABEL: Record<WhaleFlow["type"], string> = {
 };
 
 export function WhalesView() {
-  const [tab, setTab] = useState<"traders" | "flows">("traders");
+  const [tab, setTab] = useState<"traders" | "flows" | "gmgn">("traders");
   return (
     <div className="space-y-4">
       <LeaderboardHeader />
@@ -33,6 +34,7 @@ export function WhalesView() {
         {[
           { k: "traders", label: "🏆 Top traders" },
           { k: "flows", label: "🌊 Live flows" },
+          { k: "gmgn", label: "🟢 GMGN smart money" },
         ].map((s) => (
           <button
             key={s.k}
@@ -46,7 +48,7 @@ export function WhalesView() {
           </button>
         ))}
       </div>
-      {tab === "traders" ? <TradersList /> : <LiveFlows />}
+      {tab === "traders" ? <TradersList /> : tab === "flows" ? <LiveFlows /> : <GmgnSmartMoneyFeed />}
     </div>
   );
 }
@@ -297,6 +299,99 @@ function FlowCard({ flow }: { flow: WhaleFlow }) {
         <span className="text-[10px] text-muted-foreground">{fmtAgo(flow.agoSeconds)}</span>
         <span className="text-[10px] font-mono text-muted-foreground truncate">{flow.txHash}</span>
       </div>
+    </div>
+  );
+}
+
+// ===== GMGN Smart Money Feed =====
+function GmgnSmartMoneyFeed() {
+  // Pick a few trending tokens and aggregate their smart money activity
+  const trendingUrl = "/api/gmgn/trending?timeframe=1h&orderBy=smart_money&limit=5";
+  const { data: trendingData, loading: trendingLoading } = useGmgn<{ tokens: any[] }>(trendingUrl, { refreshMs: 60_000 });
+
+  const tokens = trendingData?.tokens ?? [];
+  const [selectedMint, setSelectedMint] = useState<string | null>(null);
+  useEffect(() => {
+    if (!selectedMint && tokens.length > 0 && tokens[0].address) {
+      // Defer to avoid synchronous setState in effect
+      Promise.resolve().then(() => setSelectedMint(tokens[0].address));
+    }
+  }, [tokens, selectedMint]);
+
+  const activityUrl = selectedMint ? `/api/gmgn/smart-money?address=${selectedMint}&limit=20` : null;
+  const { data: activityData, loading: activityLoading, source } = useGmgn<{ activity: any[] }>(activityUrl, { refreshMs: 30_000 });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        {trendingLoading && !tokens.length ? (
+          <div className="text-xs text-muted-foreground">Loading trending tokens...</div>
+        ) : tokens.length > 0 ? (
+          tokens.map((t: any) => (
+            <button
+              key={t.address}
+              onClick={() => setSelectedMint(t.address)}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors",
+                selectedMint === t.address
+                  ? "bg-bull/15 text-bull border-bull/30"
+                  : "bg-surface-2 text-muted-foreground border-border hover:text-foreground"
+              )}
+            >
+              ${t.symbol}
+            </button>
+          ))
+        ) : (
+          <div className="text-xs text-muted-foreground">No trending tokens available.</div>
+        )}
+      </div>
+
+      {selectedMint && (
+        <div className="space-y-2">
+          {source && (
+            <div className="text-[10px] text-muted-foreground px-1">
+              Source: <span className={source === "gmgn" ? "text-bull" : ""}>{source === "gmgn" ? "GMGN live data" : "simulated (GMGN unavailable)"}</span>
+            </div>
+          )}
+          {activityLoading && !activityData ? (
+            [1, 2, 3].map((i) => <div key={i} className="h-14 rounded-xl bg-surface-2 animate-pulse" />)
+          ) : activityData?.activity && activityData.activity.length > 0 ? (
+            activityData.activity.map((a: any, i: number) => {
+              const isBuy = a.type === "buy";
+              return (
+                <div key={i} className="rounded-xl border border-border p-2.5 flex items-center gap-2.5">
+                  <div className={cn("h-9 w-9 rounded-lg grid place-items-center shrink-0", isBuy ? "bg-bull/15" : "bg-bear/15")}>
+                    {isBuy ? <ArrowUpRight className="h-4 w-4 text-bull" /> : <ArrowDownRight className="h-4 w-4 text-bear" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-mono truncate">{a.address}</span>
+                      {a.wallet_tag && <Chip variant="outline" className="text-[9px]">{a.wallet_tag}</Chip>}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {a.wallet_label || "Smart wallet"} · {new Date(a.ts * 1000).toLocaleTimeString()}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={cn("text-sm font-bold tabular", isBuy ? "text-bull" : "text-bear")}>
+                      {isBuy ? "+" : "-"}{fmtUsd(a.amount_usd, { compact: true })}
+                    </div>
+                    {a.pnl_30d_usd !== undefined && (
+                      <div className={cn("text-[10px] tabular", a.pnl_30d_usd >= 0 ? "text-bull" : "text-bear")}>
+                        30d {a.pnl_30d_usd >= 0 ? "+" : ""}{fmtUsd(a.pnl_30d_usd, { compact: true })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-xs text-muted-foreground py-8 text-center">
+              No smart money activity found for this token.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

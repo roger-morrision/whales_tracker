@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   X,
   CandlestickChart,
@@ -43,12 +43,22 @@ import {
   type Candle,
 } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
+import { useGmgn } from "@/hooks/use-gmgn";
 import { TokenIcon, Chip, Sparkline } from "./primitives";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type Indicator = "candles" | "line" | "bb" | "ema";
 type Range = "1H" | "4H" | "1D" | "1W" | "1M";
+
+// Map UI range to GMGN resolution + candle count
+const RANGE_CONFIG: Record<Range, { resolution: "1m" | "5m" | "15m" | "1h" | "4h" | "1d"; limit: number }> = {
+  "1H": { resolution: "1m", limit: 60 },
+  "4H": { resolution: "5m", limit: 48 },
+  "1D": { resolution: "15m", limit: 96 },
+  "1W": { resolution: "1h", limit: 168 },
+  "1M": { resolution: "4h", limit: 180 },
+};
 
 export function FullChartModal() {
   const open = useMoby((s) => s.chartOpen);
@@ -62,12 +72,32 @@ export function FullChartModal() {
   const [showMacd, setShowMacd] = useState(false);
   const [showVolume, setShowVolume] = useState(true);
 
-  // Generate candles
-  const candles = useMemo(() => {
+  // Try fetching GMGN candles when token has a mint
+  const gmgnConfig = token?.mint && token.mint !== "0x0000000000000000000000000000000000000000"
+    ? RANGE_CONFIG[range]
+    : null;
+  const gmgnUrl = gmgnConfig && token?.mint
+    ? `/api/gmgn/chart?address=${token.mint}&resolution=${gmgnConfig.resolution}&limit=${gmgnConfig.limit}`
+    : null;
+  const { data: gmgnData, source: gmgnSource } = useGmgn<any>(gmgnUrl, { refreshMs: 30_000 });
+
+  // Build candles: prefer GMGN, fall back to simulated
+  const candles = useMemo<Candle[]>(() => {
     if (!token) return [];
+    if (gmgnData?.candles && gmgnData.candles.length > 0) {
+      // Convert GmgnCandle to local Candle type
+      return gmgnData.candles.map((c: any) => ({
+        t: c.t,
+        o: c.o,
+        h: c.h,
+        l: c.l,
+        c: c.c,
+        v: c.v,
+      }));
+    }
     const counts: Record<Range, number> = { "1H": 24, "4H": 48, "1D": 96, "1W": 168, "1M": 240 };
     return genCandles(`chart-${token.id}-${range}`, token.price, counts[range]);
-  }, [token, range]);
+  }, [token, range, gmgnData]);
 
   const closes = candles.map((c) => c.c);
   const rsiData = useMemo(() => calcRsi(closes, 14), [closes]);
@@ -140,6 +170,11 @@ export function FullChartModal() {
                   <span className="font-bold text-base">{token.symbol}</span>
                   <Chip variant="outline">{token.chain}</Chip>
                   <Chip variant="outline">{fmtAge(token.ageHours)}</Chip>
+                  {gmgnSource && (
+                    <Chip variant={gmgnSource === "gmgn" ? "bull" : "outline"} className="text-[9px]">
+                      {gmgnSource === "gmgn" ? "GMGN live" : "GMGN demo"}
+                    </Chip>
+                  )}
                 </div>
                 <div className="text-[11px] text-muted-foreground">{token.name}</div>
               </div>
