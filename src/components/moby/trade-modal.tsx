@@ -134,6 +134,8 @@ export function TradeModal() {
         setSuccess(false);
         close();
         setAmount("");
+        setQuote(null);
+        setShowSettings(false);
       }, 1500);
     }, 1800);
   };

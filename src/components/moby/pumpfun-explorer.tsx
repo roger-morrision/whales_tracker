@@ -166,9 +166,20 @@ export function PumpFunExplorerModal() {
             {/* Token list */}
             <div className="flex-1 overflow-y-auto scrollbar-thin px-4 pb-4 space-y-2">
               {loading && tokens.length === 0 && (
-                <div className="text-center py-12 text-sm text-muted-foreground">
-                  <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2" />
-                  Loading {tab} tokens...
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="rounded-xl border border-border p-3 animate-pulse">
+                      <div className="flex items-center gap-2.5 mb-2">
+                        <div className="h-9 w-9 rounded-full bg-surface-3" />
+                        <div className="flex-1 space-y-1">
+                          <div className="h-3 w-20 bg-surface-3 rounded" />
+                          <div className="h-2 w-32 bg-surface-3 rounded" />
+                        </div>
+                        <div className="h-4 w-12 bg-surface-3 rounded" />
+                      </div>
+                      <div className="h-1.5 rounded-full bg-surface-3" />
+                    </div>
+                  ))}
                 </div>
               )}
 

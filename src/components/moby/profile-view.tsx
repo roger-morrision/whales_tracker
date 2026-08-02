@@ -220,7 +220,11 @@ export function ProfileView() {
             icon={<LogOut className="h-4 w-4" />}
             label="Disconnect wallet"
             variant="danger"
-            onClick={() => disconnectWallet()}
+            onClick={() => {
+              if (typeof window !== "undefined" && window.confirm("Are you sure you want to disconnect your wallet?")) {
+                disconnectWallet();
+              }
+            }}
           />
         </div>
       </section>

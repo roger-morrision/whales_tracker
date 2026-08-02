@@ -63,7 +63,14 @@ function NewsCard({
   return (
     <a
       href={item.url}
-      onClick={(e) => e.preventDefault()}
+      onClick={(e) => {
+        e.preventDefault();
+        useMoby.getState().pushToast({
+          title: item.headline.slice(0, 60) + "...",
+          description: `${item.source} · Tap to read on ${item.source}`,
+          type: "info",
+        });
+      }}
       className="block rounded-xl border border-border p-3 hover:bg-surface-2 transition-colors"
     >
       <div className="flex items-start gap-2">

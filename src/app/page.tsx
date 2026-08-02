@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMoby } from "@/lib/moby-store";
 import { TOKENS } from "@/lib/moby-data";
+import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/moby/top-bar";
 import { BottomNav } from "@/components/moby/bottom-nav";
 import { DiscoverView } from "@/components/moby/discover-view";
@@ -123,6 +124,11 @@ export default function Home() {
     }, 30_000);
     return () => clearInterval(interval);
   }, [refreshFeeds]);
+
+  // Scroll to top on tab change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [activeTab]);
 
   // Keyboard shortcuts: cmd/ctrl+k (copilot), cmd/ctrl+/ (search), Escape (close top modal)
   useEffect(() => {
@@ -311,7 +317,40 @@ export default function Home() {
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />
+
+      {/* Back to top floating button */}
+      <BackToTopButton />
     </div>
     </ErrorBoundary>
+  );
+}
+
+function BackToTopButton() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setVisible(window.scrollY > 400);
+    window.addEventListener("scroll", handler, { passive: true });
+    // Also poll as fallback
+    const interval = setInterval(handler, 1000);
+    return () => {
+      window.removeEventListener("scroll", handler);
+      clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <button
+      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      className={cn(
+        "fixed bottom-24 right-4 z-40 h-10 w-10 rounded-full bg-surface-2 border border-border shadow-lg grid place-items-center hover:bg-surface-3 transition-all duration-300",
+        visible ? "opacity-100 scale-100" : "opacity-0 scale-0 pointer-events-none"
+      )}
+      aria-label="Back to top"
+    >
+      <svg className="h-4 w-4 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+      </svg>
+    </button>
   );
 }

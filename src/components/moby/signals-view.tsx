@@ -90,6 +90,19 @@ function SignalsHeader({ count, savedCount }: { count: number; savedCount: numbe
       <p className="text-xs text-muted-foreground">
         Real-time alerts when tracked smart wallets make moves. Saved: <span className="text-foreground font-medium">{savedCount}</span>
       </p>
+      {count === 0 && (
+        <div className="text-center py-8 mt-4">
+          <Zap className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm font-semibold mb-1">All signals dismissed</p>
+          <p className="text-xs text-muted-foreground mb-3">New signals will appear here as smart wallets make moves.</p>
+          <button
+            onClick={() => useMoby.setState((s) => ({ dismissedSignals: [] }))}
+            className="px-3 py-1.5 rounded-lg bg-bull/15 text-bull border border-bull/30 text-xs font-bold hover:bg-bull/20"
+          >
+            Reset dismissed signals
+          </button>
+        </div>
+      )}
     </div>
   );
 }

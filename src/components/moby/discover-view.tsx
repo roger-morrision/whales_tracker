@@ -365,6 +365,11 @@ export function TokenRow({ token, rank }: { token: Token; rank?: number }) {
         onClick={(e) => {
           e.stopPropagation();
           toggleWatch(token.id);
+          useMoby.getState().pushToast({
+            title: watched ? "Removed from watchlist" : "Added to watchlist",
+            description: `$${token.symbol} ${watched ? "removed" : "added"}`,
+            type: watched ? "info" : "success",
+          });
         }}
         className="ml-1 h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground hover:text-foreground"
         aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}

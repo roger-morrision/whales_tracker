@@ -38,7 +38,7 @@ export function PushNotificationManager() {
   if (permission !== "default") return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:max-w-sm z-[60] pointer-events-auto">
+    <div className="fixed bottom-24 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:max-w-sm z-[55] pointer-events-auto">
       <div className="rounded-xl border border-bull/30 bg-surface shadow-2xl p-3 flex items-center gap-2.5">
         <div className="h-9 w-9 rounded-lg bg-bull/15 grid place-items-center shrink-0">
           <Bell className="h-4 w-4 text-bull" />

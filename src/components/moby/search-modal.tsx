@@ -71,7 +71,7 @@ export function SearchModal() {
                 type="text"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search tokens, traders, narratives, wallets…"
+                placeholder="Search tokens, traders, narratives… (⌘/)"
                 className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
               />
               <button

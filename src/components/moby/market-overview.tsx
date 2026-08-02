@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Activity,
   Gauge,
@@ -25,10 +25,19 @@ export function MarketOverview() {
   const openToken = useMoby((s) => s.openToken);
   const heatmap = useMemo(() => getHeatmapTokens().slice(0, 16), []);
   const total = heatmap.reduce((s, t) => s + t.mcap, 0);
+  const [lastUpdate, setLastUpdate] = useState("");
+
+  useEffect(() => {
+    const updateTime = () => setLastUpdate(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    updateTime();
+    const interval = setInterval(updateTime, 15_000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="space-y-3">
       <SectionHeader title="Market overview" emoji="🌐" action="Details" onAction={() => useMoby.getState().setActiveTab("discover")} />
+      <div className="text-[9px] text-muted-foreground -mt-2 mb-1">Updated {lastUpdate}</div>
 
       <div className="grid grid-cols-2 gap-2">
         <FearGreedCard />

@@ -127,6 +127,11 @@ function TraderCard({ trader }: { trader: Trader }) {
           onClick={(e) => {
             e.stopPropagation();
             toggleFollow(trader.id);
+            useMoby.getState().pushToast({
+              title: followed ? "Unfollowed" : "Following",
+              description: `@${trader.handle} ${followed ? "removed" : "added"} to your followed traders`,
+              type: followed ? "info" : "success",
+            });
           }}
           className={cn(
             "shrink-0 h-8 px-2.5 inline-flex items-center gap-1 rounded-lg text-xs font-semibold transition-colors",
