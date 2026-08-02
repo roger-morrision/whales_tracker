@@ -41,6 +41,10 @@ export interface ToastItem {
   type: "info" | "success" | "warn" | "alert";
   actionLabel?: string;
   actionId?: string; // token id or trader id for action
+  // Quick-buy secondary action — opens trade modal pre-filled
+  quickBuyLabel?: string; // e.g. "Buy 0.1 SOL"
+  quickBuyTokenId?: string;
+  quickBuyAmountUsd?: number;
 }
 
 // ===== NEW types =====
@@ -229,6 +233,12 @@ interface MobyState {
   // Track unique traders viewed (for "whale_spotter" achievement)
   viewedTraders: string[];
   markTraderViewed: (id: string) => void;
+
+  // ===== Enhancement: Followed wallets (for per-wallet push alerts) =====
+  followedWallets: string[]; // wallet addresses (capped at 10)
+  toggleFollowWallet: (address: string, label?: string) => void;
+  followedWalletLabels: Record<string, string>; // address -> label
+  lastSeenWalletTx: Record<string, string>; // address -> last seen tx hash (for "new tx" detection)
 
   // watchlist (token ids)
   watchlist: string[];
@@ -783,6 +793,44 @@ export const useMoby = create<MobyState>()(
     });
     if (becameNew && get().viewedTraders.length >= 5) {
       get().unlockAchievement("whale_spotter");
+    }
+  },
+
+  // ===== Enhancement: Followed wallets (per-wallet push alerts) =====
+  followedWallets: [],
+  followedWalletLabels: {},
+  lastSeenWalletTx: {},
+  toggleFollowWallet: (address, label) => {
+    set((s) => {
+      const isFollowing = s.followedWallets.includes(address);
+      if (isFollowing) {
+        // Unfollow — remove from list, labels, and lastSeen
+        const newLabels = { ...s.followedWalletLabels };
+        delete newLabels[address];
+        const newLastSeen = { ...s.lastSeenWalletTx };
+        delete newLastSeen[address];
+        return {
+          followedWallets: s.followedWallets.filter((w) => w !== address),
+          followedWalletLabels: newLabels,
+          lastSeenWalletTx: newLastSeen,
+        };
+      }
+      // Follow — cap at 10
+      if (s.followedWallets.length >= 10) {
+        return {}; // at limit
+      }
+      return {
+        followedWallets: [...s.followedWallets, address],
+        followedWalletLabels: { ...s.followedWalletLabels, [address]: label || "Wallet" },
+      };
+    });
+    const isNowFollowing = get().followedWallets.includes(address);
+    if (isNowFollowing) {
+      get().pushAlert({
+        title: "Following wallet",
+        description: "You'll get a push alert when this wallet makes a trade.",
+        type: "info",
+      });
     }
   },
 
@@ -1654,6 +1702,9 @@ export const useMoby = create<MobyState>()(
       tradeHistory: s.tradeHistory,
       achievements: s.achievements,
       watchlistAlerts: s.watchlistAlerts,
+      viewedTraders: s.viewedTraders,
+      followedWallets: s.followedWallets,
+      followedWalletLabels: s.followedWalletLabels,
     }),
   }
   )

@@ -23,6 +23,7 @@ export function DiscoverView() {
     <div className="space-y-6">
       <HeroBanner />
       <MarketOverview />
+      <TopBoostsRow />
       <GmgnTrendingRow />
       <GmgnHotSearchesRow />
       <NarrativesRow />
@@ -484,7 +485,7 @@ function GmgnTrendingRow() {
       </div>
       {source && (
         <div className="text-[10px] text-muted-foreground mt-1 px-1">
-          Source: <span className={source === "gmgn" ? "text-bull" : ""}>{source === "gmgn" ? "GMGN live data" : "simulated (GMGN unavailable)"}</span>
+          Source: <span className={source === "gmgn" ? "text-bull" : ""}>{(source === "gmgn" || source === "dexscreener") ? "GMGN/DexScreener live" : "simulated (GMGN unavailable)"}</span>
         </div>
       )}
     </section>
@@ -539,7 +540,79 @@ function GmgnHotSearchesRow() {
       </div>
       {source && (
         <div className="text-[10px] text-muted-foreground mt-1 px-1">
-          Source: <span className={source === "gmgn" ? "text-bull" : ""}>{source === "gmgn" ? "GMGN live" : "simulated (GMGN unavailable)"}</span>
+          Source: <span className={source === "gmgn" ? "text-bull" : ""}>{(source === "gmgn" || source === "dexscreener") ? "GMGN/DexScreener live" : "simulated (GMGN unavailable)"}</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ===== DexScreener Top Boosts Row =====
+function TopBoostsRow() {
+  const { data, loading, source } = useGmgn<{ tokens: any[] }>(
+    "/api/dexscreener/top-boosts?chain=solana&limit=8",
+    { refreshMs: 120_000 }
+  );
+
+  return (
+    <section>
+      <SectionHeader
+        title="🚀 Top Boosted"
+        emoji=""
+        action="View all"
+        onAction={() => window.open("https://dexscreener.com/trending", "_blank")}
+      />
+      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+        {loading && !data ? (
+          [1, 2, 3, 4].map((i) => (
+            <div key={i} className="shrink-0 w-32 h-32 rounded-xl bg-surface-2 animate-pulse" />
+          ))
+        ) : data?.tokens && data.tokens.length > 0 ? (
+          data.tokens.map((t: any, i: number) => (
+            <a
+              key={t.address || i}
+              href={`https://dexscreener.com/solana/${t.address}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 w-32 rounded-xl border border-gold/20 bg-gradient-to-br from-gold/5 to-transparent p-2.5 hover:border-gold/40 transition-colors"
+            >
+              <div className="flex items-center gap-1.5 mb-1.5">
+                {t.image_uri ? (
+                  <img
+                    src={t.image_uri}
+                    alt={t.symbol}
+                    className="h-7 w-7 rounded-full object-cover shrink-0"
+                    onError={(e) => { (e.currentTarget.style.display = "none"); }}
+                  />
+                ) : (
+                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-gold to-bull grid place-items-center text-[10px] font-bold text-background shrink-0">
+                    {t.symbol?.[0] ?? "?"}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold truncate">{t.symbol}</div>
+                  <div className="text-[9px] text-gold font-semibold">🚀 ${t.total_boosts_usd}</div>
+                </div>
+              </div>
+              <div className="text-xs font-semibold tabular">{fmtPrice(t.price)}</div>
+              <div className={cn("text-[10px] tabular flex items-center gap-0.5", t.price_change_24h >= 0 ? "text-bull" : "text-bear")}>
+                {t.price_change_24h >= 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                {Math.abs(t.price_change_24h).toFixed(2)}%
+              </div>
+              <div className="mt-1.5 pt-1.5 border-t border-border text-[9px] text-muted-foreground tabular">
+                MC {fmtUsd(t.market_cap, { compact: true })}
+              </div>
+            </a>
+          ))
+        ) : (
+          <div className="text-xs text-muted-foreground py-8">No boosted tokens available.</div>
+        )}
+      </div>
+      {source && (
+        <div className="text-[10px] text-muted-foreground mt-1 px-1">
+          Source: <span className={(source === "gmgn" || source === "dexscreener") ? "text-bull" : ""}>
+            {(source === "gmgn" || source === "dexscreener") ? "DexScreener live" : "simulated"}
+          </span>
         </div>
       )}
     </section>

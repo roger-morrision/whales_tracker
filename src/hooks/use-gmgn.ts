@@ -13,7 +13,7 @@ export interface GmgnState<T> {
   data: T | null;
   loading: boolean;
   error: string | null;
-  source: "gmgn" | "simulated" | null;
+  source: "gmgn" | "simulated" | "dexscreener" | "error" | null;
   refetch: () => void;
 }
 
@@ -21,7 +21,7 @@ export function useGmgn<T>(url: string | null, opts?: { refreshMs?: number }): G
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(!!url);
   const [error, setError] = useState<string | null>(null);
-  const [source, setSource] = useState<"gmgn" | "simulated" | null>(null);
+  const [source, setSource] = useState<"gmgn" | "simulated" | "dexscreener" | "error" | null>(null);
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {

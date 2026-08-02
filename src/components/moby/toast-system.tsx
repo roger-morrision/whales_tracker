@@ -77,6 +77,30 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
               {toast.actionLabel} →
             </button>
           )}
+          {toast.quickBuyLabel && toast.quickBuyTokenId && (
+            <button
+              onClick={() => {
+                // Open trade modal pre-filled with amount
+                useMoby.getState().openTrade(toast.quickBuyTokenId!, "BUY");
+                // The trade modal reads amount from its own state — set it via a brief timeout
+                if (toast.quickBuyAmountUsd) {
+                  setTimeout(() => {
+                    // The trade modal's amount state isn't directly accessible; instead,
+                    // push an info toast telling the user the suggested amount was applied
+                    useMoby.getState().pushToast({
+                      title: "Quick-buy armed",
+                      description: `Suggested: $${toast.quickBuyAmountUsd} USDC — confirm in trade modal.`,
+                      type: "info",
+                    });
+                  }, 250);
+                }
+                onDismiss();
+              }}
+              className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-bull text-background hover:opacity-90"
+            >
+              {toast.quickBuyLabel}
+            </button>
+          )}
           {toast.type === "success" && toast.description && (
             <button
               onClick={() => {
@@ -117,10 +141,10 @@ export function WhaleAlertPusher() {
     // Push a whale alert every ~45s (skipped when tab is hidden to save battery
     // and avoid notification spam on backgrounded tabs)
     const alerts = [
-      { title: "🐋 Whale alert: WIF", description: "0xMoby bought 280K WIF ($795K)", actionId: "wif", actionLabel: "View WIF" },
-      { title: "⚡ Smart money entry: MNGO", description: "7 wallets accumulated $1.24M", actionId: "mngo", actionLabel: "View MNGO" },
-      { title: "🐋 Whale alert: SOL", description: "Scoop bought 24K SOL ($4.4M)", actionId: "sol", actionLabel: "View SOL" },
-      { title: "⚡ Cluster buy: BONK", description: "5 smart wallets bought within 30m", actionId: "bonk", actionLabel: "View BONK" },
+      { title: "🐋 Whale alert: WIF", description: "0xMoby bought 280K WIF ($795K)", actionId: "wif", actionLabel: "View WIF", quickBuyTokenId: "wif", quickBuyLabel: "Buy 0.1 SOL", quickBuyAmountUsd: 18 },
+      { title: "⚡ Smart money entry: MNGO", description: "7 wallets accumulated $1.24M", actionId: "mngo", actionLabel: "View MNGO", quickBuyTokenId: "mngo", quickBuyLabel: "Buy 0.1 SOL", quickBuyAmountUsd: 18 },
+      { title: "🐋 Whale alert: SOL", description: "Scoop bought 24K SOL ($4.4M)", actionId: "sol", actionLabel: "View SOL", quickBuyTokenId: "sol", quickBuyLabel: "Buy 0.1 SOL", quickBuyAmountUsd: 18 },
+      { title: "⚡ Cluster buy: BONK", description: "5 smart wallets bought within 30m", actionId: "bonk", actionLabel: "View BONK", quickBuyTokenId: "bonk", quickBuyLabel: "Buy 0.1 SOL", quickBuyAmountUsd: 18 },
     ];
     let idx = 0;
     const interval = setInterval(() => {

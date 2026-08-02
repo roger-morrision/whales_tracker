@@ -210,3 +210,106 @@ Stage Summary:
 - 5 race condition / memory leak fixes (WhaleAlertPusher visibility, useGmgn visibility, 3 modal setTimeout cleanups, AbortController on pumpfun)
 - All real GMGN data will flow the moment the user runs `gmgn-cli config` and `gmgn-cli config --apply <KEY>` (one-time setup)
 - Until then, DexScreener continues to provide real token/trending/search data, and other endpoints show clearly-tagged simulated fallbacks
+
+---
+Task ID: 4
+Agent: main (orchestrator)
+Task: Study GMGN/DexScreener, copy good features to Moby app
+
+Research:
+- Used general-purpose subagent to study GMGN.ai and DexScreener features
+- Key finding: GMGN data already flowing through lib/gmgn.ts (rug_ratio, bundler_rate, sniper_count, rat_trader_amount_rate, cto_flag, is_on_curve, renounced_mint, renounced_freeze_account, smart_degen_count, renowned_count, per-holder tags) but NOT rendered in UI
+- Identified 25 ranked feature recommendations; shipped top 11
+
+Features Shipped:
+
+#1 Risk badge cluster (token-detail-sheet.tsx — GmgnTokenBadges)
+- Renders already-fetched GMGN risk fields as colored pill badges:
+  - Dev renounced / Mint revoked / Mint live (security)
+  - CTO (community takeover)
+  - On curve / Graduated (bonding-curve status)
+  - Rug ratio %, Bundler %, Sniper count, Rat trades %
+  - Smart money count, KOL count (bullish signals)
+- Each pill has a tooltip explaining what it means
+- Color-coded: bull/bear/gold/muted
+
+#2 Bonding curve progress bar (token-detail-sheet.tsx — BondingCurveBar)
+- Renders when token is_on_curve === true (pump.fun style)
+- Progress bar shows marketCap / $69k graduation threshold
+- "⚡ Graduating soon" pulse animation when >85%
+- Hides for graduated tokens
+
+#3 Dev renouncement + CTO (folded into #1)
+- "✅ Dev renounced" green badge when both mint + freeze revoked
+- "👋 CTO" gold badge when cto_flag === 1
+
+#5 Token social header (token-detail-sheet.tsx — TokenSocialHeader)
+- Renders token logo (image_uri) from DexScreener
+- Inline social link buttons: Twitter, Telegram, Discord, Instagram
+- Website link with hostname display
+- Boosted count badge with rocket icon (links to DexScreener)
+- Extended fetchDexScreenerToken to capture: header_image_uri, websites[], socials[], boosts_active
+
+#6 Multi-pair All-DEXes tile view (token-detail-sheet.tsx — AllDexesPairsView + /api/dexscreener/pairs)
+- New /api/dexscreener/pairs?address=<mint>&chain=solana returns ALL pairs (not just top-liquidity)
+- Horizontal scrollable tile row showing: DEX name (Raydium/Orca/Meteora), labels, price, 24h change, liquidity, volume
+- Each tile links to the DexScreener pair page
+- Only renders when >1 pair exists
+- Verified: WIF shows 30 pairs across Raydium, Orca, Meteora
+
+#4 DexScreener paid-promo disclosure (/api/dexscreener/orders)
+- New /api/dexscreener/orders?address=<mint>&chain=solana returns paid-promo transparency data
+- Returns: orders[] (tokenAd / tokenProfile payments), boosts[] (with amounts + timestamps), totalBoostsUsd
+- Boost badge in TokenSocialHeader links to DexScreener
+
+#7 Per-wallet follow push alerts (followedWallets store slice + FollowWalletButton + page.tsx poller)
+- New store slice: followedWallets (capped at 10), followedWalletLabels, lastSeenWalletTx
+- Persisted in partialize
+- FollowWalletButton on every GmgnHoldersView row ("+ Follow" / "✓ Following")
+- Background poller in page.tsx checks /api/gmgn/wallet-activity every 30s per followed wallet
+- On new tx: fires actionable toast with quick-buy button (if token is in local registry)
+- Skips when tab hidden
+
+#10 Actionable toast with quick-buy button (toast-system.tsx + ToastItem extension)
+- Extended ToastItem with: quickBuyLabel, quickBuyTokenId, quickBuyAmountUsd
+- New toast button "Buy 0.1 SOL" opens trade modal pre-filled
+- WhaleAlertPusher now includes quickBuy fields on all 4 alert types (WIF, MNGO, SOL, BONK)
+
+#11 Wallet scoring ring gauge (trader-detail-sheet.tsx — WalletScoreCard)
+- Computes 0-100 score from fetchWalletStats: 50% winrate + 30% absolute PnL (cap $100k) + 20% trade count (cap 100)
+- SVG ring gauge with color: bull (≥70), gold (≥45), bear (<45)
+- Verdict line: "🟢 High — strong copy-trade candidate" / "🟡 Medium — proceed with caution" / "🔴 Low — limited track record"
+- Shows underlying stats: WR %, trades/30d, PnL
+
+#17 Bundled-wallet exposure gauge (token-detail-sheet.tsx — ExposureMetric in GmgnHoldersView)
+- Computes from holder tags: bundlers, snipers, rat traders, fresh wallets, smart money, KOLs
+- 2-column grid of exposure metrics with counts + cumulative %
+- "⚠️ Bundled cluster detected" warning when bundler % > 20%
+- Added SNIPER/BUNDLER/FRESH chips to individual holder rows
+
+#19 Top-boosted tokens carousel (discover-view.tsx — TopBoostsRow + /api/dexscreener/top-boosts)
+- New /api/dexscreener/top-boosts?chain=solana&limit=N returns top boosted tokens with paid amounts
+- Horizontal scrollable card row above GmgnTrendingRow
+- Each card shows: token logo, symbol, boost $ amount, price, 24h change, market cap
+- Gold-themed styling to distinguish from volume-based trending
+- Verified: WHEN ($500), AORA ($500), VISION ($200)
+
+Type System / Infrastructure:
+- moby-store.ts: Added followedWallets, followedWalletLabels, lastSeenWalletTx slices + toggleFollowWallet action
+- use-gmgn.ts: Extended GmgnState source type to include "dexscreener" | "error"
+- Updated all source comparisons to treat "dexscreener" as live (alongside "gmgn")
+- lib/gmgn.ts: Exported fetchJson for reuse by /api/dexscreener/* routes
+- Extended GmgnTokenInfo interface with: header_image_uri, websites[], socials[], boosts_active
+
+New API Routes (3 added):
+- /api/dexscreener/pairs — all DEX pairs for a token (multi-pair view)
+- /api/dexscreener/orders — paid-promo transparency (boosts + token ads)
+- /api/dexscreener/top-boosts — top boosted tokens carousel
+
+Verification:
+- TypeScript: 0 errors in src/
+- ESLint: clean
+- Production build: ✓ Compiled successfully
+- All 20 endpoints return 200 (17 GMGN + 3 DexScreener)
+- Real DexScreener data flowing: WIF shows 30 pairs, top-boosts shows real paid amounts
+- Existing endpoints unaffected

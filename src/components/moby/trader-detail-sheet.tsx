@@ -253,8 +253,8 @@ function GmgnTraderPortfolio({ walletAddress }: { walletAddress: string }) {
           </div>
           <span className="text-xs font-semibold">GMGN Live Portfolio</span>
           {source && (
-            <Chip variant={source === "gmgn" ? "bull" : "outline"} className="text-[9px]">
-              {source === "gmgn" ? "live" : "demo"}
+            <Chip variant={(source === "gmgn" || source === "dexscreener") ? "bull" : "outline"} className="text-[9px]">
+              {(source === "gmgn" || source === "dexscreener") ? "live" : "demo"}
             </Chip>
           )}
           <a
@@ -275,7 +275,9 @@ function GmgnTraderPortfolio({ walletAddress }: { walletAddress: string }) {
             </div>
           ) : data && data.source === "gmgn" && data.stats ? (
             <>
-              <div className="grid grid-cols-3 gap-2 mb-3">
+              {/* Copy-trade-ability score ring + verdict */}
+              <WalletScoreCard stats={data.stats} />
+              <div className="grid grid-cols-3 gap-2 mb-3 mt-2">
                 <div className="rounded-lg border border-border p-2">
                   <div className="text-[9px] text-muted-foreground uppercase">Total value</div>
                   <div className="text-sm font-bold tabular">{fmtUsd(data.stats.total_value, { compact: true })}</div>
@@ -313,6 +315,65 @@ function GmgnTraderPortfolio({ walletAddress }: { walletAddress: string }) {
               GMGN portfolio unavailable for this wallet.
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Wallet Score Card (copy-trade-ability) =====
+function computeWalletScore(stats: any): { score: number; verdict: string; tone: "bull" | "gold" | "bear" } {
+  // Score: 0-100, weighted:
+  //   - 50% winrate (already 0-1)
+  //   - 30% absolute pnl_30d (cap at $100k → 100)
+  //   - 20% trade_count_30d (cap at 100 → 100)
+  const winrateScore = (stats.winrate ?? 0) * 50;
+  const pnlScore = Math.min(30, (Math.max(0, stats.pnl_30d ?? 0) / 100_000) * 30);
+  const tradeCountScore = Math.min(20, (Math.min(100, stats.trade_count_30d ?? 0) / 100) * 20);
+  const score = Math.round(winrateScore + pnlScore + tradeCountScore);
+  let verdict = "Low signal";
+  let tone: "bull" | "gold" | "bear" = "bear";
+  if (score >= 70) { verdict = "🟢 High — strong copy-trade candidate"; tone = "bull"; }
+  else if (score >= 45) { verdict = "🟡 Medium — proceed with caution"; tone = "gold"; }
+  else { verdict = "🔴 Low — limited track record"; tone = "bear"; }
+  return { score, verdict, tone };
+}
+
+function WalletScoreCard({ stats }: { stats: any }) {
+  const { score, verdict, tone } = computeWalletScore(stats);
+  const circumference = 2 * Math.PI * 28;
+  const offset = circumference - (score / 100) * circumference;
+  const colorClass =
+    tone === "bull" ? "text-bull" : tone === "gold" ? "text-gold" : "text-bear";
+
+  return (
+    <div className={cn(
+      "rounded-xl border p-3 flex items-center gap-3",
+      tone === "bull" && "border-bull/30 bg-bull/5",
+      tone === "gold" && "border-gold/30 bg-gold/5",
+      tone === "bear" && "border-bear/30 bg-bear/5"
+    )}>
+      {/* Score ring */}
+      <div className="relative h-16 w-16 shrink-0">
+        <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" className="text-surface-3" />
+          <circle
+            cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className={cn(colorClass, "transition-all duration-700")}
+          />
+        </svg>
+        <div className="absolute inset-0 grid place-items-center">
+          <div className={cn("text-lg font-bold tabular", colorClass)}>{score}</div>
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Copy-trade score</div>
+        <div className={cn("text-xs font-semibold mt-0.5", colorClass)}>{verdict}</div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">
+          {Math.round((stats.winrate ?? 0) * 100)}% WR · {stats.trade_count_30d ?? 0} trades/30d · {fmtUsd(stats.pnl_30d ?? 0, { compact: true })} P&L
         </div>
       </div>
     </div>

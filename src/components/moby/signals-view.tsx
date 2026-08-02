@@ -226,8 +226,8 @@ function GmgnSignalsSection() {
         </div>
         <span className="text-xs font-semibold">GMGN Live Signals</span>
         {source && (
-          <Chip variant={source === "gmgn" ? "bull" : "outline"} className="text-[9px]">
-            {source === "gmgn" ? "live" : "demo"}
+          <Chip variant={(source === "gmgn" || source === "dexscreener") ? "bull" : "outline"} className="text-[9px]">
+            {(source === "gmgn" || source === "dexscreener") ? "live" : "demo"}
           </Chip>
         )}
         <a

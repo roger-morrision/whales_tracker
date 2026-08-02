@@ -350,7 +350,7 @@ function GmgnSmartMoneyFeed() {
         <div className="space-y-2">
           {source && (
             <div className="text-[10px] text-muted-foreground px-1">
-              Source: <span className={source === "gmgn" ? "text-bull" : ""}>{source === "gmgn" ? "GMGN live data" : "simulated (GMGN unavailable)"}</span>
+              Source: <span className={source === "gmgn" ? "text-bull" : ""}>{(source === "gmgn" || source === "dexscreener") ? "GMGN/DexScreener live" : "simulated (GMGN unavailable)"}</span>
             </div>
           )}
           {activityLoading && !activityData ? (

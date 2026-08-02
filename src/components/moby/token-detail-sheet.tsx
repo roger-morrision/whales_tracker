@@ -16,6 +16,11 @@ import {
   Bell,
   GitCompareArrows,
   Share2,
+  Globe,
+  Twitter,
+  Send,
+  MessageCircle,
+  Rocket,
 } from "lucide-react";
 import {
   Area,
@@ -162,6 +167,11 @@ function TokenDetailContent({ token }: { token: Token }) {
         </div>
       </div>
 
+      {/* GMGN/DexScreener token header: logo + socials + boosts */}
+      {token.mint && token.mint !== "0x0000000000000000000000000000000000000000" && (
+        <TokenSocialHeader mint={token.mint} symbol={token.symbol} />
+      )}
+
       {/* Chart */}
       <div className="px-2 mt-3">
         <div className="h-44">
@@ -211,6 +221,11 @@ function TokenDetailContent({ token }: { token: Token }) {
           ))}
         </div>
       </div>
+
+      {/* Bonding curve progress (only renders when token is on pump.fun curve) */}
+      {token.mint && token.mint !== "0x0000000000000000000000000000000000000000" && (
+        <BondingCurveBar mint={token.mint} marketCap={live * (token.marketCap / token.price)} />
+      )}
 
       {/* Trade buttons */}
       <div className="px-4 mt-3 grid grid-cols-2 gap-2">
@@ -378,7 +393,11 @@ function TokenDetailContent({ token }: { token: Token }) {
 
       {/* GMGN live data: security + smart money + KOL + top holders */}
       {token.mint && token.mint !== "0x0000000000000000000000000000000000000000" && (
-        <GmgnPanel mint={token.mint} symbol={token.symbol} />
+        <>
+          <GmgnTokenBadges mint={token.mint} />
+          <AllDexesPairsView mint={token.mint} />
+          <GmgnPanel mint={token.mint} symbol={token.symbol} />
+        </>
       )}
 
       {/* External links + tools */}
@@ -488,8 +507,8 @@ function GmgnPanel({ mint, symbol }: { mint: string; symbol: string }) {
             </div>
             <span className="text-xs font-semibold">GMGN Live</span>
             {source && (
-              <Chip variant={source === "gmgn" ? "bull" : "outline"} className="text-[9px]">
-                {source === "gmgn" ? "live" : "demo"}
+              <Chip variant={(source === "gmgn" || source === "dexscreener") ? "bull" : "outline"} className="text-[9px]">
+                {(source === "gmgn" || source === "dexscreener") ? "live" : "demo"}
               </Chip>
             )}
           </div>
@@ -615,29 +634,93 @@ function GmgnSecurityView({ data }: { data: any }) {
 
 function GmgnHoldersView({ holders }: { holders: any[] }) {
   if (holders.length === 0) return <div className="text-xs text-muted-foreground py-4 text-center">No holder data</div>;
+
+  // Compute exposure summary from holder tags
+  const bundled = holders.filter((h) => h.is_bundler || h.tags?.includes("bundler"));
+  const snipers = holders.filter((h) => h.is_sniper || h.tags?.includes("sniper"));
+  const ratTraders = holders.filter((h) => h.is_rat_trader || h.tags?.includes("rat_trader"));
+  const freshWallets = holders.filter((h) => h.is_fresh_wallet || h.tags?.includes("fresh_wallet"));
+  const smartMoney = holders.filter((h) => h.is_smart_money || h.tags?.includes("smart_degen"));
+  const kols = holders.filter((h) => h.is_kol || h.tags?.includes("renowned"));
+
+  const totalBundlerPct = bundled.reduce((s, h) => s + (h.holder_rate || 0), 0);
+  const totalSniperPct = snipers.reduce((s, h) => s + (h.holder_rate || 0), 0);
+
   return (
-    <div className="space-y-1">
-      {holders.slice(0, 15).map((h, i) => (
-        <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
-          <div className="text-[10px] font-semibold text-muted-foreground w-5">{i + 1}</div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] font-mono truncate">{h.address}</span>
-              {h.is_dev && <Chip variant="bear" className="text-[9px]">DEV</Chip>}
-              {h.is_smart_money && <Chip variant="bull" className="text-[9px]">SMART</Chip>}
-              {h.is_kol && <Chip variant="gold" className="text-[9px]">KOL</Chip>}
-            </div>
-            <div className="text-[10px] text-muted-foreground tabular">
-              {fmtNum(h.balance)} · {fmtUsd(h.value_usd, { compact: true })}
-            </div>
+    <div className="space-y-2">
+      {/* Exposure summary */}
+      {(bundled.length > 0 || snipers.length > 0 || ratTraders.length > 0 || freshWallets.length > 0) && (
+        <div className="rounded-lg border border-border bg-surface-2/50 p-2.5">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Wallet exposure</div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <ExposureMetric label="Bundlers" count={bundled.length} pct={totalBundlerPct} tone={totalBundlerPct > 20 ? "bear" : "muted"} tip="Bundler bots that bought in coordinated batches at launch" />
+            <ExposureMetric label="Snipers" count={snipers.length} pct={totalSniperPct} tone={totalSniperPct > 20 ? "bear" : "muted"} tip="Wallets that bought in the first blocks after launch" />
+            <ExposureMetric label="Rat traders" count={ratTraders.length} pct={0} tone="muted" tip="Insider/sneak trading wallets" />
+            <ExposureMetric label="Fresh wallets" count={freshWallets.length} pct={0} tone="muted" tip="Newly-created wallets — often insider-linked" />
+            <ExposureMetric label="Smart money" count={smartMoney.length} pct={0} tone="bull" tip="GMGN-tagged smart-money holders (bullish)" />
+            <ExposureMetric label="KOLs" count={kols.length} pct={0} tone="bull" tip="GMGN-tagged KOL/influencer holders (bullish)" />
           </div>
-          <div className="text-right">
-            <div className={cn("text-xs font-bold tabular", h.holder_rate > 5 ? "text-bear" : "text-foreground")}>
-              {h.holder_rate.toFixed(2)}%
+          {totalBundlerPct > 20 && (
+            <div className="mt-2 rounded-md border border-bear/30 bg-bear/5 p-1.5 text-[10px] text-bear">
+              ⚠️ Bundled cluster detected — {totalBundlerPct.toFixed(1)}% of supply held by {bundled.length} bundler wallet(s). High rug risk.
             </div>
-          </div>
+          )}
         </div>
-      ))}
+      )}
+
+      {/* Holder list */}
+      <div className="space-y-1">
+        {holders.slice(0, 15).map((h, i) => (
+          <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
+            <div className="text-[10px] font-semibold text-muted-foreground w-5">{i + 1}</div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-mono truncate">{h.address}</span>
+                {h.is_dev && <Chip variant="bear" className="text-[9px]">DEV</Chip>}
+                {h.is_smart_money && <Chip variant="bull" className="text-[9px]">SMART</Chip>}
+                {h.is_kol && <Chip variant="gold" className="text-[9px]">KOL</Chip>}
+                {h.is_sniper && <Chip variant="bear" className="text-[9px]">SNIPER</Chip>}
+                {h.is_bundler && <Chip variant="bear" className="text-[9px]">BUNDLER</Chip>}
+                {h.is_fresh_wallet && <Chip variant="outline" className="text-[9px]">FRESH</Chip>}
+              </div>
+              <div className="text-[10px] text-muted-foreground tabular">
+                {fmtNum(h.balance)} · {fmtUsd(h.value_usd, { compact: true })}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className={cn("text-xs font-bold tabular", h.holder_rate > 5 ? "text-bear" : "text-foreground")}>
+                {h.holder_rate.toFixed(2)}%
+              </div>
+              <FollowWalletButton address={h.address} label={h.is_smart_money ? "Smart wallet" : h.is_kol ? "KOL" : "Holder"} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExposureMetric({ label, count, pct, tone, tip }: { label: string; count: number; pct: number; tone: "bull" | "bear" | "muted"; tip: string }) {
+  if (count === 0) return null;
+  return (
+    <div
+      className={cn(
+        "rounded-md border p-1.5",
+        tone === "bear" && "border-bear/30 bg-bear/5",
+        tone === "bull" && "border-bull/30 bg-bull/5",
+        tone === "muted" && "border-border"
+      )}
+      title={tip}
+    >
+      <div className="text-[9px] text-muted-foreground uppercase">{label}</div>
+      <div className={cn(
+        "text-xs font-bold tabular",
+        tone === "bear" && "text-bear",
+        tone === "bull" && "text-bull",
+        tone === "muted" && "text-foreground"
+      )}>
+        {count} {pct > 0 && <span className="text-[9px] font-normal opacity-70">· {pct.toFixed(1)}%</span>}
+      </div>
     </div>
   );
 }
@@ -741,5 +824,386 @@ function GmgnTradersView({ traders }: { traders: any[] }) {
         );
       })}
     </div>
+  );
+}
+
+// ===== GMGN Token Badges — risk score, dev renouncement, bonding curve =====
+function GmgnTokenBadges({ mint }: { mint: string }) {
+  // Fetch token info + security in parallel
+  const tokenUrl = `/api/gmgn/token?address=${mint}`;
+  const securityUrl = `/api/gmgn/security?address=${mint}`;
+  const { data: tokenData, source: tokenSource } = useGmgn<any>(tokenUrl, { refreshMs: 60_000 });
+  const { data: secData } = useGmgn<any>(securityUrl, { refreshMs: 120_000 });
+
+  const token = tokenData?.token;
+  const sec = secData?.security;
+  if (!token) return null;
+
+  // Compose risk badges from already-fetched GMGN fields
+  const badges: { label: string; emoji: string; tone: "bull" | "bear" | "gold" | "muted"; tip: string }[] = [];
+
+  // Dev renouncement (positive signal)
+  if (sec?.is_mint_authority_revoked && sec?.is_freeze_authority_revoked) {
+    badges.push({
+      label: "Dev renounced",
+      emoji: "✅",
+      tone: "bull",
+      tip: "Mint and freeze authority both revoked — dev cannot mint more or freeze wallets.",
+    });
+  } else if (sec?.is_mint_authority_revoked) {
+    badges.push({
+      label: "Mint revoked",
+      emoji: "✅",
+      tone: "bull",
+      tip: "Mint authority revoked — dev cannot create more supply. Freeze authority still active.",
+    });
+  } else if (sec && !sec.is_mint_authority_revoked) {
+    badges.push({
+      label: "Mint live",
+      emoji: "⚠️",
+      tone: "bear",
+      tip: "Mint authority NOT revoked — dev can still mint more tokens.",
+    });
+  }
+
+  // CTO (community takeover) flag
+  if (token.cto_flag === 1) {
+    badges.push({
+      label: "CTO",
+      emoji: "👋",
+      tone: "gold",
+      tip: "Community Takeover — original dev abandoned, community is running the project.",
+    });
+  }
+
+  // Bonding curve status
+  if (token.is_on_curve === true) {
+    badges.push({
+      label: "On curve",
+      emoji: "📈",
+      tone: "gold",
+      tip: "Still inside pump.fun bonding curve — buy via pump.fun, not Raydium.",
+    });
+  } else if (token.is_on_curve === false && token.market_cap > 0) {
+    badges.push({
+      label: "Graduated",
+      emoji: "🎓",
+      tone: "bull",
+      tip: "Graduated to open DEX (Raydium/PumpSwap) — bonding curve complete.",
+    });
+  }
+
+  // Risk scores (only show if non-zero)
+  if (typeof token.rug_ratio === "number") {
+    const pct = Math.round(token.rug_ratio * 100);
+    if (pct > 0) {
+      badges.push({
+        label: `Rug ${pct}%`,
+        emoji: "🚩",
+        tone: pct > 30 ? "bear" : pct > 10 ? "gold" : "muted",
+        tip: `Rug-ratio score: ${pct}/100. GMGN's historical rug-pull probability estimate. >30% is high risk.`,
+      });
+    }
+  }
+  if (typeof token.bundler_rate === "number" && token.bundler_rate > 0) {
+    const pct = Math.round(token.bundler_rate * 100);
+    badges.push({
+      label: `Bundler ${pct}%`,
+      emoji: "🤖",
+      tone: pct > 30 ? "bear" : "muted",
+      tip: `${pct}% of supply was bought by bundler bots in the first transactions. High values suggest coordinated launch.`,
+    });
+  }
+  if (typeof token.sniper_count === "number" && token.sniper_count > 0) {
+    badges.push({
+      label: `${token.sniper_count} snipers`,
+      emoji: "🎯",
+      tone: token.sniper_count > 20 ? "bear" : "gold",
+      tip: `${token.sniper_count} sniper wallets bought in the first blocks after launch. These wallets typically dump quickly.`,
+    });
+  }
+  if (typeof token.rat_trader_amount_rate === "number" && token.rat_trader_amount_rate > 0) {
+    const pct = Math.round(token.rat_trader_amount_rate * 100);
+    badges.push({
+      label: `Rat ${pct}%`,
+      emoji: "🐀",
+      tone: pct > 30 ? "bear" : "muted",
+      tip: `${pct}% of volume from "rat trader" (insider/sneak) wallets. Indicates coordinated fake activity.`,
+    });
+  }
+
+  // Smart money / KOL counts (positive signals)
+  if (typeof token.smart_degen_count === "number" && token.smart_degen_count > 0) {
+    badges.push({
+      label: `${token.smart_degen_count} smart`,
+      emoji: "🐋",
+      tone: "bull",
+      tip: `${token.smart_degen_count} GMGN-tagged smart-money wallets holding this token.`,
+    });
+  }
+  if (typeof token.renowned_count === "number" && token.renowned_count > 0) {
+    badges.push({
+      label: `${token.renowned_count} KOL`,
+      emoji: "⭐",
+      tone: "bull",
+      tip: `${token.renowned_count} KOL/influencer wallets holding this token.`,
+    });
+  }
+
+  if (badges.length === 0) return null;
+
+  return (
+    <div className="px-4 mt-3">
+      <div className="flex flex-wrap gap-1.5">
+        {badges.map((b, i) => (
+          <span
+            key={i}
+            title={b.tip}
+            className={cn(
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border",
+              b.tone === "bull" && "bg-bull/10 text-bull border-bull/30",
+              b.tone === "bear" && "bg-bear/10 text-bear border-bear/30",
+              b.tone === "gold" && "bg-gold/10 text-gold border-gold/30",
+              b.tone === "muted" && "bg-surface-2 text-muted-foreground border-border"
+            )}
+          >
+            <span className="text-[11px]">{b.emoji}</span>
+            {b.label}
+          </span>
+        ))}
+        {tokenSource && (
+          <span className="text-[9px] text-muted-foreground self-center ml-1">
+            via {tokenSource === "gmgn" ? "GMGN" : "demo"}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===== Bonding Curve Progress Bar =====
+function BondingCurveBar({ mint, marketCap }: { mint: string; marketCap: number }) {
+  const { data } = useGmgn<any>(`/api/gmgn/token?address=${mint}`, { refreshMs: 60_000 });
+  const token = data?.token;
+  if (!token) return null;
+  // Only show if on curve (pump.fun style)
+  if (token.is_on_curve !== true) return null;
+
+  // Pump.fun graduation threshold ≈ $69k SOL market cap
+  const GRAD_THRESHOLD = 69_000;
+  const progress = Math.min(100, Math.round((marketCap / GRAD_THRESHOLD) * 100));
+  const isGraduating = progress > 85;
+
+  return (
+    <div className="px-4 mt-3">
+      <div className="rounded-xl border border-gold/30 bg-gold/5 p-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold text-gold">📈 Bonding curve</span>
+            {isGraduating && (
+              <span className="text-[9px] font-bold text-gold animate-pulse">⚡ Graduating soon</span>
+            )}
+          </div>
+          <span className="text-[10px] font-mono text-muted-foreground tabular">{progress}%</span>
+        </div>
+        <div className="h-2 rounded-full bg-surface-3 overflow-hidden">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all",
+              isGraduating
+                ? "bg-gradient-to-r from-gold to-bull live-dot"
+                : "bg-gradient-to-r from-gold/60 to-gold"
+            )}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="text-[9px] text-muted-foreground mt-1 flex justify-between">
+          <span>MC {fmtUsd(marketCap, { compact: true })}</span>
+          <span>Graduates at ~$69K</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Token Social Header — logo + socials + boosts badge =====
+function TokenSocialHeader({ mint, symbol }: { mint: string; symbol: string }) {
+  const { data } = useGmgn<any>(`/api/gmgn/token?address=${mint}`, { refreshMs: 120_000 });
+  const token = data?.token;
+  if (!token) return null;
+
+  const socials: { type: string; url: string }[] = token.socials || [];
+  const websites: { url: string; label?: string }[] = token.websites || [];
+  const website = token.website || websites[0]?.url;
+  const boostsActive: number = token.boosts_active || 0;
+  const hasAnySocial = socials.length > 0 || website;
+
+  if (!hasAnySocial && !token.image_uri && boostsActive === 0) return null;
+
+  const socialIcon: Record<string, React.ReactNode> = {
+    twitter: <Twitter className="h-3.5 w-3.5" />,
+    telegram: <Send className="h-3.5 w-3.5" />,
+    discord: <MessageCircle className="h-3.5 w-3.5" />,
+    instagram: <Globe className="h-3.5 w-3.5" />,
+  };
+
+  return (
+    <div className="px-4 mt-3">
+      <div className="rounded-xl border border-border bg-surface-2/40 p-2.5 flex items-center gap-2.5">
+        {/* Token logo from DexScreener */}
+        {token.image_uri && (
+          <img
+            src={token.image_uri}
+            alt={symbol}
+            className="h-9 w-9 rounded-full object-cover shrink-0"
+            onError={(e) => { (e.currentTarget.style.display = "none"); }}
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          {website && (
+            <a
+              href={website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-semibold text-foreground hover:text-bull inline-flex items-center gap-1 max-w-full"
+              title={website}
+            >
+              <Globe className="h-3 w-3 shrink-0" />
+              <span className="truncate">{websites[0]?.label || new URL(website).hostname.replace("www.", "")}</span>
+            </a>
+          )}
+          {socials.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-1">
+              {socials.map((s, i) => (
+                <a
+                  key={i}
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-6 w-6 grid place-items-center rounded-md bg-surface-3 hover:bg-bull/15 hover:text-bull text-muted-foreground transition-colors"
+                  aria-label={s.type}
+                  title={s.type}
+                >
+                  {socialIcon[s.type] || <Globe className="h-3.5 w-3.5" />}
+                </a>
+              ))}
+            </div>
+          )}
+          {!website && socials.length === 0 && (
+            <div className="text-[10px] text-muted-foreground">No social links available</div>
+          )}
+        </div>
+        {/* Boosted badge */}
+        {boostsActive > 0 && (
+          <a
+            href={`https://dexscreener.com/solana/${mint}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gold/10 text-gold border border-gold/30 text-[10px] font-bold hover:bg-gold/20"
+            title={`${boostsActive} active boosts on DexScreener — paid promotion. Tap to view.`}
+          >
+            <Rocket className="h-3 w-3" />
+            {boostsActive}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===== All-DEXes Multi-Pair View =====
+function AllDexesPairsView({ mint }: { mint: string }) {
+  const { data, loading, source } = useGmgn<{ pairs: any[] }>(
+    `/api/dexscreener/pairs?address=${mint}&chain=solana`,
+    { refreshMs: 60_000 }
+  );
+
+  const pairs = data?.pairs || [];
+
+  // Don't render if only 1 pair (no value over the inline view)
+  if (!loading && pairs.length <= 1) return null;
+
+  return (
+    <div className="px-4 mt-4">
+      <div className="rounded-2xl border border-border bg-surface-2/40 overflow-hidden">
+        <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
+          <span className="text-xs font-semibold">🔗 All DEXes</span>
+          {source && (
+            <Chip variant={source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
+              {source === "dexscreener" ? "live" : "demo"}
+            </Chip>
+          )}
+          <span className="ml-auto text-[10px] text-muted-foreground">{pairs.length} pairs</span>
+        </div>
+        <div className="p-2 overflow-x-auto no-scrollbar">
+          {loading ? (
+            <div className="flex gap-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="shrink-0 w-32 h-24 rounded-lg bg-surface-3 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              {pairs.map((p: any, i: number) => {
+                const liq = p.liquidity?.usd ?? 0;
+                const vol = p.volume?.h24 ?? 0;
+                const change = p.priceChange?.h24 ?? 0;
+                const priceUsd = parseFloat(p.priceUsd ?? "0");
+                const isBull = change >= 0;
+                return (
+                  <a
+                    key={p.pairAddress || i}
+                    href={p.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 w-32 rounded-lg border border-border bg-surface-2 p-2 hover:bg-surface-3 transition-colors"
+                  >
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-[10px] font-bold uppercase truncate">{p.dexId}</span>
+                      {p.labels?.[0] && (
+                        <Chip variant="outline" className="text-[8px] px-1 py-0">{p.labels[0]}</Chip>
+                      )}
+                    </div>
+                    <div className="text-[11px] font-semibold tabular">{fmtPrice(priceUsd)}</div>
+                    <div className={cn("text-[10px] tabular", isBull ? "text-bull" : "text-bear")}>
+                      {isBull ? "+" : ""}{change.toFixed(2)}%
+                    </div>
+                    <div className="mt-1 pt-1 border-t border-border text-[9px] text-muted-foreground tabular space-y-0.5">
+                      <div>Liq {fmtUsd(liq, { compact: true })}</div>
+                      <div>Vol {fmtUsd(vol, { compact: true })}</div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Follow Wallet Button (per-wallet push alerts) =====
+function FollowWalletButton({ address, label }: { address: string; label?: string }) {
+  const followedWallets = useMoby((s) => s.followedWallets);
+  const toggleFollowWallet = useMoby((s) => s.toggleFollowWallet);
+  const isFollowing = followedWallets.includes(address);
+
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        toggleFollowWallet(address, label);
+      }}
+      className={cn(
+        "mt-1 px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors",
+        isFollowing
+          ? "bg-bull/15 text-bull border-bull/30"
+          : "bg-surface-3 text-muted-foreground border-border hover:text-foreground"
+      )}
+      title={isFollowing ? "Unfollow — stop alerts for this wallet" : "Follow — get push alerts when this wallet trades"}
+    >
+      {isFollowing ? "✓ Following" : "+ Follow"}
+    </button>
   );
 }

@@ -149,6 +149,60 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [refreshFeeds]);
 
+  // Followed-wallet activity poller — checks each followed wallet for new
+  // transactions every 30s and fires an actionable toast with quick-buy.
+  // Capped at 10 wallets (enforced by store).
+  const followedWallets = useMoby((s) => s.followedWallets);
+  const followedWalletLabels = useMoby((s) => s.followedWalletLabels);
+  useEffect(() => {
+    if (followedWallets.length === 0) return;
+    let cancelled = false;
+    const poll = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      const state = useMoby.getState();
+      for (const wallet of state.followedWallets) {
+        if (cancelled) return;
+        try {
+          const res = await fetch(`/api/gmgn/wallet-activity?wallet=${encodeURIComponent(wallet)}&limit=1`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const latest = data.activity?.[0];
+          if (!latest) continue;
+          const lastSeen = state.lastSeenWalletTx[wallet];
+          if (lastSeen === latest.hash) continue; // already seen
+          // New tx! Fire toast and update lastSeen
+          useMoby.setState((s) => ({
+            lastSeenWalletTx: { ...s.lastSeenWalletTx, [wallet]: latest.hash },
+          }));
+          const label = state.followedWalletLabels[wallet] || "Followed wallet";
+          const isBuy = latest.type === "buy";
+          // Try to find the token in our local registry; if found, attach quickBuy
+          const localToken = TOKENS.find((t) => t.mint === latest.token_address);
+          useMoby.getState().pushToast({
+            title: `${isBuy ? "🟢" : "🔴"} ${label} ${isBuy ? "bought" : "sold"} ${latest.token_symbol}`,
+            description: `${label === "Followed wallet" ? "Followed wallet" : label} · ${isBuy ? "+" : "-"}${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(latest.value_usd)} · via GMGN`,
+            type: "alert",
+            actionLabel: localToken ? `View ${localToken.symbol}` : undefined,
+            actionId: localToken?.id,
+            quickBuyLabel: localToken ? "Buy 0.1 SOL" : undefined,
+            quickBuyTokenId: localToken?.id,
+            quickBuyAmountUsd: 18,
+          });
+        } catch {
+          // ignore individual wallet errors
+        }
+      }
+    };
+    // Initial poll after 5s (give the page time to settle)
+    const initialTimer = setTimeout(poll, 5000);
+    const interval = setInterval(poll, 30_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [followedWallets, followedWalletLabels]);
+
   // Live price ticking — every 2.5s (skipped when tab hidden to save CPU)
   useEffect(() => {
     const interval = setInterval(() => {

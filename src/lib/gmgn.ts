@@ -138,7 +138,7 @@ async function runGmgnCli(args: string[]): Promise<any | null> {
 }
 
 // ===== DexScreener fallback =====
-async function fetchJson(url: string, timeoutMs = 8000): Promise<any | null> {
+export async function fetchJson(url: string, timeoutMs = 8000): Promise<any | null> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -192,6 +192,11 @@ export interface GmgnTokenInfo {
   website?: string;
   telegram?: string;
   image_uri?: string;
+  // Extended visual / social fields (DexScreener)
+  header_image_uri?: string;
+  websites?: { url: string; label?: string }[];
+  socials?: { type: string; url: string }[];
+  boosts_active?: number;
   // Extended fields from gmgn-cli
   smart_degen_count?: number;
   renowned_count?: number;
@@ -404,10 +409,20 @@ async function fetchDexScreenerToken(address: string): Promise<GmgnTokenInfo | n
   const priceChange1h = p.priceChange?.h1 ?? 0;
   const created = p.pairCreatedAt ? Math.floor(new Date(p.pairCreatedAt).getTime() / 1000) : undefined;
   const socials = (p.info?.socials ?? []) as any[];
+  const websites = (p.info?.websites ?? []) as any[];
   const twitter = socials.find((s) => s.type === "twitter")?.url;
-  const website = p.info?.websites?.[0]?.url;
   const telegram = socials.find((s) => s.type === "telegram")?.url;
+  const discord = socials.find((s) => s.type === "discord")?.url;
+  const instagram = socials.find((s) => s.type === "instagram")?.url;
+  const website = websites[0]?.url;
   const imageUri = p.info?.imageUrl;
+  const headerUri = p.info?.header;
+  const boostsActive = p.boosts?.active ?? 0;
+  const allSocials: { type: string; url: string }[] = [];
+  if (twitter) allSocials.push({ type: "twitter", url: twitter });
+  if (telegram) allSocials.push({ type: "telegram", url: telegram });
+  if (discord) allSocials.push({ type: "discord", url: discord });
+  if (instagram) allSocials.push({ type: "instagram", url: instagram });
   return {
     address,
     symbol: p.baseToken?.symbol ?? "",
@@ -430,6 +445,10 @@ async function fetchDexScreenerToken(address: string): Promise<GmgnTokenInfo | n
     website,
     telegram,
     image_uri: imageUri,
+    header_image_uri: headerUri,
+    websites: websites.map((w) => ({ url: w.url, label: w.label })),
+    socials: allSocials,
+    boosts_active: boostsActive,
   };
 }
 
