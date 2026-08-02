@@ -7,6 +7,7 @@ import {
   SIGNALS,
   WHALE_FLOWS,
   PORTFOLIO,
+  fmtUsd,
   type Token,
   type Trader,
   type SmartSignal,
@@ -170,6 +171,47 @@ export interface WatchlistAlertConfig {
   priceBelow?: number;
   smartMoneyEntry?: boolean;
   move10?: boolean;
+}
+
+// ===== Enhancement #13: Snipe-bot rule type =====
+export interface SnipeRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  createdAt: number;
+  conditions: {
+    maxDevHoldPct: number;        // reject if dev holds more than X%
+    minLiquidityUsd: number;      // require at least $X liquidity
+    maxAgeMinutes: number;        // only snipe tokens launched <Xm ago
+    minSmartMoneyHolders: number; // require at least X smart-money holders
+    renouncedOnly: boolean;       // require mint authority revoked
+    maxRugRatio: number;          // 0-1, reject if rug_ratio > X
+  };
+  actions: {
+    buyUsd: number;               // buy $X worth
+    slippagePct: number;
+    autoTakeProfitPct: number;    // auto-sell if price rises X%
+    autoStopLossPct: number;      // auto-sell if price drops X%
+  };
+  stats: {
+    triggered: number;
+    filled: number;
+    pnl: number;
+  };
+}
+
+// ===== Enhancement #12: Trailing stop type =====
+export interface TrailingStopConfig {
+  id: string;
+  tokenId: string;
+  tokenSymbol: string;
+  trailPct: number;             // % below peak to trigger sell (e.g. 10 = sell if price drops 10% from peak)
+  buyUsd: number;               // notional to sell
+  peakPrice: number;            // highest price seen since trailing-stop was created
+  createdAt: number;
+  triggered: boolean;
+  triggeredAt?: number;
+  triggeredPrice?: number;
 }
 
 // Default portfolio holdings seeded from the static PORTFOLIO cryptoHoldings.
@@ -586,6 +628,21 @@ interface MobyState {
   watchlistAlerts: Record<string, WatchlistAlertConfig>;
   setWatchlistAlert: (tokenId: string, cfg: Partial<WatchlistAlertConfig>) => void;
   removeWatchlistAlert: (tokenId: string) => void;
+
+  // ===== Enhancement #13: Snipe-bot rules (persisted) =====
+  snipeRules: SnipeRule[];
+  addSnipeRule: (rule: Omit<SnipeRule, "id" | "createdAt" | "stats" | "enabled">) => void;
+  updateSnipeRule: (id: string, patch: Partial<SnipeRule>) => void;
+  removeSnipeRule: (id: string) => void;
+  toggleSnipeRule: (id: string) => void;
+  recordSnipeTrigger: (id: string, filled: boolean, pnlUsd: number) => void;
+
+  // ===== Enhancement #12: Trailing stops (persisted) =====
+  trailingStops: TrailingStopConfig[];
+  addTrailingStop: (cfg: Omit<TrailingStopConfig, "id" | "createdAt" | "peakPrice" | "triggered">) => void;
+  removeTrailingStop: (id: string) => void;
+  updateTrailingPeak: (tokenId: string, price: number) => void;
+  fireTrailingStop: (id: string) => void;
 
   // ===== Enhancement: Global Share modal (store-driven) =====
   shareOpen: boolean;
@@ -1670,6 +1727,123 @@ export const useMoby = create<MobyState>()(
     });
   },
 
+  // ===== Enhancement #13: Snipe-bot rules (persisted) =====
+  snipeRules: [],
+  addSnipeRule: (rule) => {
+    const id = `snipe_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const newRule: SnipeRule = {
+      ...rule,
+      id,
+      createdAt: Date.now(),
+      enabled: true,
+      stats: { triggered: 0, filled: 0, pnl: 0 },
+    };
+    set((s) => ({ snipeRules: [...s.snipeRules, newRule].slice(0, 20) }));
+    get().pushAlert({
+      title: "Snipe rule created",
+      description: `"${rule.name}" is now live — will auto-fire on matching new pairs.`,
+      type: "success",
+    });
+  },
+  updateSnipeRule: (id, patch) => {
+    set((s) => ({
+      snipeRules: s.snipeRules.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+  },
+  removeSnipeRule: (id) => {
+    set((s) => ({ snipeRules: s.snipeRules.filter((r) => r.id !== id) }));
+  },
+  toggleSnipeRule: (id) => {
+    set((s) => ({
+      snipeRules: s.snipeRules.map((r) =>
+        r.id === id ? { ...r, enabled: !r.enabled } : r
+      ),
+    }));
+  },
+  recordSnipeTrigger: (id, filled, pnlUsd) => {
+    set((s) => ({
+      snipeRules: s.snipeRules.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              stats: {
+                triggered: r.stats.triggered + 1,
+                filled: r.stats.filled + (filled ? 1 : 0),
+                pnl: r.stats.pnl + pnlUsd,
+              },
+            }
+          : r
+      ),
+    }));
+  },
+
+  // ===== Enhancement #12: Trailing stops (persisted) =====
+  trailingStops: [],
+  addTrailingStop: (cfg) => {
+    const id = `ts_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    // Seed peakPrice from the current live price (if available)
+    const livePrice = get().prices[cfg.tokenId]?.price ?? 0;
+    const newStop: TrailingStopConfig = {
+      ...cfg,
+      id,
+      createdAt: Date.now(),
+      peakPrice: livePrice,
+      triggered: false,
+    };
+    set((s) => ({ trailingStops: [...s.trailingStops, newStop].slice(0, 20) }));
+    get().pushAlert({
+      title: "Trailing stop set",
+      description: `Trailing ${cfg.trailPct}% on ${cfg.tokenSymbol} from peak $${livePrice.toFixed(4)}`,
+      type: "success",
+    });
+  },
+  removeTrailingStop: (id) => {
+    set((s) => ({ trailingStops: s.trailingStops.filter((t) => t.id !== id) }));
+  },
+  updateTrailingPeak: (tokenId, price) => {
+    set((s) => ({
+      trailingStops: s.trailingStops.map((t) =>
+        t.tokenId === tokenId && !t.triggered && price > t.peakPrice
+          ? { ...t, peakPrice: price }
+          : t
+      ),
+    }));
+  },
+  fireTrailingStop: (id) => {
+    const stop = get().trailingStops.find((t) => t.id === id);
+    if (!stop || stop.triggered) return;
+    const livePrice = get().prices[stop.tokenId]?.price ?? stop.peakPrice;
+    set((s) => ({
+      trailingStops: s.trailingStops.map((t) =>
+        t.id === id
+          ? { ...t, triggered: true, triggeredAt: Date.now(), triggeredPrice: livePrice }
+          : t
+      ),
+    }));
+    // Apply sell to portfolio
+    get().applyTrade({
+      tokenId: stop.tokenId,
+      side: "SELL",
+      usdAmount: stop.buyUsd,
+      tokenAmount: stop.buyUsd / Math.max(0.000001, livePrice),
+      price: livePrice,
+    });
+    get().recordTrade({
+      tokenId: stop.tokenId,
+      tokenSymbol: stop.tokenSymbol,
+      side: "SELL",
+      usdAmount: stop.buyUsd,
+      tokenAmount: stop.buyUsd / Math.max(0.000001, livePrice),
+      price: livePrice,
+      txHash: `trailing_${id}`,
+    });
+    get().pushToast({
+      title: `Trailing stop triggered: ${stop.tokenSymbol}`,
+      description: `Sold ${fmtUsd(stop.buyUsd)} at $${livePrice.toFixed(4)} (peak was $${stop.peakPrice.toFixed(4)}, trail ${stop.trailPct}%)`,
+      type: "alert",
+    });
+  },
+
   // ===== Enhancement: Global Share modal (store-driven) =====
   shareOpen: false,
   shareData: { title: "", description: "" },
@@ -1705,6 +1879,8 @@ export const useMoby = create<MobyState>()(
       viewedTraders: s.viewedTraders,
       followedWallets: s.followedWallets,
       followedWalletLabels: s.followedWalletLabels,
+      snipeRules: s.snipeRules,
+      trailingStops: s.trailingStops,
     }),
   }
   )

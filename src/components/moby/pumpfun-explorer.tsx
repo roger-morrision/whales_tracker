@@ -92,6 +92,19 @@ export function PumpFunExplorerModal() {
   const [loading, setLoading] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
+  // ===== Enhancement #9: Trenches filters =====
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    maxDevHoldPct: 100,        // 0-100
+    minLiquidityUsd: 0,        // 0-100k
+    maxAgeMinutes: 1440,       // 0-1440 (24h)
+    minSmartMoney: 0,          // 0-50
+    maxRatTraderPct: 100,      // 0-100
+    renouncedOnly: false,
+    onCurveOnly: false,
+  });
+  const [filtersApplied, setFiltersApplied] = useState(0); // bump to trigger refilter
+
   // Track the active fetch to abort stale requests on rapid tab/filter switches
   const abortRef = useRef<AbortController | null>(null);
 
@@ -178,6 +191,32 @@ export function PumpFunExplorerModal() {
     };
   }, []);
 
+  // Apply trenches filters client-side (filters don't trigger a re-fetch — they
+  // just narrow the already-fetched list). Note: `filters` is intentionally
+  // omitted from deps — we use `filtersApplied` as a bump-counter to trigger
+  // refiltering only when the user clicks "Apply", not on every slider drag.
+  const filteredTokens = useMemo(() => {
+    return tokens.filter((t) => {
+      if (t.devHoldingPct > filters.maxDevHoldPct) return false;
+      if (t.liquidity < filters.minLiquidityUsd) return false;
+      if (t.ageMinutes > filters.maxAgeMinutes) return false;
+      if ((t.holders || 0) < filters.minSmartMoney) return false;
+      return true;
+    });
+  }, [tokens, filtersApplied]);
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (filters.maxDevHoldPct < 100) n++;
+    if (filters.minLiquidityUsd > 0) n++;
+    if (filters.maxAgeMinutes < 1440) n++;
+    if (filters.minSmartMoney > 0) n++;
+    if (filters.maxRatTraderPct < 100) n++;
+    if (filters.renouncedOnly) n++;
+    if (filters.onCurveOnly) n++;
+    return n;
+  }, [filters]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -188,6 +227,21 @@ export function PumpFunExplorerModal() {
             <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               <Flame className="h-4 w-4 text-bull" />
               <h2 className="font-semibold text-sm flex-1">Launchpad explorer</h2>
+              <button
+                onClick={() => setShowFilters((v) => !v)}
+                className={cn(
+                  "h-7 px-2 grid place-items-center rounded-lg text-muted-foreground relative",
+                  showFilters || activeFilterCount > 0 ? "bg-bull/15 text-bull" : "hover:bg-surface-3"
+                )}
+                aria-label="Filters"
+              >
+                <Filter className="h-3.5 w-3.5" />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-3.5 min-w-3.5 px-0.5 grid place-items-center rounded-full bg-bull text-[8px] font-bold text-background">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
               <button onClick={fetchTokens} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Refresh">
                 <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
               </button>
@@ -195,6 +249,119 @@ export function PumpFunExplorerModal() {
                 <X className="h-4 w-4" />
               </button>
             </div>
+
+            {/* Filter panel (slide-down) */}
+            <AnimatePresence>
+              {showFilters && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden border-b border-border bg-surface-2/50"
+                >
+                  <div className="p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Trenches filters</span>
+                      <button
+                        onClick={() => {
+                          setFilters({
+                            maxDevHoldPct: 100,
+                            minLiquidityUsd: 0,
+                            maxAgeMinutes: 1440,
+                            minSmartMoney: 0,
+                            maxRatTraderPct: 100,
+                            renouncedOnly: false,
+                            onCurveOnly: false,
+                          });
+                          setFiltersApplied((n) => n + 1);
+                        }}
+                        className="text-[10px] text-muted-foreground hover:text-bull"
+                      >
+                        Reset
+                      </button>
+                    </div>
+
+                    <TrenchFilterSlider
+                      label="Max dev holdings"
+                      value={filters.maxDevHoldPct}
+                      min={0}
+                      max={100}
+                      step={1}
+                      format={(v) => `${v}%`}
+                      onChange={(v) => setFilters((f) => ({ ...f, maxDevHoldPct: v }))}
+                    />
+                    <TrenchFilterSlider
+                      label="Min liquidity"
+                      value={filters.minLiquidityUsd}
+                      min={0}
+                      max={100_000}
+                      step={1_000}
+                      format={(v) => v === 0 ? "Any" : `$${(v / 1000).toFixed(0)}k`}
+                      onChange={(v) => setFilters((f) => ({ ...f, minLiquidityUsd: v }))}
+                    />
+                    <TrenchFilterSlider
+                      label="Max age"
+                      value={filters.maxAgeMinutes}
+                      min={5}
+                      max={1440}
+                      step={5}
+                      format={(v) => v >= 1440 ? "24h+" : v < 60 ? `${v}m` : `${(v / 60).toFixed(1)}h`}
+                      onChange={(v) => setFilters((f) => ({ ...f, maxAgeMinutes: v }))}
+                    />
+                    <TrenchFilterSlider
+                      label="Min smart-money holders"
+                      value={filters.minSmartMoney}
+                      min={0}
+                      max={50}
+                      step={1}
+                      format={(v) => v === 0 ? "Any" : `≥${v}`}
+                      onChange={(v) => setFilters((f) => ({ ...f, minSmartMoney: v }))}
+                    />
+                    <TrenchFilterSlider
+                      label="Max rat-trader ratio"
+                      value={filters.maxRatTraderPct}
+                      min={0}
+                      max={100}
+                      step={5}
+                      format={(v) => v >= 100 ? "Any" : `≤${v}%`}
+                      onChange={(v) => setFilters((f) => ({ ...f, maxRatTraderPct: v }))}
+                    />
+
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={filters.renouncedOnly}
+                          onChange={(e) => setFilters((f) => ({ ...f, renouncedOnly: e.target.checked }))}
+                          className="accent-bull"
+                        />
+                        <span className="text-muted-foreground">Renounced mint only</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={filters.onCurveOnly}
+                          onChange={(e) => setFilters((f) => ({ ...f, onCurveOnly: e.target.checked }))}
+                          className="accent-bull"
+                        />
+                        <span className="text-muted-foreground">On curve only</span>
+                      </label>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setFiltersApplied((n) => n + 1);
+                        setShowFilters(false);
+                      }}
+                      className="w-full py-2 rounded-lg bg-bull text-background text-xs font-bold hover:opacity-90"
+                    >
+                      Apply ({filteredTokens.length} match)
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Tab selector */}
             <div className="flex gap-1 p-1 bg-surface-2 m-3 rounded-lg">
@@ -218,7 +385,11 @@ export function PumpFunExplorerModal() {
             {/* Stats bar */}
             <div className="px-4 pb-2 flex items-center gap-3 text-[10px] text-muted-foreground">
               <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-bull live-dot" /> Live</span>
-              <span>{tokens.length} tokens</span>
+              <span>
+                {activeFilterCount > 0
+                  ? `${filteredTokens.length}/${tokens.length} tokens`
+                  : `${tokens.length} tokens`}
+              </span>
               {counts["pump.fun"] !== undefined && <span>pump.fun: {counts["pump.fun"]}</span>}
               {counts["letsbonk.fun"] !== undefined && <span>bonk: {counts["letsbonk.fun"]}</span>}
               <span className="ml-auto">Auto-refresh 30s</span>
@@ -244,13 +415,13 @@ export function PumpFunExplorerModal() {
                 </div>
               )}
 
-              {!loading && tokens.length === 0 && (
+              {!loading && filteredTokens.length === 0 && (
                 <div className="text-center py-12 text-sm text-muted-foreground">
-                  No tokens found for this filter.
+                  {tokens.length === 0 ? "No tokens found for this filter." : `No tokens match your filters (of ${tokens.length} total).`}
                 </div>
               )}
 
-              {tokens.map((t) => (
+              {filteredTokens.map((t) => (
                 <PumpFunTokenCard key={t.id} token={t} />
               ))}
             </div>
@@ -421,6 +592,43 @@ function PumpFunTokenCard({ token }: { token: PumpFunToken }) {
           🛡️ Audit
         </button>
       </div>
+    </div>
+  );
+}
+
+// ===== Trench Filter Slider =====
+function TrenchFilterSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  format,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[11px] mb-1">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-semibold tabular">{format(value)}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+        className="w-full h-1.5 rounded-full bg-surface-3 accent-bull cursor-pointer"
+      />
     </div>
   );
 }

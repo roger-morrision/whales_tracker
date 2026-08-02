@@ -208,9 +208,87 @@ export default function Home() {
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       tickPrices();
+      // ===== Enhancement #12: Trailing-stop price tracking =====
+      // After each tick, update peaks and check for triggers.
+      const state = useMoby.getState();
+      const prices = state.prices;
+      for (const stop of state.trailingStops) {
+        if (stop.triggered) continue;
+        const live = prices[stop.tokenId]?.price;
+        if (!live || live <= 0) continue;
+        // Update peak if higher
+        if (live > stop.peakPrice) {
+          state.updateTrailingPeak(stop.tokenId, live);
+        }
+        // Check trigger: price dropped trailPct below peak
+        const peak = Math.max(stop.peakPrice, live);
+        const triggerPrice = peak * (1 - stop.trailPct / 100);
+        if (live <= triggerPrice) {
+          state.fireTrailingStop(stop.id);
+        }
+      }
     }, 2500);
     return () => clearInterval(interval);
   }, [tickPrices]);
+
+  // ===== Enhancement #13: Snipe-bot background poller =====
+  // Every 60s, fetches new pairs from GMGN and checks each enabled snipe rule.
+  // When a rule matches, fires an actionable toast with quick-buy button.
+  const snipeRules = useMoby((s) => s.snipeRules);
+  const enabledRuleCount = snipeRules.filter((r) => r.enabled).length;
+  useEffect(() => {
+    if (enabledRuleCount === 0) return;
+    let cancelled = false;
+    const poll = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      const state = useMoby.getState();
+      const enabledRules = state.snipeRules.filter((r) => r.enabled);
+      if (enabledRules.length === 0) return;
+      try {
+        const res = await fetch("/api/gmgn/new-pairs?limit=20");
+        if (!res.ok) return;
+        const data = await res.json();
+        const pairs = data.tokens || [];
+        const now = Date.now() / 1000;
+        for (const pair of pairs) {
+          // Compute age in minutes
+          const ageMin = pair.create_timestamp
+            ? Math.max(0, (now - pair.create_timestamp) / 60)
+            : 999;
+          for (const rule of enabledRules) {
+            // Check each condition
+            if (pair.devHoldingPct !== undefined && pair.devHoldingPct > rule.conditions.maxDevHoldPct) continue;
+            if (pair.liquidity !== undefined && pair.liquidity < rule.conditions.minLiquidityUsd) continue;
+            if (ageMin > rule.conditions.maxAgeMinutes) continue;
+            if (pair.smart_money_holders !== undefined && pair.smart_money_holders < rule.conditions.minSmartMoneyHolders) continue;
+            // Match! Fire toast + record trigger
+            state.recordSnipeTrigger(rule.id, false, 0);
+            const localToken = TOKENS.find((t) => t.mint === pair.address);
+            state.pushToast({
+              title: `🎯 Snipe rule "${rule.name}" matched!`,
+              description: `${pair.symbol} (${pair.name || "unknown"}) — MC $${(pair.market_cap || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })} · ${ageMin.toFixed(0)}m old · liq $${(pair.liquidity || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`,
+              type: "alert",
+              actionLabel: localToken ? `View ${localToken.symbol}` : "View on GMGN",
+              actionId: localToken?.id,
+              quickBuyLabel: `Buy $${rule.actions.buyUsd}`,
+              quickBuyTokenId: localToken?.id,
+              quickBuyAmountUsd: rule.actions.buyUsd,
+            });
+            break; // one trigger per pair
+          }
+        }
+      } catch {
+        // silent fail
+      }
+    };
+    const initialTimer = setTimeout(poll, 8000);
+    const interval = setInterval(poll, 60_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [enabledRuleCount]);
 
   // Scroll to top on tab change
   useEffect(() => {

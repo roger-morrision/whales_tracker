@@ -26,71 +26,224 @@ export function TrailingStopsModal() {
   const open = useMoby((s) => s.trailingStopsOpen);
   const setOpen = useMoby((s) => s.setTrailingStopsOpen);
   const openToken = useMoby((s) => s.openToken);
+  const userStops = useMoby((s) => s.trailingStops);
+  const addTrailingStop = useMoby((s) => s.addTrailingStop);
+  const removeTrailingStop = useMoby((s) => s.removeTrailingStop);
+  const fireTrailingStop = useMoby((s) => s.fireTrailingStop);
+  const prices = useMoby((s) => s.prices);
+
+  // Sample data for empty state
   const active = TRAILING_STOPS.filter((t) => t.status === "active");
   const triggered = TRAILING_STOPS.filter((t) => t.status === "triggered");
   const totalProtected = active.reduce((s, t) => s + t.amountUsd, 0);
   const totalPnl = TRAILING_STOPS.reduce((s, t) => {
-    const token = TOKENS_BY_ID[t.tokenId];
     const pnl = t.status === "triggered" ? t.amountUsd * 0.15 : ((t.currentPrice - t.entryPrice) / t.entryPrice) * t.amountUsd;
     return s + pnl;
   }, 0);
 
+  // User stops: split active vs triggered
+  const userActive = userStops.filter((t) => !t.triggered);
+  const userTriggered = userStops.filter((t) => t.triggered);
+  const userProtected = userActive.reduce((s, t) => s + t.buyUsd, 0);
+
   return (
     <ModalShell open={open} onClose={() => setOpen(false)} title="Trailing stops" icon={<TrendingDown className="h-4 w-4 text-bull" />}>
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{active.length}</div><div className="text-[10px] text-muted-foreground">Active</div></div>
-        <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center"><div className="text-lg font-bold tabular text-bull">{fmtUsd(totalProtected, { compact: true })}</div><div className="text-[10px] text-muted-foreground">Protected</div></div>
-        <div className="rounded-xl border border-border p-2.5 text-center"><div className={cn("text-lg font-bold tabular", totalPnl >= 0 ? "text-bull" : "text-bear")}>{totalPnl >= 0 ? "+" : ""}{fmtUsd(totalPnl, { compact: true })}</div><div className="text-[10px] text-muted-foreground">Total PnL</div></div>
-      </div>
-      <div className="space-y-2 mb-3">
-        {active.map((t) => {
-          const token = TOKENS_BY_ID[t.tokenId];
-          const isProfit = t.currentPrice > t.entryPrice;
-          return (
-            <div key={t.id} className="rounded-xl border border-bull/30 bg-bull/5 p-3">
-              <div className="flex items-center gap-2 mb-2">
-                {token && <TokenIcon symbol={t.tokenSymbol} glyph={token.logoGlyph} color={token.logoColor} size="sm" />}
-                <span className="font-semibold text-sm">{t.tokenSymbol}</span>
-                <Chip variant="bull">{t.side}</Chip>
-                <Chip variant="outline">{t.trailPercent}% trail</Chip>
-                <span className="text-[10px] text-muted-foreground ml-auto">{fmtAgo(t.createdAgoSec)}</span>
-              </div>
-              <div className="grid grid-cols-4 gap-2 text-[10px] mb-2">
-                <div><div className="text-[9px] text-muted-foreground uppercase">Entry</div><div className="font-semibold tabular">{fmtPrice(t.entryPrice)}</div></div>
-                <div><div className="text-[9px] text-muted-foreground uppercase">Current</div><div className={cn("font-semibold tabular", isProfit ? "text-bull" : "text-bear")}>{fmtPrice(t.currentPrice)}</div></div>
-                <div><div className="text-[9px] text-muted-foreground uppercase">Highest</div><div className="font-semibold tabular text-bull">{fmtPrice(t.highestPrice)}</div></div>
-                <div><div className="text-[9px] text-muted-foreground uppercase">Stop</div><div className="font-semibold tabular text-bear">{fmtPrice(t.stopPrice)}</div></div>
-              </div>
-              <div className="mb-1">
-                <div className="flex items-center justify-between text-[9px] mb-0.5"><span className="text-muted-foreground">Distance to stop</span><span className={cn("font-semibold tabular", t.distancePct < 3 ? "text-bear" : "text-foreground")}>{t.distancePct.toFixed(1)}%</span></div>
-                <div className="h-1.5 rounded-full bg-surface-3 overflow-hidden">
-                  <div className={cn("h-full rounded-full", t.distancePct < 3 ? "bg-bear" : t.distancePct < 6 ? "bg-gold" : "bg-bull")} style={{ width: `${Math.min(100, t.distancePct * 10)}%` }} />
+      {/* Stats: prefer user data */}
+      {userStops.length > 0 ? (
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{userActive.length}</div><div className="text-[10px] text-muted-foreground">Active</div></div>
+          <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center"><div className="text-lg font-bold tabular text-bull">{fmtUsd(userProtected, { compact: true })}</div><div className="text-[10px] text-muted-foreground">Protected</div></div>
+          <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{userTriggered.length}</div><div className="text-[10px] text-muted-foreground">Triggered</div></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{active.length}</div><div className="text-[10px] text-muted-foreground">Active</div></div>
+          <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center"><div className="text-lg font-bold tabular text-bull">{fmtUsd(totalProtected, { compact: true })}</div><div className="text-[10px] text-muted-foreground">Protected</div></div>
+          <div className="rounded-xl border border-border p-2.5 text-center"><div className={cn("text-lg font-bold tabular", totalPnl >= 0 ? "text-bull" : "text-bear")}>{totalPnl >= 0 ? "+" : ""}{fmtUsd(totalPnl, { compact: true })}</div><div className="text-[10px] text-muted-foreground">Total PnL</div></div>
+        </div>
+      )}
+
+      {/* User trailing stops — active */}
+      {userActive.length > 0 && (
+        <div className="space-y-2 mb-3">
+          {userActive.map((t) => {
+            const token = TOKENS_BY_ID[t.tokenId];
+            const currentPrice = prices[t.tokenId]?.price ?? t.peakPrice;
+            const stopPrice = t.peakPrice * (1 - t.trailPct / 100);
+            const distancePct = ((currentPrice - stopPrice) / stopPrice) * 100;
+            const isProfit = currentPrice > t.peakPrice * 0.99;
+            return (
+              <div key={t.id} className="rounded-xl border border-bull/30 bg-bull/5 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  {token && <TokenIcon symbol={t.tokenSymbol} glyph={token.logoGlyph} color={token.logoColor} size="sm" />}
+                  <span className="font-semibold text-sm">{t.tokenSymbol}</span>
+                  <Chip variant="outline">{t.trailPct}% trail</Chip>
+                  <span className="text-[10px] text-muted-foreground ml-auto">{fmtAgo((Date.now() - t.createdAt) / 1000)}</span>
+                  <button
+                    onClick={() => removeTrailingStop(t.id)}
+                    className="h-6 w-6 grid place-items-center rounded-md hover:bg-surface-3 text-muted-foreground hover:text-bear"
+                    aria-label="Remove"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[10px] mb-2">
+                  <div><div className="text-[9px] text-muted-foreground uppercase">Peak</div><div className="font-semibold tabular text-bull">{fmtPrice(t.peakPrice)}</div></div>
+                  <div><div className="text-[9px] text-muted-foreground uppercase">Current</div><div className={cn("font-semibold tabular", isProfit ? "text-bull" : "text-bear")}>{fmtPrice(currentPrice)}</div></div>
+                  <div><div className="text-[9px] text-muted-foreground uppercase">Stop at</div><div className="font-semibold tabular text-bear">{fmtPrice(stopPrice)}</div></div>
+                </div>
+                <div className="mb-1">
+                  <div className="flex items-center justify-between text-[9px] mb-0.5">
+                    <span className="text-muted-foreground">Distance to stop</span>
+                    <span className={cn("font-semibold tabular", distancePct < 3 ? "text-bear" : "text-foreground")}>{distancePct.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-surface-3 overflow-hidden">
+                    <div className={cn("h-full rounded-full", distancePct < 3 ? "bg-bear" : distancePct < 6 ? "bg-gold" : "bg-bull")} style={{ width: `${Math.min(100, distancePct * 10)}%` }} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>Position: {fmtUsd(t.buyUsd, { compact: true })}</span>
+                  <button
+                    onClick={() => fireTrailingStop(t.id)}
+                    className="text-bear hover:opacity-80 font-semibold"
+                  >
+                    Sell now →
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>Position: {fmtUsd(t.amountUsd, { compact: true })}</span>
-                <span className={cn("font-semibold", isProfit ? "text-bull" : "text-bear")}>{isProfit ? "+" : ""}{(((t.currentPrice - t.entryPrice) / t.entryPrice) * 100).toFixed(1)}% unrealized</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {triggered.length > 0 && (
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Triggered</div>
-          {triggered.map((t) => (
-            <div key={t.id} className="rounded-xl border border-border p-3 opacity-60">
+            );
+          })}
+        </div>
+      )}
+
+      {/* User trailing stops — triggered */}
+      {userTriggered.length > 0 && (
+        <div className="mb-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Triggered ({userTriggered.length})</div>
+          {userTriggered.map((t) => (
+            <div key={t.id} className="rounded-xl border border-border p-3 opacity-60 mb-1">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-sm">{t.tokenSymbol}</span>
                 <Chip variant="default">Triggered</Chip>
-                <span className="text-[10px] text-muted-foreground ml-auto">Sold at {fmtPrice(t.stopPrice)}</span>
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  Sold at {fmtPrice(t.triggeredPrice ?? t.peakPrice)}
+                </span>
               </div>
             </div>
           ))}
         </div>
       )}
-      <button onClick={() => useMoby.getState().pushToast({ title: "New trailing stop", description: "Select a token from Discover to create a trailing stop.", type: "info" })} className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5 mt-2">+ New trailing stop</button>
+
+      {/* Sample data when user has no stops */}
+      {userStops.length === 0 && active.length > 0 && (
+        <div className="space-y-2 mb-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Sample trailing stops</div>
+          {active.map((t) => {
+            const isProfit = t.currentPrice > t.entryPrice;
+            return (
+              <div key={t.id} className="rounded-xl border border-border p-3 opacity-70">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-semibold text-sm">{t.tokenSymbol}</span>
+                  <Chip variant="outline">{t.trailPercent}% trail</Chip>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-[10px]">
+                  <div><div className="text-[9px] text-muted-foreground uppercase">Entry</div><div className="font-semibold tabular">{fmtPrice(t.entryPrice)}</div></div>
+                  <div><div className="text-[9px] text-muted-foreground uppercase">Current</div><div className={cn("font-semibold tabular", isProfit ? "text-bull" : "text-bear")}>{fmtPrice(t.currentPrice)}</div></div>
+                  <div><div className="text-[9px] text-muted-foreground uppercase">Highest</div><div className="font-semibold tabular text-bull">{fmtPrice(t.highestPrice)}</div></div>
+                  <div><div className="text-[9px] text-muted-foreground uppercase">Stop</div><div className="font-semibold tabular text-bear">{fmtPrice(t.stopPrice)}</div></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create new trailing stop — quick picker */}
+      <NewTrailingStopPicker onCreate={addTrailingStop} />
     </ModalShell>
+  );
+}
+
+function NewTrailingStopPicker({
+  onCreate,
+}: {
+  onCreate: (cfg: {
+    tokenId: string;
+    tokenSymbol: string;
+    trailPct: number;
+    buyUsd: number;
+  }) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [tokenId, setTokenId] = useState("wif");
+  const [trailPct, setTrailPct] = useState(10);
+  const [buyUsd, setBuyUsd] = useState(100);
+
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className="w-full py-2.5 rounded-xl border border-dashed border-bull/40 text-xs font-semibold text-bull hover:bg-bull/5 flex items-center justify-center gap-1.5 mt-2"
+      >
+        <TrendingDown className="h-3.5 w-3.5" /> + New trailing stop
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-bull/30 bg-bull/5 p-3 space-y-3 mt-2">
+      <div className="text-xs font-semibold">New trailing stop</div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Token</div>
+        <select
+          value={tokenId}
+          onChange={(e) => setTokenId(e.target.value)}
+          className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-bull/40"
+        >
+          {TOKENS_BY_ID && Object.values(TOKENS_BY_ID).slice(0, 12).map((t: any) => (
+            <option key={t.id} value={t.id}>{t.symbol} — {t.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between text-[11px] mb-1">
+          <span className="text-muted-foreground">Trail %</span>
+          <span className="font-semibold tabular">{trailPct}%</span>
+        </div>
+        <input type="range" min={1} max={50} step={1} value={trailPct} onChange={(e) => setTrailPct(parseInt(e.target.value, 10))} className="w-full h-1.5 rounded-full bg-surface-3 accent-bull cursor-pointer" />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between text-[11px] mb-1">
+          <span className="text-muted-foreground">Position size (USD)</span>
+          <span className="font-semibold tabular">${buyUsd}</span>
+        </div>
+        <input type="range" min={10} max={1000} step={10} value={buyUsd} onChange={(e) => setBuyUsd(parseInt(e.target.value, 10))} className="w-full h-1.5 rounded-full bg-surface-3 accent-bull cursor-pointer" />
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={() => setExpanded(false)} className="flex-1 py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground">Cancel</button>
+        <button
+          onClick={() => {
+            const token = TOKENS_BY_ID[tokenId];
+            if (token) {
+              onCreate({
+                tokenId: token.id,
+                tokenSymbol: token.symbol,
+                trailPct,
+                buyUsd,
+              });
+              setExpanded(false);
+            }
+          }}
+          className="flex-1 py-2 rounded-lg bg-bull text-background text-xs font-bold hover:opacity-90"
+        >
+          Set trailing stop
+        </button>
+      </div>
+    </div>
   );
 }
 

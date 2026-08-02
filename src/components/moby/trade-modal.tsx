@@ -465,6 +465,15 @@ export function TradeModal() {
                 )}
               </button>
 
+              {/* Cooking order (buy + auto TP/SL) — only on BUY side */}
+              {isBuy && wallet && !success && !submitting && (
+                <CookingOrderToggle
+                  tokenSymbol={token.symbol}
+                  tokenId={token.id}
+                  buyUsd={parseFloat(amount) || 0}
+                />
+              )}
+
               {!wallet && (
                 <p className="text-[10px] text-center text-muted-foreground">
                   By continuing, you agree to Moby's Terms. Slippage may vary based on network conditions.
@@ -475,5 +484,91 @@ export function TradeModal() {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+// ===== Enhancement #8: Cooking Order (buy + auto trailing TP/SL) =====
+function CookingOrderToggle({
+  tokenSymbol,
+  tokenId,
+  buyUsd,
+}: {
+  tokenSymbol: string;
+  tokenId: string;
+  buyUsd: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [trailPct, setTrailPct] = useState(15);
+  const [armed, setArmed] = useState(false);
+  const addTrailingStop = useMoby((s) => s.addTrailingStop);
+
+  if (buyUsd <= 0) return null;
+
+  const handleArm = () => {
+    addTrailingStop({
+      tokenId,
+      tokenSymbol,
+      trailPct,
+      buyUsd,
+    });
+    setArmed(true);
+    setTimeout(() => setArmed(false), 3000);
+  };
+
+  return (
+    <div className="rounded-xl border border-gold/30 bg-gold/5 overflow-hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full p-2.5 flex items-center gap-2 hover:bg-gold/10 transition-colors"
+      >
+        <span className="text-base">🍳</span>
+        <div className="flex-1 text-left">
+          <div className="text-xs font-semibold">Cook order</div>
+          <div className="text-[10px] text-muted-foreground">Buy + auto trailing stop in one flow</div>
+        </div>
+        <span className="text-[10px] text-muted-foreground">{expanded ? "▲" : "▼"}</span>
+      </button>
+      {expanded && (
+        <div className="p-2.5 pt-0 space-y-2">
+          <div className="text-[10px] text-muted-foreground">
+            After buying {fmtUsd(buyUsd)} of {tokenSymbol}, automatically set a trailing stop that sells if price drops <span className="text-gold font-semibold">{trailPct}%</span> below the peak.
+          </div>
+          <div>
+            <div className="flex items-center justify-between text-[11px] mb-1">
+              <span className="text-muted-foreground">Trail stop %</span>
+              <span className="font-semibold tabular text-gold">{trailPct}%</span>
+            </div>
+            <input
+              type="range"
+              min={5}
+              max={50}
+              step={1}
+              value={trailPct}
+              onChange={(e) => setTrailPct(parseInt(e.target.value, 10))}
+              className="w-full h-1.5 rounded-full bg-surface-3 accent-gold cursor-pointer"
+            />
+            <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+              <span>Tighter (5%)</span>
+              <span>Looser (50%)</span>
+            </div>
+          </div>
+          <button
+            onClick={handleArm}
+            disabled={armed}
+            className={cn(
+              "w-full py-2 rounded-lg text-xs font-bold transition-colors",
+              armed
+                ? "bg-bull text-background"
+                : "bg-gold/20 text-gold border border-gold/40 hover:bg-gold/30"
+            )}
+          >
+            {armed ? "✓ Trailing stop armed" : "Arm trailing stop on next buy"}
+          </button>
+          <div className="text-[9px] text-muted-foreground">
+            The trailing stop activates after you submit the buy above. It tracks the peak price and auto-sells when the trail threshold is hit.
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -313,3 +313,97 @@ Verification:
 - All 20 endpoints return 200 (17 GMGN + 3 DexScreener)
 - Real DexScreener data flowing: WIF shows 30 pairs, top-boosts shows real paid amounts
 - Existing endpoints unaffected
+
+---
+Task ID: 5
+Agent: main (orchestrator)
+Task: Continue all enhancements and bug fixes (round 5)
+
+Features Shipped:
+
+#9 Trenches filter sidebar (pumpfun-explorer.tsx)
+- New TrenchFilterSlider component with 5 filter dimensions:
+  - Max dev holdings % (0-100)
+  - Min liquidity USD (0-100k)
+  - Max age minutes (5-1440)
+  - Min smart-money holders (0-50)
+  - Max rat-trader ratio % (0-100)
+- 2 toggle filters: "Renounced mint only", "On curve only"
+- Filter button in header with active-filter-count badge
+- Slide-down animated filter panel
+- "Apply" button shows live match count
+- Reset button clears all filters
+- Stats bar shows "X/Y tokens" when filters active
+- Client-side filtering (no re-fetch needed) via filteredTokens memo
+- Trenches tab added to Whales view (4th tab) — opens pumpfun-explorer modal
+
+#13 Snipe-bot rules engine (SnipeBotModal + store + page.tsx poller)
+- New SnipeRule type: { id, name, enabled, createdAt, conditions, actions, stats }
+- Conditions: maxDevHoldPct, minLiquidityUsd, maxAgeMinutes, minSmartMoneyHolders, renouncedOnly, maxRugRatio
+- Actions: buyUsd, slippagePct, autoTakeProfitPct, autoStopLossPct
+- Stats: triggered, filled, pnl
+- New store slice (persisted): snipeRules, addSnipeRule, updateSnipeRule, removeSnipeRule, toggleSnipeRule, recordSnipeTrigger (capped at 20 rules)
+- Rewrote SnipeBotModal:
+  - Stats bar aggregates from user rules (triggered/filled/PnL)
+  - "Your rules" section with UserSnipeRuleCard (toggle/delete/test buttons)
+  - SnipeRuleBuilder with 9 sliders (max dev, min liq, max age, min smart, max rug, buy $, slippage, TP, SL) + renounced checkbox + name input
+  - Sample rules shown as read-only when user has no rules
+- Background poller in page.tsx (every 60s):
+  - Fetches /api/gmgn/new-pairs?limit=20
+  - Checks each enabled rule against each new pair
+  - On match: fires actionable toast with quick-buy button, records trigger
+  - Skips when tab hidden
+  - Initial poll after 8s delay
+
+#12 Trailing stops (TrailingStopsModal + store + price tracking)
+- New TrailingStopConfig type: { id, tokenId, tokenSymbol, trailPct, buyUsd, peakPrice, createdAt, triggered, triggeredAt?, triggeredPrice? }
+- New store slice (persisted): trailingStops, addTrailingStop, removeTrailingStop, updateTrailingPeak, fireTrailingStop (capped at 20)
+- fireTrailingStop: marks triggered, applies SELL trade to portfolio, records to trade history, pushes alert toast
+- Rewrote TrailingStopsModal:
+  - Stats bar shows user data (active/protected/triggered) when user has stops, falls back to sample data
+  - User active stops: peak/current/stop prices, distance-to-stop progress bar, "Sell now" button
+  - User triggered stops: history view with sold-at price
+  - NewTrailingStopPicker: token dropdown + trail % slider + position size slider + create button
+  - Sample trailing stops shown when user has none
+- Price tracking loop in page.tsx (every 2.5s, integrated with tickPrices):
+  - For each non-triggered trailing stop, reads live price from store
+  - Updates peakPrice if live > peak
+  - Fires trailing stop when live <= peak * (1 - trailPct/100)
+  - Skips when tab hidden
+
+#8 Cooking order (trade-modal.tsx — CookingOrderToggle)
+- New "🍳 Cook order" expandable section below the Buy button (only on BUY side, only when wallet connected)
+- Trail stop % slider (5-50%)
+- "Arm trailing stop on next buy" button
+- When armed: calls addTrailingStop with the current buy amount + selected trail %
+- The trailing stop activates immediately (peakPrice seeded from current live price)
+- The buy still goes through the normal handleSubmit flow — the trailing stop is layered on top
+- Visual feedback: button changes to "✓ Trailing stop armed" for 3s after arming
+
+#15 Bottom-nav: Trenches tab in Whales view
+- WhalesView now has 4 tabs: Top traders / Live flows / GMGN smart / Trenches
+- Trenches tab opens the pumpfun-explorer modal (was previously only reachable via Discover's "Launch scanner" button)
+- Horizontal scrollable tab bar to fit 4 labels on mobile
+
+Type System / Infrastructure:
+- moby-store.ts: Added SnipeRule + TrailingStopConfig types, snipeRules + trailingStops slices, all action methods, partialize entries
+- Imported fmtUsd into moby-store.ts (used by fireTrailingStop toast)
+- batch7-modals.tsx: Added UserSnipeRuleCard, SnipeRuleBuilder, SnipeSlider components
+- batch8-modals.tsx: Added NewTrailingStopPicker component
+- trade-modal.tsx: Added CookingOrderToggle component
+- pumpfun-explorer.tsx: Added TrenchFilterSlider component, filteredTokens memo, activeFilterCount memo
+
+Verification:
+- TypeScript: 0 errors in src/
+- ESLint: clean
+- Production build: ✓ Compiled successfully
+- All 20 endpoints return 200
+- Home page renders
+- Real data flowing: GMGN trending, new-pairs, top-boosts all return real DexScreener data
+
+Stage Summary:
+- 5 features shipped (Trenches filters, Snipe-bot engine, Trailing stops, Cooking orders, Trenches tab)
+- 2 background pollers added (snipe-bot 60s, trailing-stop 2.5s integrated with price tick)
+- 4 new persisted store slices (snipeRules, trailingStops + already-shipped followedWallets, etc.)
+- 6 new UI components (TrenchFilterSlider, UserSnipeRuleCard, SnipeRuleBuilder, SnipeSlider, NewTrailingStopPicker, CookingOrderToggle)
+- All persisted in localStorage — survives page reloads

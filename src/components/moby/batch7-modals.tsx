@@ -257,31 +257,234 @@ export function SnipeBotModal() {
   const open = useMoby((s) => s.snipeBotOpen);
   const setOpen = useMoby((s) => s.setSnipeBotOpen);
   const pushToast = useMoby((s) => s.pushToast);
+  const snipeRules = useMoby((s) => s.snipeRules);
+  const addSnipeRule = useMoby((s) => s.addSnipeRule);
+  const removeSnipeRule = useMoby((s) => s.removeSnipeRule);
+  const toggleSnipeRule = useMoby((s) => s.toggleSnipeRule);
+  const [showBuilder, setShowBuilder] = useState(false);
+
+  // Aggregate stats from user rules
+  const totalTriggered = snipeRules.reduce((s, r) => s + r.stats.triggered, 0);
+  const totalFilled = snipeRules.reduce((s, r) => s + r.stats.filled, 0);
+  const totalPnl = snipeRules.reduce((s, r) => s + r.stats.pnl, 0);
+
   return (
     <AnimatePresence>
       {open && (
         <ModalShell open={open} onClose={() => setOpen(false)} title="Snipe bot" icon={<Bot className="h-4 w-4 text-bull" />}>
           <div className="grid grid-cols-3 gap-2 mb-3">
-            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{SNIPE_RULES.reduce((s, r) => s + r.stats.triggered, 0)}</div><div className="text-[10px] text-muted-foreground">Triggered</div></div>
-            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{SNIPE_RULES.reduce((s, r) => s + r.stats.filled, 0)}</div><div className="text-[10px] text-muted-foreground">Filled</div></div>
-            <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center"><div className="text-lg font-bold tabular text-bull">{fmtUsd(SNIPE_RULES.reduce((s, r) => s + r.stats.pnl, 0), { compact: true })}</div><div className="text-[10px] text-muted-foreground">Total PnL</div></div>
+            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{totalTriggered}</div><div className="text-[10px] text-muted-foreground">Triggered</div></div>
+            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{totalFilled}</div><div className="text-[10px] text-muted-foreground">Filled</div></div>
+            <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center"><div className="text-lg font-bold tabular text-bull">{fmtUsd(totalPnl, { compact: true })}</div><div className="text-[10px] text-muted-foreground">Total PnL</div></div>
           </div>
-          {SNIPE_RULES.map((r) => <SnipeRuleCard key={r.id} rule={r} onTrigger={() => pushToast({ title: "🎯 Snipe rule triggered!", description: `${r.name} matched a new token`, type: "alert" })} />)}
-          <button
-            onClick={() =>
-              pushToast({
-                title: "Snipe rule builder",
-                description: "Snipe rule creation requires connecting a wallet.",
-                type: "info",
-              })
-            }
-            className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5"
-          >
-            + Create snipe rule
-          </button>
+
+          {/* User-created snipe rules */}
+          {snipeRules.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Your rules ({snipeRules.length})</div>
+              {snipeRules.map((r) => (
+                <UserSnipeRuleCard
+                  key={r.id}
+                  rule={r}
+                  onToggle={() => toggleSnipeRule(r.id)}
+                  onRemove={() => {
+                    removeSnipeRule(r.id);
+                    pushToast({ title: "Snipe rule deleted", description: `"${r.name}" removed.`, type: "info" });
+                  }}
+                  onTest={() => {
+                    pushToast({ title: "🎯 Test trigger fired", description: `"${r.name}" matched a (simulated) new token.`, type: "alert" });
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Builder */}
+          {showBuilder ? (
+            <SnipeRuleBuilder
+              onCreate={(rule) => {
+                addSnipeRule(rule);
+                setShowBuilder(false);
+              }}
+              onCancel={() => setShowBuilder(false)}
+            />
+          ) : (
+            <button
+              onClick={() => setShowBuilder(true)}
+              className="w-full py-2.5 rounded-xl border border-dashed border-bull/40 text-xs font-semibold text-bull hover:bg-bull/5 flex items-center justify-center gap-1.5"
+            >
+              <Bot className="h-3.5 w-3.5" /> + Create snipe rule
+            </button>
+          )}
+
+          {/* Demo / sample rules from static data (for reference) */}
+          {snipeRules.length === 0 && !showBuilder && (
+            <div className="mt-4">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Sample rules (read-only)</div>
+              {SNIPE_RULES.map((r) => <SnipeRuleCard key={r.id} rule={r} onTrigger={() => pushToast({ title: "🎯 Sample rule", description: `${r.name} — create your own rule to enable.`, type: "info" })} />)}
+            </div>
+          )}
         </ModalShell>
       )}
     </AnimatePresence>
+  );
+}
+
+function UserSnipeRuleCard({
+  rule,
+  onToggle,
+  onRemove,
+  onTest,
+}: {
+  rule: any;
+  onToggle: () => void;
+  onRemove: () => void;
+  onTest: () => void;
+}) {
+  return (
+    <div className={cn("rounded-xl border p-3 mb-2", rule.enabled ? "border-bull/30 bg-bull/5" : "border-border")}>
+      <div className="flex items-center gap-2 mb-2">
+        <Bot className={cn("h-4 w-4", rule.enabled ? "text-bull" : "text-muted-foreground")} />
+        <span className="font-semibold text-sm flex-1 truncate">{rule.name}</span>
+        {rule.enabled ? <Chip variant="bull">LIVE</Chip> : <Chip variant="default">PAUSED</Chip>}
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-[10px] mb-2">
+        <div><span className="text-muted-foreground">Max dev: </span><span className="font-semibold tabular">{rule.conditions.maxDevHoldPct}%</span></div>
+        <div><span className="text-muted-foreground">Min liq: </span><span className="font-semibold tabular">{fmtUsd(rule.conditions.minLiquidityUsd, { compact: true })}</span></div>
+        <div><span className="text-muted-foreground">Max age: </span><span className="font-semibold tabular">{rule.conditions.maxAgeMinutes}m</span></div>
+        <div><span className="text-muted-foreground">Min smart: </span><span className="font-semibold tabular">≥{rule.conditions.minSmartMoneyHolders}</span></div>
+        <div><span className="text-muted-foreground">Buy: </span><span className="font-semibold tabular">{fmtUsd(rule.actions.buyUsd)}</span></div>
+        <div><span className="text-muted-foreground">SL/TP: </span><span className="font-semibold tabular">-{rule.actions.autoStopLossPct}%/+{rule.actions.autoTakeProfitPct}%</span></div>
+      </div>
+      <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2">
+        <span>Stats: {rule.stats.triggered} triggered · {rule.stats.filled} filled · PnL {fmtUsd(rule.stats.pnl, { compact: true })}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        <button onClick={onTest} className="py-1.5 rounded-md border border-border text-[11px] font-semibold text-muted-foreground hover:text-foreground">Test</button>
+        <button
+          onClick={onToggle}
+          className={cn("py-1.5 rounded-md text-[11px] font-bold", rule.enabled ? "bg-bear/15 text-bear border border-bear/30" : "bg-bull text-background")}
+        >
+          {rule.enabled ? "Pause" : "Start"}
+        </button>
+        <button
+          onClick={onRemove}
+          className="py-1.5 rounded-md border border-border text-[11px] font-semibold text-muted-foreground hover:text-bear"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SnipeRuleBuilder({
+  onCreate,
+  onCancel,
+}: {
+  onCreate: (rule: {
+    name: string;
+    conditions: {
+      maxDevHoldPct: number;
+      minLiquidityUsd: number;
+      maxAgeMinutes: number;
+      minSmartMoneyHolders: number;
+      renouncedOnly: boolean;
+      maxRugRatio: number;
+    };
+    actions: {
+      buyUsd: number;
+      slippagePct: number;
+      autoTakeProfitPct: number;
+      autoStopLossPct: number;
+    };
+  }) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [maxDevHoldPct, setMaxDevHoldPct] = useState(10);
+  const [minLiquidityUsd, setMinLiquidityUsd] = useState(10_000);
+  const [maxAgeMinutes, setMaxAgeMinutes] = useState(60);
+  const [minSmartMoneyHolders, setMinSmartMoneyHolders] = useState(3);
+  const [maxRugRatio, setMaxRugRatio] = useState(30);
+  const [renouncedOnly, setRenouncedOnly] = useState(true);
+  const [buyUsd, setBuyUsd] = useState(50);
+  const [slippagePct, setSlippagePct] = useState(5);
+  const [autoTakeProfitPct, setAutoTakeProfitPct] = useState(100);
+  const [autoStopLossPct, setAutoStopLossPct] = useState(30);
+
+  const handleCreate = () => {
+    onCreate({
+      name: name.trim() || `Snipe ${maxAgeMinutes}m · ≥${minSmartMoneyHolders} smart`,
+      conditions: { maxDevHoldPct, minLiquidityUsd, maxAgeMinutes, minSmartMoneyHolders, renouncedOnly, maxRugRatio: maxRugRatio / 100 },
+      actions: { buyUsd, slippagePct, autoTakeProfitPct, autoStopLossPct },
+    });
+  };
+
+  return (
+    <div className="rounded-xl border border-bull/30 bg-bull/5 p-3 space-y-3">
+      <div className="text-xs font-semibold flex items-center gap-1.5">
+        <Bot className="h-3.5 w-3.5 text-bull" /> New snipe rule
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Name (optional)</div>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={`Snipe ${maxAgeMinutes}m · ≥${minSmartMoneyHolders} smart`}
+          className="w-full bg-surface-2 border border-border rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-bull/40"
+        />
+      </div>
+
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Conditions</div>
+      <SnipeSlider label="Max dev holdings" value={maxDevHoldPct} min={0} max={50} step={1} format={(v) => `${v}%`} onChange={setMaxDevHoldPct} />
+      <SnipeSlider label="Min liquidity" value={minLiquidityUsd} min={0} max={100_000} step={1_000} format={(v) => v === 0 ? "Any" : `$${(v / 1000).toFixed(0)}k`} onChange={setMinLiquidityUsd} />
+      <SnipeSlider label="Max age (minutes)" value={maxAgeMinutes} min={5} max={240} step={5} format={(v) => `${v}m`} onChange={setMaxAgeMinutes} />
+      <SnipeSlider label="Min smart-money holders" value={minSmartMoneyHolders} min={0} max={30} step={1} format={(v) => v === 0 ? "Any" : `≥${v}`} onChange={setMinSmartMoneyHolders} />
+      <SnipeSlider label="Max rug-ratio" value={maxRugRatio} min={0} max={100} step={5} format={(v) => v >= 100 ? "Any" : `≤${v}%`} onChange={setMaxRugRatio} />
+
+      <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+        <input type="checkbox" checked={renouncedOnly} onChange={(e) => setRenouncedOnly(e.target.checked)} className="accent-bull" />
+        <span className="text-muted-foreground">Require mint renounced</span>
+      </label>
+
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold pt-2 border-t border-border">Actions</div>
+      <SnipeSlider label="Buy amount (USD)" value={buyUsd} min={5} max={500} step={5} format={(v) => `$${v}`} onChange={setBuyUsd} />
+      <SnipeSlider label="Slippage tolerance" value={slippagePct} min={1} max={30} step={1} format={(v) => `${v}%`} onChange={setSlippagePct} />
+      <SnipeSlider label="Auto take-profit" value={autoTakeProfitPct} min={10} max={500} step={10} format={(v) => `+${v}%`} onChange={setAutoTakeProfitPct} />
+      <SnipeSlider label="Auto stop-loss" value={autoStopLossPct} min={5} max={80} step={5} format={(v) => `-${v}%`} onChange={setAutoStopLossPct} />
+
+      <div className="flex gap-2 pt-2">
+        <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground">Cancel</button>
+        <button onClick={handleCreate} className="flex-1 py-2 rounded-lg bg-bull text-background text-xs font-bold hover:opacity-90">Create rule</button>
+      </div>
+    </div>
+  );
+}
+
+function SnipeSlider({
+  label, value, min, max, step, format, onChange,
+}: {
+  label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[11px] mb-1">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-semibold tabular">{format(value)}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+        className="w-full h-1.5 rounded-full bg-surface-3 accent-bull cursor-pointer"
+      />
+    </div>
   );
 }
 

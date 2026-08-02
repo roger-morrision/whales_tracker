@@ -26,21 +26,29 @@ const FLOW_TYPE_LABEL: Record<WhaleFlow["type"], string> = {
 };
 
 export function WhalesView() {
-  const [tab, setTab] = useState<"traders" | "flows" | "gmgn">("traders");
+  const [tab, setTab] = useState<"traders" | "flows" | "gmgn" | "trenches">("traders");
+  const setPumpFunOpen = useMoby((s) => s.setPumpFunOpen);
   return (
     <div className="space-y-4">
       <LeaderboardHeader />
-      <div className="flex gap-1 p-1 bg-surface-2 rounded-lg">
+      <div className="flex gap-1 p-1 bg-surface-2 rounded-lg overflow-x-auto no-scrollbar">
         {[
           { k: "traders", label: "🏆 Top traders" },
           { k: "flows", label: "🌊 Live flows" },
-          { k: "gmgn", label: "🟢 GMGN smart money" },
+          { k: "gmgn", label: "🟢 GMGN smart" },
+          { k: "trenches", label: "🔥 Trenches" },
         ].map((s) => (
           <button
             key={s.k}
-            onClick={() => setTab(s.k as typeof tab)}
+            onClick={() => {
+              if (s.k === "trenches") {
+                setPumpFunOpen(true);
+              } else {
+                setTab(s.k as typeof tab);
+              }
+            }}
             className={cn(
-              "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors",
+              "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap",
               tab === s.k ? "bg-surface-3 text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
