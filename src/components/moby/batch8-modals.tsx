@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { X, Shield, TrendingUp, TrendingDown, Flame, ArrowRight, Key, Copy, Check, Activity, Zap, AlertTriangle, Bell } from "lucide-react";
 import {
   TRAILING_STOPS,
@@ -331,6 +331,42 @@ export function WatchlistAlertsModal() {
   const setOpen = useMoby((s) => s.setWatchlistAlertsOpen);
   const watchlist = useMoby((s) => s.watchlist);
   const openToken = useMoby((s) => s.openToken);
+  const watchlistAlerts = useMoby((s) => s.watchlistAlerts);
+  const setWatchlistAlert = useMoby((s) => s.setWatchlistAlert);
+  const removeWatchlistAlert = useMoby((s) => s.removeWatchlistAlert);
+
+  // Local form state keyed by tokenId (initialized from store)
+  const [forms, setForms] = useState<Record<string, { above: string; below: string; smart: boolean; move10: boolean }>>({});
+
+  // Sync form state when modal opens
+  useEffect(() => {
+    if (!open) return;
+    const next: Record<string, { above: string; below: string; smart: boolean; move10: boolean }> = {};
+    watchlist.forEach((id) => {
+      const cfg = watchlistAlerts[id];
+      next[id] = {
+        above: cfg?.priceAbove ? String(cfg.priceAbove) : "",
+        below: cfg?.priceBelow ? String(cfg.priceBelow) : "",
+        smart: cfg?.smartMoneyEntry ?? true,
+        move10: cfg?.move10 ?? true,
+      };
+    });
+    // Defer to avoid synchronous setState in effect
+    Promise.resolve().then(() => setForms(next));
+  }, [open, watchlist, watchlistAlerts]);
+
+  const handleSave = (tokenId: string) => {
+    const f = forms[tokenId];
+    if (!f) return;
+    const above = parseFloat(f.above);
+    const below = parseFloat(f.below);
+    setWatchlistAlert(tokenId, {
+      priceAbove: isNaN(above) ? undefined : above,
+      priceBelow: isNaN(below) ? undefined : below,
+      smartMoneyEntry: f.smart,
+      move10: f.move10,
+    });
+  };
 
   return (
     <ModalShell open={open} onClose={() => setOpen(false)} title="Watchlist alerts" icon={<Bell className="h-4 w-4 text-bull" />}>
@@ -339,6 +375,8 @@ export function WatchlistAlertsModal() {
         {watchlist.map((id) => {
           const t = TOKENS_BY_ID[id];
           if (!t) return null;
+          const f = forms[id] ?? { above: "", below: "", smart: true, move10: true };
+          const hasExisting = !!watchlistAlerts[id];
           return (
             <div key={id} className="rounded-xl border border-border p-3">
               <div className="flex items-center gap-2.5 mb-2">
@@ -352,20 +390,63 @@ export function WatchlistAlertsModal() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <div className="text-[9px] text-muted-foreground uppercase mb-1">Price above</div>
-                  <input type="text" placeholder={fmtPrice(t.price * 1.1)} className="w-full bg-surface-2 border border-border rounded-md px-2 py-1 text-[11px] tabular focus:outline-none focus:ring-1 focus:ring-bull/40" />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={f.above}
+                    onChange={(e) => setForms((s) => ({ ...s, [id]: { ...f, above: e.target.value } }))}
+                    placeholder={fmtPrice(t.price * 1.1)}
+                    className="w-full bg-surface-2 border border-border rounded-md px-2 py-1 text-[11px] tabular focus:outline-none focus:ring-1 focus:ring-bull/40"
+                  />
                 </div>
                 <div>
                   <div className="text-[9px] text-muted-foreground uppercase mb-1">Price below</div>
-                  <input type="text" placeholder={fmtPrice(t.price * 0.9)} className="w-full bg-surface-2 border border-border rounded-md px-2 py-1 text-[11px] tabular focus:outline-none focus:ring-1 focus:ring-bull/40" />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={f.below}
+                    onChange={(e) => setForms((s) => ({ ...s, [id]: { ...f, below: e.target.value } }))}
+                    placeholder={fmtPrice(t.price * 0.9)}
+                    className="w-full bg-surface-2 border border-border rounded-md px-2 py-1 text-[11px] tabular focus:outline-none focus:ring-1 focus:ring-bull/40"
+                  />
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <input type="checkbox" defaultChecked className="accent-bull" /> Smart money entry
+                  <input
+                    type="checkbox"
+                    checked={f.smart}
+                    onChange={(e) => setForms((s) => ({ ...s, [id]: { ...f, smart: e.target.checked } }))}
+                    className="accent-bull"
+                  /> Smart money entry
                 </label>
                 <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <input type="checkbox" defaultChecked className="accent-bull" /> 10%+ move
+                  <input
+                    type="checkbox"
+                    checked={f.move10}
+                    onChange={(e) => setForms((s) => ({ ...s, [id]: { ...f, move10: e.target.checked } }))}
+                    className="accent-bull"
+                  /> 10%+ move
                 </label>
+                <div className="ml-auto flex items-center gap-1.5">
+                  {hasExisting && (
+                    <button
+                      onClick={() => {
+                        removeWatchlistAlert(id);
+                        setForms((s) => ({ ...s, [id]: { above: "", below: "", smart: true, move10: true } }));
+                      }}
+                      className="text-[10px] text-bear hover:opacity-80"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleSave(id)}
+                    className="text-[10px] font-semibold px-2 py-1 rounded-md bg-bull text-background hover:opacity-90"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
           );

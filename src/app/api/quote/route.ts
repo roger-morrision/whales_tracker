@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
     inAmount: amount,
     inUsd: Number(inputUsd.toFixed(2)),
     outAmount: Number(afterImpact.toFixed(8)),
-    outUsd: Number(inputUsd.toFixed(2)),
+    outUsd: Number((afterImpact * outToken.price).toFixed(2)),
     priceImpactPct: Number(impactPct.toFixed(2)),
     minReceived: Number(minReceived.toFixed(8)),
     slippagePct: slippage,

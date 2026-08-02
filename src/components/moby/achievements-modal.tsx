@@ -16,19 +16,19 @@ interface Achievement {
   points: number;
 }
 
-const ACHIEVEMENTS: Achievement[] = [
-  { id: "a1", icon: "🐋", label: "Whale Watcher", desc: "Track 100+ whale wallets", unlocked: true, tier: "gold", points: 100 },
-  { id: "a2", icon: "⚡", label: "Early Bird", desc: "Catch 10 early entries", unlocked: true, tier: "silver", points: 75 },
-  { id: "a3", icon: "🎯", label: "Sniper", desc: "Hit 5 cluster buy signals", unlocked: true, tier: "silver", points: 75 },
-  { id: "a4", icon: "🚀", label: "Diamond Hands", desc: "Hold a position for 30+ days", unlocked: true, tier: "bronze", points: 50 },
-  { id: "a5", icon: "🔮", label: "Oracle", desc: "Have 5 calls validated by smart money", unlocked: false, progress: 60, tier: "gold", points: 100 },
-  { id: "a6", icon: "👑", label: "Moby Maxi", desc: "Follow 10 traders", unlocked: false, progress: 70, tier: "platinum", points: 150 },
+const ACHIEVEMENTS: (Achievement & { storeId?: string })[] = [
+  { id: "a1", storeId: "whale_spotter", icon: "🐋", label: "Whale Watcher", desc: "Track 100+ whale wallets", unlocked: false, tier: "gold", points: 100 },
+  { id: "a2", storeId: "early_adopter", icon: "⚡", label: "Early Bird", desc: "Joined Moby early", unlocked: true, tier: "silver", points: 75 },
+  { id: "a3", icon: "🎯", label: "Sniper", desc: "Hit 5 cluster buy signals", unlocked: false, tier: "silver", points: 75 },
+  { id: "a4", storeId: "first_trade", icon: "🚀", label: "First Trade", desc: "Execute your first swap", unlocked: false, tier: "bronze", points: 50 },
+  { id: "a5", icon: "🔮", label: "Oracle", desc: "Have 5 calls validated by smart money", unlocked: false, progress: 0, tier: "gold", points: 100 },
+  { id: "a6", storeId: "first_follow", icon: "👑", label: "First Follow", desc: "Follow your first trader", unlocked: false, tier: "platinum", points: 150 },
   { id: "a7", icon: "🪙", label: "Coin Collector", desc: "Track 50 unique tokens", unlocked: false, progress: 32, tier: "bronze", points: 50 },
-  { id: "a8", icon: "🌊", label: "Solana Maxi", desc: "Hold 5+ Solana tokens", unlocked: true, tier: "bronze", points: 50 },
-  { id: "a9", icon: "📊", label: "Portfolio Pro", desc: "Reach $100K portfolio value", unlocked: true, tier: "gold", points: 100 },
+  { id: "a8", storeId: "diversified", icon: "🌊", label: "Diversified", desc: "Hold 5+ Solana tokens", unlocked: false, tier: "bronze", points: 50 },
+  { id: "a9", storeId: "portfolio_100k", icon: "📊", label: "Portfolio Pro", desc: "Reach $100K portfolio value", unlocked: false, tier: "gold", points: 100 },
   { id: "a10", icon: "🤖", label: "AI Whisperer", desc: "Ask Moby AI 100 questions", unlocked: false, progress: 42, tier: "silver", points: 75 },
-  { id: "a11", icon: "💸", label: "Tax Wizard", desc: "Generate a tax report", unlocked: false, progress: 0, tier: "bronze", points: 50 },
-  { id: "a12", icon: "🏆", label: "Leaderboard Legend", desc: "Reach top 10 on P&L leaderboard", unlocked: false, progress: 0, tier: "platinum", points: 200 },
+  { id: "a11", storeId: "first_alert", icon: "💸", label: "First Alert", desc: "Create your first price alert", unlocked: false, tier: "bronze", points: 50 },
+  { id: "a12", storeId: "ten_trades", icon: "🏆", label: "Ten Trades", desc: "Execute 10 swaps on Moby", unlocked: false, progress: 0, tier: "platinum", points: 200 },
 ];
 
 const TIER_COLORS: Record<NonNullable<Achievement["tier"]>, string> = {
@@ -48,11 +48,24 @@ const TIER_RING: Record<NonNullable<Achievement["tier"]>, string> = {
 export function AchievementsModal() {
   const open = useMoby((s) => s.achievementsOpen);
   const setOpen = useMoby((s) => s.setAchievementsOpen);
+  const storeAchievements = useMoby((s) => s.achievements);
 
-  const unlocked = ACHIEVEMENTS.filter((a) => a.unlocked);
-  const locked = ACHIEVEMENTS.filter((a) => !a.unlocked);
+  // Merge static rich definitions with persisted store state
+  const merged: Achievement[] = ACHIEVEMENTS.map((a) => {
+    if (!a.storeId) return a;
+    const storeA = storeAchievements.find((x) => x.id === a.storeId);
+    if (!storeA) return a;
+    return {
+      ...a,
+      unlocked: a.unlocked || storeA.unlocked,
+      progress: storeA.unlocked ? 100 : Math.round((storeA.progress ?? 0) * 100),
+    };
+  });
+
+  const unlocked = merged.filter((a) => a.unlocked);
+  const locked = merged.filter((a) => !a.unlocked);
   const totalPoints = unlocked.reduce((s, a) => s + a.points, 0);
-  const maxPoints = ACHIEVEMENTS.reduce((s, a) => s + a.points, 0);
+  const maxPoints = merged.reduce((s, a) => s + a.points, 0);
 
   return (
     <AnimatePresence>
@@ -94,7 +107,7 @@ export function AchievementsModal() {
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Moby Points</div>
                   </div>
                   <div className="ml-auto text-right">
-                    <div className="text-sm font-semibold">{unlocked.length}/{ACHIEVEMENTS.length}</div>
+                    <div className="text-sm font-semibold">{unlocked.length}/{merged.length}</div>
                     <div className="text-[10px] text-muted-foreground">unlocked</div>
                   </div>
                 </div>

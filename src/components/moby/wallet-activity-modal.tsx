@@ -178,9 +178,14 @@ export function WalletActivityModal() {
                       </div>
                       <div className="flex items-center justify-between mt-1.5 pl-[46px]">
                         <span className="text-[10px] font-mono text-muted-foreground truncate">{a.txHash}</span>
-                        <button className="text-[10px] text-bull hover:opacity-80 inline-flex items-center gap-0.5 ml-2 shrink-0">
+                        <a
+                          href={`https://solscan.io/tx/${a.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-bull hover:opacity-80 inline-flex items-center gap-0.5 ml-2 shrink-0"
+                        >
                           <ExternalLink className="h-2.5 w-2.5" /> View
-                        </button>
+                        </a>
                       </div>
                     </div>
                   );

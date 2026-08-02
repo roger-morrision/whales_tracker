@@ -205,16 +205,27 @@ function PumpFunTokenCard({ token }: { token: PumpFunToken }) {
   const statusMeta = STATUS_META[token.status];
   const lpColor = LP_COLORS[token.launchpad] || "from-[#64748B] to-[#334155]";
   const isBull = token.priceChange24h >= 0;
+  // Deterministic sparkline: seed from token.id so the shape doesn't reshuffle
+  // every time the parent re-renders or fetches new tokens.
   const sparkData = useMemo(() => {
+    const seedStr = token.id || token.symbol;
+    let seed = 0;
+    for (let i = 0; i < seedStr.length; i++) {
+      seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
+    }
+    const rng = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0xffffffff;
+    };
     const out: number[] = [];
     let v = token.price * 0.8;
     for (let i = 0; i < 20; i++) {
-      v = v * (1 + (Math.random() - 0.4) * 0.1);
+      v = v * (1 + (rng() - 0.4) * 0.1);
       out.push(v);
     }
     out.push(token.price);
     return out;
-  }, [token.price]);
+  }, [token.id, token.price]);
 
   const devRisk = token.devHoldingPct > 10;
   const holderRisk = token.topHolderPct > 20;

@@ -62,7 +62,7 @@ export function WalletConnectModal() {
           const resp = await provider.connect();
           const address = resp.publicKey?.toString() ?? resp.publicKey ?? resp;
           // Success — connect with real address
-          connect(name);
+          connect(name, typeof address === "string" ? address : undefined);
           setConnecting(null);
           return;
         }

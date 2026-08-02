@@ -244,8 +244,30 @@ export function YieldFarmingModal() {
                     <div className="text-[10px]"><span className="text-muted-foreground">Reward APR: </span><span className="font-semibold tabular text-bull">{p.aprRewards}%</span></div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    <button className="py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2">Withdraw</button>
-                    <button className="py-1.5 rounded-lg bg-bull text-background text-xs font-bold hover:opacity-90">Claim {p.rewardsToken}</button>
+                    <button
+                      onClick={() =>
+                        useMoby.getState().pushToast({
+                          title: "Withdraw queued",
+                          description: `Withdrawing ${p.protocol} position would simulate a withdrawal of ${fmtUsd(p.myPosition, { compact: true })} USDC.`,
+                          type: "info",
+                        })
+                      }
+                      className="py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                    >
+                      Withdraw
+                    </button>
+                    <button
+                      onClick={() =>
+                        useMoby.getState().pushToast({
+                          title: "Rewards claimed",
+                          description: `Claimed ${p.rewardsEarned} ${p.rewardsToken} from ${p.protocol}.`,
+                          type: "success",
+                        })
+                      }
+                      className="py-1.5 rounded-lg bg-bull text-background text-xs font-bold hover:opacity-90"
+                    >
+                      Claim {p.rewardsToken}
+                    </button>
                   </div>
                 </div>
               ))}

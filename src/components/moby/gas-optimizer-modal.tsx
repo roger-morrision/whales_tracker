@@ -147,7 +147,22 @@ export function GasOptimizerModal() {
                 </p>
               </div>
 
-              <button className="w-full py-2.5 rounded-xl bg-bull text-background text-sm font-bold hover:opacity-90">
+              <button
+                onClick={() => {
+                  // Wire to settings persistence
+                  const tier = selected as "slow" | "standard" | "fast";
+                  useMoby.getState().setSettings({
+                    defaultGas: tier,
+                    priorityFee: 0.001,
+                  });
+                  useMoby.getState().pushToast({
+                    title: "Gas settings saved",
+                    description: `Default ${tier} priority saved to settings.`,
+                    type: "success",
+                  });
+                }}
+                className="w-full py-2.5 rounded-xl bg-bull text-background text-sm font-bold hover:opacity-90"
+              >
                 Save as default
               </button>
             </div>

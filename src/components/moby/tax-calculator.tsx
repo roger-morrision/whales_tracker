@@ -174,10 +174,28 @@ export function TaxCalculatorModal() {
 
                   {/* Export buttons */}
                   <div className="grid grid-cols-2 gap-2">
-                    <button className="py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-surface-2 flex items-center justify-center gap-1.5">
+                    <button
+                      onClick={() =>
+                        useMoby.getState().pushToast({
+                          title: "CSV export ready",
+                          description: "Tax events exported as CSV (demo). In production, a download would start now.",
+                          type: "success",
+                        })
+                      }
+                      className="py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-surface-2 flex items-center justify-center gap-1.5"
+                    >
                       <Download className="h-3.5 w-3.5" /> CSV
                     </button>
-                    <button className="py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-surface-2 flex items-center justify-center gap-1.5">
+                    <button
+                      onClick={() =>
+                        useMoby.getState().pushToast({
+                          title: "Form 8949 drafted",
+                          description: "IRS Form 8949 drafted from your trade history (demo).",
+                          type: "success",
+                        })
+                      }
+                      className="py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-surface-2 flex items-center justify-center gap-1.5"
+                    >
                       <FileText className="h-3.5 w-3.5" /> Form 8949
                     </button>
                   </div>

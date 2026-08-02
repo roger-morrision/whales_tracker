@@ -436,11 +436,15 @@ function TokenDetailContent({ token }: { token: Token }) {
         <button
           onClick={() => {
             const text = `${token.name} ($${token.symbol})\nPrice: ${fmtPrice(live)}\n24h: ${delta24h >= 0 ? "+" : ""}${delta24h.toFixed(2)}%\nSmart money: ${token.smartMoneyHolders} wallets\n\nDiscovered on Moby 🐋`;
+            // Prefer Web Share API on mobile; otherwise open Moby's share modal
             if (typeof navigator !== "undefined" && navigator.share) {
               navigator.share({ title: `${token.symbol} on Moby`, text }).catch(() => {});
-            } else if (typeof navigator !== "undefined" && navigator.clipboard) {
-              navigator.clipboard.writeText(text);
-              useMoby.getState().pushToast({ title: "Copied to clipboard", type: "info" });
+            } else {
+              useMoby.getState().openShare({
+                title: `${token.name} ($${token.symbol})`,
+                description: `Price: ${fmtPrice(live)} · 24h: ${delta24h >= 0 ? "+" : ""}${delta24h.toFixed(2)}% · Smart money: ${token.smartMoneyHolders} wallets`,
+                url: "https://moby.win",
+              });
             }
           }}
           className="w-full h-9 rounded-lg bg-bull/15 text-bull border border-bull/30 text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-bull/20"

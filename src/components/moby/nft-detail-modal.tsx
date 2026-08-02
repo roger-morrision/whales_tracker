@@ -161,10 +161,28 @@ function NftDetailContent({ collection, onClose }: { collection: NftCollection; 
 
       {/* Buy/Sell buttons */}
       <div className="px-4 mt-4 pb-6 grid grid-cols-2 gap-2">
-        <button className="py-2.5 rounded-xl bg-bear/15 text-bear border border-bear/30 text-sm font-bold hover:bg-bear/20 transition-colors">
+        <button
+          onClick={() =>
+            useMoby.getState().pushToast({
+              title: "Listing drafted",
+              description: `Demo: List a ${collection.name} NFT at ${collection.floorPrice} SOL floor.`,
+              type: "info",
+            })
+          }
+          className="py-2.5 rounded-xl bg-bear/15 text-bear border border-bear/30 text-sm font-bold hover:bg-bear/20 transition-colors"
+        >
           List for sale
         </button>
-        <button className="py-2.5 rounded-xl bg-bull text-background text-sm font-bold hover:opacity-90 transition-opacity">
+        <button
+          onClick={() =>
+            useMoby.getState().pushToast({
+              title: "Buy order pending",
+              description: `Demo: Buy ${collection.name} at ${collection.floorPrice} SOL floor.`,
+              type: "info",
+            })
+          }
+          className="py-2.5 rounded-xl bg-bull text-background text-sm font-bold hover:opacity-90 transition-opacity"
+        >
           Buy at floor
         </button>
       </div>

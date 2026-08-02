@@ -187,15 +187,37 @@ export function ReferralModal() {
 
               {/* Share buttons */}
               <div className="grid grid-cols-3 gap-2">
-                <button className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-surface-2 flex flex-col items-center gap-0.5">
+                <button
+                  onClick={() => {
+                    const link = "https://moby.win/r/YOURCODE";
+                    const text = encodeURIComponent(`Join me on Moby — track smart money, get signals, and trade smarter. ${link}`);
+                    window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank");
+                  }}
+                  className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-surface-2 flex flex-col items-center gap-0.5"
+                >
                   <span className="text-base">𝕏</span>
                   <span className="text-[10px]">X</span>
                 </button>
-                <button className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-surface-2 flex flex-col items-center gap-0.5">
+                <button
+                  onClick={() => {
+                    const link = "https://moby.win/r/YOURCODE";
+                    const text = encodeURIComponent("Join me on Moby — track smart money and trade smarter.");
+                    window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`, "_blank");
+                  }}
+                  className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-surface-2 flex flex-col items-center gap-0.5"
+                >
                   <span className="text-base">✈️</span>
                   <span className="text-[10px]">Telegram</span>
                 </button>
-                <button className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-surface-2 flex flex-col items-center gap-0.5">
+                <button
+                  onClick={() => {
+                    const link = "https://moby.win/r/YOURCODE";
+                    const subject = encodeURIComponent("Join me on Moby");
+                    const body = encodeURIComponent(`Check out Moby — onchain intelligence for traders.\n\n${link}`);
+                    window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+                  }}
+                  className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-surface-2 flex flex-col items-center gap-0.5"
+                >
                   <span className="text-base">📧</span>
                   <span className="text-[10px]">Email</span>
                 </button>

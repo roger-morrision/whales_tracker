@@ -16,17 +16,19 @@ interface TargetAllocation {
 export function RebalanceModal() {
   const open = useMoby((s) => s.rebalanceOpen);
   const setOpen = useMoby((s) => s.setRebalanceOpen);
+  const prices = useMoby((s) => s.prices);
 
-  // Compute current allocations
+  // Compute current allocations — use live prices when available, fall back to static
   const current = useMemo(() => {
     const holdings = PORTFOLIO.cryptoHoldings.map((h) => {
       const tk = TOKENS_BY_ID[h.tokenId];
-      const value = h.amount * (tk?.price ?? 0);
+      const livePrice = prices[h.tokenId]?.price ?? tk?.price ?? 0;
+      const value = h.amount * livePrice;
       return { tokenId: h.tokenId, value, symbol: tk?.symbol ?? "", token: tk };
     });
     const total = holdings.reduce((s, h) => s + h.value, 0);
     return holdings.map((h) => ({ ...h, pct: (h.value / total) * 100 })).sort((a, b) => b.value - a.value);
-  }, []);
+  }, [prices]);
 
   const totalValue = current.reduce((s, h) => s + h.value, 0);
 

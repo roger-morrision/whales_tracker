@@ -41,16 +41,17 @@ export function PortfolioView() {
   const [range, setRange] = useState<Range>("1M");
   const [assetTab, setAssetTab] = useState<"crypto" | "nft" | "stocks">("crypto");
   const prices = useMoby((s) => s.prices);
+  const portfolioHoldings = useMoby((s) => s.portfolioHoldings);
 
-  // Compute live portfolio value
+  // Compute live portfolio value (uses persisted portfolioHoldings mutated by trades)
   const { totalValue, totalCost, cryptoValue, nftValue, stockValue, dayChange, dayChangePct } = useMemo(() => {
     let cv = 0;
     let cc = 0;
-    PORTFOLIO.cryptoHoldings.forEach((h) => {
+    portfolioHoldings.forEach((h) => {
       const tk = TOKENS_BY_ID[h.tokenId];
       const livePrice = prices[h.tokenId]?.price ?? tk?.price ?? 0;
       cv += h.amount * livePrice;
-      cc += h.amount * h.avgCost;
+      cc += h.costUsd;
     });
     let nv = 0;
     let nc = 0;
@@ -78,7 +79,7 @@ export function PortfolioView() {
       dayChange: dc,
       dayChangePct: dcp,
     };
-  }, [prices]);
+  }, [prices, portfolioHoldings]);
 
   const totalPnl = totalValue - totalCost;
   const totalPnlPct = (totalPnl / totalCost) * 100;
@@ -304,20 +305,33 @@ function AssetClassCard({
 function CryptoHoldings() {
   const prices = useMoby((s) => s.prices);
   const openToken = useMoby((s) => s.openToken);
+  const portfolioHoldings = useMoby((s) => s.portfolioHoldings);
   const holdings = useMemo(
     () =>
-      PORTFOLIO.cryptoHoldings
+      portfolioHoldings
         .map((h) => {
           const tk = TOKENS_BY_ID[h.tokenId];
           const live = prices[h.tokenId]?.price ?? tk?.price ?? 0;
           const value = h.amount * live;
-          const cost = h.amount * h.avgCost;
+          const cost = h.costUsd;
           const pnl = value - cost;
-          const pnlPct = (pnl / cost) * 100;
-          return { ...h, token: tk, livePrice: live, value, cost, pnl, pnlPct };
+          const pnlPct = cost > 0 ? (pnl / cost) * 100 : 0;
+          const avgCost = h.amount > 0 ? cost / h.amount : 0;
+          return {
+            ...h,
+            id: `ph_${h.tokenId}`,
+            chain: tk?.chain ?? "SOL",
+            token: tk,
+            livePrice: live,
+            value,
+            cost,
+            pnl,
+            pnlPct,
+            avgCost,
+          };
         })
         .sort((a, b) => b.value - a.value),
-    [prices]
+    [prices, portfolioHoldings]
   );
 
   return (

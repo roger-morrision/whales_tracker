@@ -125,7 +125,9 @@ export function AlertCreatorModal() {
                               ${a.tokenSymbol} · {condMeta?.emoji} {condMeta?.label}
                             </div>
                             <div className="text-[10px] text-muted-foreground">
-                              {isPriceCondition ? fmtPrice(a.threshold) : fmtUsd(a.threshold, { compact: true })}
+                              {(a.condition === "price_above" || a.condition === "price_below")
+                                ? fmtPrice(a.threshold)
+                                : fmtUsd(a.threshold, { compact: true })}
                               {" · "}
                               {a.channels.map((c) => c).join(", ")}
                             </div>

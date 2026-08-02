@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   X,
   ArrowDown,
@@ -47,8 +47,15 @@ export function TradeModal() {
 
   const prices = useMoby((s) => s.prices);
   const livePrice = token ? prices[token.id]?.price ?? token.price : 0;
+  // Keep a ref to livePrice so the quote effect doesn't re-run every 2.5s
+  const livePriceRef = useRef(livePrice);
+  livePriceRef.current = livePrice;
+  const applyTrade = useMoby((s) => s.applyTrade);
+  const recordTrade = useMoby((s) => s.recordTrade);
 
   // Fetch real quote from API when amount changes
+  // NOTE: livePrice is intentionally NOT in deps — it changes every 2.5s via
+  // tickPrices and would cause constant refetches. It's read via livePriceRef.
   useEffect(() => {
     if (!token || !amount || parseFloat(amount) <= 0) {
       setQuote(null);
@@ -76,7 +83,8 @@ export function TradeModal() {
       } catch {
         // Fallback to local calculation
         const usdIn = parseFloat(amount) || 0;
-        const baseOut = usdIn / livePrice;
+        const refPrice = livePriceRef.current || token.price;
+        const baseOut = usdIn / refPrice;
         const impact = Math.min(15, (usdIn / Math.max(1, token.liquidity)) * 100);
         const afterImpact = baseOut * (1 - impact / 100);
         const minRec = afterImpact * (1 - slippage / 100);
@@ -97,7 +105,7 @@ export function TradeModal() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [token, amount, slippage, side, livePrice]);
+  }, [token, amount, slippage, side]);
 
   const amountOut = quote?.outAmount ?? 0;
   const priceImpact = quote?.priceImpactPct ?? 0;
@@ -125,6 +133,25 @@ export function TradeModal() {
       if (typeof navigator !== "undefined" && navigator.vibrate) {
         navigator.vibrate([10, 30, 10]);
       }
+      // Apply trade to portfolio + record in history
+      const usdAmount = parseFloat(amount) || 0;
+      const executedPrice = livePriceRef.current || token.price;
+      applyTrade({
+        tokenId: token.id,
+        side,
+        usdAmount,
+        tokenAmount: amountOut,
+        price: executedPrice,
+      });
+      recordTrade({
+        tokenId: token.id,
+        tokenSymbol: token.symbol,
+        side,
+        usdAmount,
+        tokenAmount: amountOut,
+        price: executedPrice,
+        txHash: quote?.quoteId,
+      });
       useMoby.getState().pushToast({
         title: `${isBuy ? "Buy" : "Sell"} order confirmed`,
         description: `${isBuy ? "Bought" : "Sold"} ${fmtNum(amountOut)} ${token.symbol} for $${amount} USDC${quote ? ` · Quote: ${quote.quoteId.slice(0, 12)}` : ""}`,
@@ -264,7 +291,14 @@ export function TradeModal() {
                   {[25, 50, 75, 100].map((pct) => (
                     <button
                       key={pct}
-                      onClick={() => setAmount(String((wallet?.balanceUsd ?? 1000) * pct / 100))}
+                      onClick={() =>
+                        setAmount(String(((wallet?.balanceUsd ?? 1000) * pct) / 100))
+                      }
+                      title={
+                        wallet
+                          ? `${pct}% of ${fmtUsd(wallet.balanceUsd)} wallet balance`
+                          : "Demo: 1000 USDC notional"
+                      }
                       className="flex-1 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground bg-surface-3 rounded"
                     >
                       {pct}%

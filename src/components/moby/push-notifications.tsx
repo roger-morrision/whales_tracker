@@ -14,7 +14,8 @@ export function PushNotificationManager() {
   const requestPermission = useMoby((s) => s.requestPushPermission);
   const toasts = useMoby((s) => s.toasts);
 
-  // Track which toast IDs we've already notified about
+  // Track which toast IDs we've already notified about (LRU capped to 50 entries
+  // to avoid unbounded growth in long-running tabs).
   const notifiedRef = useRef<Set<string>>(new Set());
 
   // Fire real browser notifications for alert-type toasts when permission granted
@@ -22,6 +23,11 @@ export function PushNotificationManager() {
     if (permission !== "granted") return;
     const latest = toasts[0];
     if (latest && latest.type === "alert" && !notifiedRef.current.has(latest.id)) {
+      // Cap Set size to avoid unbounded growth
+      if (notifiedRef.current.size > 50) {
+        const arr = [...notifiedRef.current];
+        notifiedRef.current = new Set(arr.slice(-25));
+      }
       notifiedRef.current.add(latest.id);
       try {
         new Notification(latest.title, {

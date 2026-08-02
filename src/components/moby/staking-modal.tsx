@@ -111,10 +111,28 @@ export function StakingModal() {
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 mt-2">
-                        <button className="py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2">
+                        <button
+                          onClick={() =>
+                            useMoby.getState().pushToast({
+                              title: "Unstake queued",
+                              description: `Unstaking ${p.amount} SOL from ${p.validatorName}.`,
+                              type: "info",
+                            })
+                          }
+                          className="py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                        >
                           Unstake
                         </button>
-                        <button className="py-1.5 rounded-lg bg-bull text-background text-xs font-bold hover:opacity-90">
+                        <button
+                          onClick={() =>
+                            useMoby.getState().pushToast({
+                              title: "Rewards claimed",
+                              description: `Claimed ${p.rewardsEarned} SOL rewards.`,
+                              type: "success",
+                            })
+                          }
+                          className="py-1.5 rounded-lg bg-bull text-background text-xs font-bold hover:opacity-90"
+                        >
                           Claim rewards
                         </button>
                       </div>
@@ -156,7 +174,16 @@ export function StakingModal() {
                           <div className="font-semibold tabular">{v.uptime}%</div>
                         </div>
                       </div>
-                      <button className="w-full mt-2 py-1.5 rounded-lg bg-bull/15 text-bull text-xs font-bold hover:bg-bull/20">
+                      <button
+                        onClick={() =>
+                          useMoby.getState().pushToast({
+                            title: "Stake initiated",
+                            description: `Demo: Stake with ${v.name} at ${v.apy}% APY.`,
+                            type: "info",
+                          })
+                        }
+                        className="w-full mt-2 py-1.5 rounded-lg bg-bull/15 text-bull text-xs font-bold hover:bg-bull/20"
+                      >
                         Stake with {v.name}
                       </button>
                     </div>

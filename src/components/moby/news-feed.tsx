@@ -63,11 +63,14 @@ function NewsCard({
   return (
     <a
       href={item.url}
-      onClick={(e) => {
-        e.preventDefault();
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => {
+        // Don't preventDefault — let the anchor open the URL in a new tab.
+        // Also push a toast for in-app context.
         useMoby.getState().pushToast({
-          title: item.headline.slice(0, 60) + "...",
-          description: `${item.source} · Tap to read on ${item.source}`,
+          title: "Opening article",
+          description: `${item.source} · ${item.headline.slice(0, 60)}...`,
           type: "info",
         });
       }}

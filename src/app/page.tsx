@@ -144,6 +144,8 @@ export default function Home() {
       // Escape closes the topmost open modal/sheet
       if (e.key === "Escape") {
         const s = useMoby.getState();
+        if (!s.onboarded) { s.setOnboarded(true); return; }
+        if (s.shareOpen) { s.setShareOpen(false); return; }
         if (s.selectedTraderId) { s.openTrader(null); return; }
         if (s.selectedTokenId) { s.openToken(null); return; }
         if (s.copilotOpen) { s.setCopilotOpen(false); return; }
@@ -308,12 +310,8 @@ export default function Home() {
       {/* Batch 9: Pump.fun explorer */}
       <PumpFunExplorerModal />
 
-      {/* Share modal (global) */}
-      <ShareModal
-        data={{ title: "Moby — Trade Smarter", description: "Onchain intelligence for traders. Follow whales, discover tokens, trade smarter." }}
-        open={false}
-        onClose={() => {}}
-      />
+      {/* Share modal (global, store-driven) */}
+      <StoreShareModal />
 
       {/* Onboarding — first-time experience */}
       <OnboardingOverlay />
@@ -322,6 +320,19 @@ export default function Home() {
       <BackToTopButton />
     </div>
     </ErrorBoundary>
+  );
+}
+
+function StoreShareModal() {
+  const open = useMoby((s) => s.shareOpen);
+  const data = useMoby((s) => s.shareData);
+  const setOpen = useMoby((s) => s.setShareOpen);
+  return (
+    <ShareModal
+      data={data}
+      open={open}
+      onClose={() => setOpen(false)}
+    />
   );
 }
 

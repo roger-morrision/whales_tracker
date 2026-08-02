@@ -182,7 +182,7 @@ function InsightCard({
 function LaunchCalendar() {
   return (
     <section>
-      <SectionHeader title="Upcoming launches" emoji="🚀" action="All" onAction={() => {}} />
+      <SectionHeader title="Upcoming launches" emoji="🚀" action="All" onAction={() => useMoby.getState().setLaunchScannerOpen(true)} />
       <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {LAUNCHES.map((l) => {
           const d = new Date(l.date);
@@ -272,7 +272,7 @@ function NarrativesRow() {
   const openNarrative = useMoby((s) => s.openNarrative);
   return (
     <section>
-      <SectionHeader title="Hot narratives" emoji="📊" action="All" onAction={() => {}} />
+      <SectionHeader title="Hot narratives" emoji="📊" action="All" onAction={() => useMoby.getState().setLaunchScannerOpen(true)} />
       <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {NARRATIVES.map((n) => (
           <button

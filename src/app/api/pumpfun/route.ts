@@ -135,9 +135,14 @@ export async function GET(req: NextRequest) {
         });
 
         // Filter by launchpad if specified
-        const filtered = launchpad && launchpad !== "pump.fun"
-          ? tokens.filter(() => false) // Real pump.fun API only returns pump.fun tokens
-          : tokens;
+        let filtered = tokens;
+        let note: string | undefined;
+        if (launchpad && launchpad !== "all" && launchpad !== "pump.fun") {
+          // Real pump.fun API only returns pump.fun tokens — fall through to simulation
+          // by returning an empty real list with a note, the caller (frontend) will retry with simulated.
+          filtered = [];
+          note = `Real pump.fun API only returns pump.fun tokens. Filter "${launchpad}" requires simulated data.`;
+        }
 
         return NextResponse.json({
           type,
@@ -146,6 +151,7 @@ export async function GET(req: NextRequest) {
           timestamp: Date.now(),
           launchpads: { "pump.fun": filtered.length },
           source: "pump.fun_api",
+          note,
         });
       }
     }
@@ -154,7 +160,35 @@ export async function GET(req: NextRequest) {
   }
 
   // Fallback: Simulated data
-  const tokens = [];
+  type PumpToken = {
+    id: string;
+    symbol: string;
+    name: string;
+    mint: string;
+    launchpad: string;
+    status: string;
+    marketCap: number;
+    bondingCurveProgress: number;
+    price: number;
+    priceChange1h: number;
+    priceChange24h: number;
+    volume24h: number;
+    liquidity: number;
+    holders: number;
+    ageMinutes: number;
+    creator: string;
+    creatorVerified: boolean;
+    description: string;
+    migratedTo: string | null;
+    migrationProgress?: number;
+    socials: Record<string, string>;
+    topHolderPct: number;
+    devHoldingPct: number;
+    isLive: boolean;
+    imageUrl?: string;
+  };
+
+  const tokens: PumpToken[] = [];
   const now = Date.now();
 
   for (let i = 0; i < limit; i++) {
@@ -170,7 +204,7 @@ export async function GET(req: NextRequest) {
       ? launchpad
       : LAUNCHPADS[Math.floor(r1 * LAUNCHPADS.length)];
 
-    let status, bondingCurveProgress, marketCap, ageMinutes, migratedTo = null, migrationProgress;
+    let status, bondingCurveProgress, marketCap, ageMinutes, migratedTo: string | null = null, migrationProgress;
 
     if (type === "new") {
       status = "bonding";

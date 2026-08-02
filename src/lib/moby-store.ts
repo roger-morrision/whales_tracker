@@ -6,6 +6,7 @@ import {
   TRADERS,
   SIGNALS,
   WHALE_FLOWS,
+  PORTFOLIO,
   type Token,
   type Trader,
   type SmartSignal,
@@ -134,6 +135,80 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
 };
 
+// ===== Enhancement: Portfolio / Trade / Achievement / Watchlist Alert types =====
+export interface PortfolioHolding {
+  tokenId: string;
+  amount: number; // token amount
+  costUsd: number; // total cost basis in USD
+}
+
+export interface TradeRecord {
+  id: string;
+  ts: number;
+  tokenId: string;
+  tokenSymbol: string;
+  side: "BUY" | "SELL";
+  usdAmount: number;
+  tokenAmount: number;
+  price: number;
+  txHash?: string;
+}
+
+export interface AchievementState {
+  id: string;
+  unlocked: boolean;
+  unlockedAt?: number;
+  progress: number; // 0..1
+}
+
+export interface WatchlistAlertConfig {
+  priceAbove?: number;
+  priceBelow?: number;
+  smartMoneyEntry?: boolean;
+  move10?: boolean;
+}
+
+// Default portfolio holdings seeded from the static PORTFOLIO cryptoHoldings.
+// These get mutated by trades; if no trades have happened, this matches the
+// previous static display exactly.
+function initialPortfolioHoldings(): PortfolioHolding[] {
+  return (PORTFOLIO.cryptoHoldings || []).map((h) => ({
+    tokenId: h.tokenId,
+    amount: h.amount,
+    costUsd: h.amount * (h.avgCost ?? 0),
+  }));
+}
+
+const DEFAULT_ACHIEVEMENTS: AchievementState[] = [
+  { id: "first_trade", unlocked: false, progress: 0 },
+  { id: "first_save", unlocked: false, progress: 0 },
+  { id: "first_alert", unlocked: false, progress: 0 },
+  { id: "first_follow", unlocked: false, progress: 0 },
+  { id: "ten_trades", unlocked: false, progress: 0 },
+  { id: "whale_spotter", unlocked: false, progress: 0 },
+  { id: "early_adopter", unlocked: true, progress: 1, unlockedAt: Date.now() },
+  { id: "portfolio_10k", unlocked: false, progress: 0 },
+  { id: "portfolio_100k", unlocked: false, progress: 0 },
+  { id: "diversified", unlocked: false, progress: 0 },
+];
+
+const ACHIEVEMENT_LABELS: Record<string, string> = {
+  first_trade: "First Trade — Welcome aboard!",
+  first_save: "First Signal Saved — Building your playbook",
+  first_alert: "First Alert — You'll never miss a move",
+  first_follow: "First Follow — Tracking smart money",
+  ten_trades: "Ten Trades — Getting into the rhythm",
+  whale_spotter: "Whale Spotter — Spotted 5 whale flows",
+  early_adopter: "Early Adopter — Joined Moby early",
+  portfolio_10k: "Portfolio $10K — Crossing five figures",
+  portfolio_100k: "Portfolio $100K — Six-figure milestone",
+  diversified: "Diversified — Holding 5+ tokens",
+};
+
+function achievementLabel(id: string): string {
+  return ACHIEVEMENT_LABELS[id] ?? `Achievement: ${id}`;
+}
+
 interface MobyState {
   // navigation
   activeTab: TabKey;
@@ -151,6 +226,9 @@ interface MobyState {
   // selected trader (opens trader sheet)
   selectedTraderId: string | null;
   openTrader: (id: string | null) => void;
+  // Track unique traders viewed (for "whale_spotter" achievement)
+  viewedTraders: string[];
+  markTraderViewed: (id: string) => void;
 
   // watchlist (token ids)
   watchlist: string[];
@@ -197,7 +275,7 @@ interface MobyState {
   walletOpen: boolean;
   setWalletOpen: (open: boolean) => void;
   wallet: { connected: boolean; address: string; label: string; balanceUsd: number } | null;
-  connectWallet: (label: string) => void;
+  connectWallet: (label: string, address?: string) => void;
   disconnectWallet: () => void;
 
   // ===== NEW: Token screener =====
@@ -474,6 +552,36 @@ interface MobyState {
   // ===== BATCH 9: Pump.fun explorer =====
   pumpFunOpen: boolean;
   setPumpFunOpen: (open: boolean) => void;
+
+  // ===== Enhancement: Portfolio holdings (persisted, mutated by trades) =====
+  portfolioHoldings: PortfolioHolding[];
+  applyTrade: (input: {
+    tokenId: string;
+    side: "BUY" | "SELL";
+    usdAmount: number;
+    tokenAmount: number;
+    price: number;
+  }) => void;
+
+  // ===== Enhancement: Trade history (persisted) =====
+  tradeHistory: TradeRecord[];
+  recordTrade: (trade: Omit<TradeRecord, "id" | "ts">) => void;
+
+  // ===== Enhancement: Achievements (persisted, unlocked by activity) =====
+  achievements: AchievementState[];
+  unlockAchievement: (id: string) => void;
+  isAchievementUnlocked: (id: string) => boolean;
+
+  // ===== Enhancement: Per-token watchlist alerts (persisted) =====
+  watchlistAlerts: Record<string, WatchlistAlertConfig>;
+  setWatchlistAlert: (tokenId: string, cfg: Partial<WatchlistAlertConfig>) => void;
+  removeWatchlistAlert: (tokenId: string) => void;
+
+  // ===== Enhancement: Global Share modal (store-driven) =====
+  shareOpen: boolean;
+  shareData: { title: string; description: string; url?: string };
+  openShare: (data: { title: string; description: string; url?: string }) => void;
+  setShareOpen: (open: boolean) => void;
 }
 
 // ===== BATCH 3 types =====
@@ -647,7 +755,36 @@ export const useMoby = create<MobyState>()(
   })),
 
   selectedTraderId: null,
-  openTrader: (id) => set({ selectedTraderId: id }),
+  openTrader: (id) => {
+    set({ selectedTraderId: id });
+    if (id) {
+      get().markTraderViewed(id);
+    }
+  },
+  viewedTraders: [],
+  markTraderViewed: (id) => {
+    let becameNew = false;
+    set((s) => {
+      if (s.viewedTraders.includes(id)) return {};
+      becameNew = true;
+      const next = [...s.viewedTraders, id].slice(-100);
+      // Update whale_spotter progress
+      const progress = Math.min(1, next.length / 5);
+      return {
+        viewedTraders: next,
+        achievements: s.achievements.map((a) =>
+          a.id === "whale_spotter" && !a.unlocked
+            ? progress >= 1
+              ? { ...a, unlocked: true, unlockedAt: Date.now(), progress: 1 }
+              : { ...a, progress }
+            : a
+        ),
+      };
+    });
+    if (becameNew && get().viewedTraders.length >= 5) {
+      get().unlockAchievement("whale_spotter");
+    }
+  },
 
   watchlist: ["wif", "jup", "io", "mngo"],
   toggleWatch: (id) =>
@@ -658,21 +795,44 @@ export const useMoby = create<MobyState>()(
     })),
 
   followedTraders: TRADERS.filter((t) => t.following).map((t) => t.id),
-  toggleFollow: (id) =>
-    set((s) => ({
-      followedTraders: s.followedTraders.includes(id)
-        ? s.followedTraders.filter((w) => w !== id)
-        : [...s.followedTraders, id],
-    })),
+  toggleFollow: (id) => {
+    let becameFollowing = false;
+    set((s) => {
+      const isFollowing = s.followedTraders.includes(id);
+      becameFollowing = !isFollowing;
+      return {
+        followedTraders: isFollowing
+          ? s.followedTraders.filter((w) => w !== id)
+          : [...s.followedTraders, id],
+      };
+    });
+    if (becameFollowing) {
+      get().unlockAchievement("first_follow");
+      get().pushAlert({
+        title: "Following trader",
+        description: "You'll see their activity in your feeds.",
+        type: "info",
+      });
+    }
+  },
 
   savedSignals: [],
   dismissedSignals: [],
-  toggleSaveSignal: (id) =>
-    set((s) => ({
-      savedSignals: s.savedSignals.includes(id)
-        ? s.savedSignals.filter((x) => x !== id)
-        : [...s.savedSignals, id],
-    })),
+  toggleSaveSignal: (id) => {
+    let becameSaved = false;
+    set((s) => {
+      const isSaved = s.savedSignals.includes(id);
+      becameSaved = !isSaved;
+      return {
+        savedSignals: isSaved
+          ? s.savedSignals.filter((x) => x !== id)
+          : [...s.savedSignals, id],
+      };
+    });
+    if (becameSaved) {
+      get().unlockAchievement("first_save");
+    }
+  },
   dismissSignal: (id) =>
     set((s) => ({ dismissedSignals: [...s.dismissedSignals, id] })),
 
@@ -818,8 +978,10 @@ export const useMoby = create<MobyState>()(
   walletOpen: false,
   setWalletOpen: (open) => set({ walletOpen: open }),
   wallet: null,
-  connectWallet: (label) => {
-    const addr = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
+  connectWallet: (label, address) => {
+    const addr =
+      address ||
+      `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
     set({
       wallet: { connected: true, address: addr, label, balanceUsd: 8420.5 },
       walletOpen: false,
@@ -1332,6 +1494,139 @@ export const useMoby = create<MobyState>()(
   // ===== BATCH 9: Pump.fun explorer =====
   pumpFunOpen: false,
   setPumpFunOpen: (open) => set({ pumpFunOpen: open }),
+
+  // ===== Enhancement: Portfolio holdings (persisted, mutated by trades) =====
+  portfolioHoldings: initialPortfolioHoldings(),
+  applyTrade: ({ tokenId, side, usdAmount, tokenAmount, price }) => {
+    set((s) => {
+      const existing = s.portfolioHoldings.find((h) => h.tokenId === tokenId);
+      let nextHoldings: PortfolioHolding[];
+      if (side === "BUY") {
+        if (existing) {
+          const newAmount = existing.amount + tokenAmount;
+          const newCost = existing.costUsd + usdAmount;
+          nextHoldings = s.portfolioHoldings.map((h) =>
+            h.tokenId === tokenId ? { ...h, amount: newAmount, costUsd: newCost } : h
+          );
+        } else {
+          nextHoldings = [
+            ...s.portfolioHoldings,
+            { tokenId, amount: tokenAmount, costUsd: usdAmount },
+          ];
+        }
+      } else {
+        // SELL: reduce amount, reduce cost proportionally
+        if (!existing) {
+          nextHoldings = s.portfolioHoldings;
+        } else {
+          const newAmount = Math.max(0, existing.amount - tokenAmount);
+          const costPerToken = existing.amount > 0 ? existing.costUsd / existing.amount : 0;
+          const realizedCost = costPerToken * Math.min(tokenAmount, existing.amount);
+          const newCost = Math.max(0, existing.costUsd - realizedCost);
+          nextHoldings = s.portfolioHoldings
+            .map((h) =>
+              h.tokenId === tokenId
+                ? newAmount > 0.000001
+                  ? { ...h, amount: newAmount, costUsd: newCost }
+                  : null
+                : h
+            )
+            .filter(Boolean) as PortfolioHolding[];
+        }
+      }
+      return { portfolioHoldings: nextHoldings };
+    });
+    // Auto-unlock "first_trade"
+    get().unlockAchievement("first_trade");
+    // Update "ten_trades" progress based on trade history length
+    const tradeCount = get().tradeHistory.length + 1; // +1 because recordTrade hasn't fired yet
+    if (tradeCount >= 10) {
+      get().unlockAchievement("ten_trades");
+    } else {
+      set((s) => ({
+        achievements: s.achievements.map((a) =>
+          a.id === "ten_trades" && !a.unlocked ? { ...a, progress: tradeCount / 10 } : a
+        ),
+      }));
+    }
+    // Auto-check portfolio milestone achievements
+    const holdings = get().portfolioHoldings;
+    const totalValue = holdings.reduce((sum, h) => {
+      const tk = TOKENS.find((t) => t.id === h.tokenId);
+      const livePrice = get().prices[h.tokenId]?.price ?? tk?.price ?? 0;
+      return sum + h.amount * livePrice;
+    }, 0);
+    if (totalValue >= 100_000) get().unlockAchievement("portfolio_100k");
+    else if (totalValue >= 10_000) get().unlockAchievement("portfolio_10k");
+    if (holdings.filter((h) => h.amount > 0.000001).length >= 5) {
+      get().unlockAchievement("diversified");
+    }
+  },
+
+  // ===== Enhancement: Trade history (persisted) =====
+  tradeHistory: [],
+  recordTrade: (trade) => {
+    const id = `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const record: TradeRecord = { id, ts: Date.now(), ...trade };
+    set((s) => ({ tradeHistory: [record, ...s.tradeHistory].slice(0, 200) }));
+  },
+
+  // ===== Enhancement: Achievements (persisted) =====
+  achievements: DEFAULT_ACHIEVEMENTS,
+  unlockAchievement: (id) => {
+    let justUnlocked = false;
+    set((s) => {
+      const exists = s.achievements.find((a) => a.id === id);
+      if (exists?.unlocked) return {}; // no-op if already unlocked
+      justUnlocked = true;
+      return {
+        achievements: s.achievements.map((a) =>
+          a.id === id ? { ...a, unlocked: true, unlockedAt: Date.now(), progress: 1 } : a
+        ),
+      };
+    });
+    if (justUnlocked) {
+      get().pushAlert({
+        title: "Achievement unlocked",
+        description: achievementLabel(id),
+        type: "success",
+      });
+    }
+  },
+  isAchievementUnlocked: (id) => {
+    const a = get().achievements.find((x) => x.id === id);
+    return !!a?.unlocked;
+  },
+
+  // ===== Enhancement: Per-token watchlist alerts (persisted) =====
+  watchlistAlerts: {},
+  setWatchlistAlert: (tokenId, cfg) => {
+    set((s) => ({
+      watchlistAlerts: {
+        ...s.watchlistAlerts,
+        [tokenId]: { ...(s.watchlistAlerts[tokenId] || {}), ...cfg },
+      },
+    }));
+    get().unlockAchievement("first_alert");
+    get().pushAlert({
+      title: "Watchlist alert saved",
+      description: "You'll be notified when conditions are met.",
+      type: "success",
+    });
+  },
+  removeWatchlistAlert: (tokenId) => {
+    set((s) => {
+      const next = { ...s.watchlistAlerts };
+      delete next[tokenId];
+      return { watchlistAlerts: next };
+    });
+  },
+
+  // ===== Enhancement: Global Share modal (store-driven) =====
+  shareOpen: false,
+  shareData: { title: "", description: "" },
+  openShare: (data) => set({ shareOpen: true, shareData: data }),
+  setShareOpen: (open) => set({ shareOpen: open }),
   }),
   {
     name: "moby-storage",
@@ -1340,6 +1635,7 @@ export const useMoby = create<MobyState>()(
       watchlist: s.watchlist,
       followedTraders: s.followedTraders,
       savedSignals: s.savedSignals,
+      dismissedSignals: s.dismissedSignals,
       customAlerts: s.customAlerts,
       copyTrades: s.copyTrades,
       limitOrders: s.limitOrders,
@@ -1349,9 +1645,15 @@ export const useMoby = create<MobyState>()(
       claimedAirdrops: s.claimedAirdrops,
       votedProposals: s.votedProposals,
       activeWalletId: s.activeWalletId,
+      wallet: s.wallet,
+      walletPnlAddress: s.walletPnlAddress,
       theme: s.theme,
       pushPermission: s.pushPermission,
       recentlyViewed: s.recentlyViewed,
+      portfolioHoldings: s.portfolioHoldings,
+      tradeHistory: s.tradeHistory,
+      achievements: s.achievements,
+      watchlistAlerts: s.watchlistAlerts,
     }),
   }
   )

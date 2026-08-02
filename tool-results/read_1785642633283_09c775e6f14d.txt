@@ -1,0 +1,1368 @@
+     1→// Moby global client state — Zustand store
+     2→import { create } from "zustand";
+     3→import { persist, createJSONStorage } from "zustand/middleware";
+     4→import {
+     5→  TOKENS,
+     6→  TRADERS,
+     7→  SIGNALS,
+     8→  WHALE_FLOWS,
+     9→  type Token,
+    10→  type Trader,
+    11→  type SmartSignal,
+    12→  type WhaleFlow,
+    13→  nextPriceTick,
+    14→} from "./moby-data";
+    15→
+    16→export type TabKey = "discover" | "whales" | "signals" | "portfolio" | "profile";
+    17→
+    18→export interface ChatMessage {
+    19→  id: string;
+    20→  role: "user" | "assistant";
+    21→  content: string;
+    22→  ts: number;
+    23→  pending?: boolean;
+    24→  suggestedTokens?: string[]; // token ids
+    25→}
+    26→
+    27→export interface ToastLike {
+    28→  id: string;
+    29→  title: string;
+    30→  description?: string;
+    31→  type: "info" | "success" | "warn" | "alert";
+    32→}
+    33→
+    34→// Toast notifications (transient popups)
+    35→export interface ToastItem {
+    36→  id: string;
+    37→  ts: number;
+    38→  title: string;
+    39→  description?: string;
+    40→  type: "info" | "success" | "warn" | "alert";
+    41→  actionLabel?: string;
+    42→  actionId?: string; // token id or trader id for action
+    43→}
+    44→
+    45→// ===== NEW types =====
+    46→export type Chain = "SOL" | "ETH" | "BASE" | "BTC";
+    47→export type Category = "DeFi" | "Meme" | "AI" | "L1" | "L2" | "Gaming" | "DePIN" | "RWA" | "NFT" | "Stablecoin";
+    48→
+    49→export interface ScreenerFilters {
+    50→  chains: Chain[];
+    51→  categories: Category[];
+    52→  minLiquidity: number; // USD
+    53→  minSmartMoneyHolders: number;
+    54→  maxAgeHours: number; // 0 = no limit
+    55→  minVolume24h: number;
+    56→  sortBy: "trending" | "gainers" | "newest" | "smartMoney" | "volume" | "liquidity";
+    57→  search: string;
+    58→}
+    59→
+    60→export const DEFAULT_SCREENER_FILTERS: ScreenerFilters = {
+    61→  chains: [],
+    62→  categories: [],
+    63→  minLiquidity: 0,
+    64→  minSmartMoneyHolders: 0,
+    65→  maxAgeHours: 0,
+    66→  minVolume24h: 0,
+    67→  sortBy: "trending",
+    68→  search: "",
+    69→};
+    70→
+    71→export interface CustomAlert {
+    72→  id: string;
+    73→  tokenId: string;
+    74→  tokenSymbol: string;
+    75→  condition: "price_above" | "price_below" | "smart_money_inflow" | "smart_money_outflow" | "new_whale_buy";
+    76→  threshold: number; // USD value or price
+    77→  channels: ("push" | "email" | "telegram")[];
+    78→  createdAt: number;
+    79→  active: boolean;
+    80→  triggered: boolean;
+    81→}
+    82→
+    83→export interface AppSettings {
+    84→  defaultSlippage: number; // percent
+    85→  defaultGas: "slow" | "standard" | "fast";
+    86→  priorityFee: number; // micro-lamports
+    87→  showHiddenTokens: boolean;
+    88→  hideSmallBalances: boolean;
+    89→  smallBalanceThreshold: number;
+    90→  notifications: {
+    91→    smartMoneyEntry: boolean;
+    92→    whaleAccumulation: boolean;
+    93→    priceAlerts: boolean;
+    94→    newTokenLaunch: boolean;
+    95→    portfolioMilestones: boolean;
+    96→    weeklyDigest: boolean;
+    97→  };
+    98→  privacy: {
+    99→    hideBalances: boolean;
+   100→    blockTransactionTracking: boolean;
+   101→  };
+   102→  display: {
+   103→    currency: "USD" | "EUR" | "JPY" | "CNY";
+   104→    theme: "dark" | "system";
+   105→    compactMode: boolean;
+   106→    showSparklines: boolean;
+   107→  };
+   108→}
+   109→
+   110→export const DEFAULT_SETTINGS: AppSettings = {
+   111→  defaultSlippage: 1.0,
+   112→  defaultGas: "fast",
+   113→  priorityFee: 0.001,
+   114→  showHiddenTokens: false,
+   115→  hideSmallBalances: true,
+   116→  smallBalanceThreshold: 10,
+   117→  notifications: {
+   118→    smartMoneyEntry: true,
+   119→    whaleAccumulation: true,
+   120→    priceAlerts: true,
+   121→    newTokenLaunch: true,
+   122→    portfolioMilestones: true,
+   123→    weeklyDigest: false,
+   124→  },
+   125→  privacy: {
+   126→    hideBalances: false,
+   127→    blockTransactionTracking: false,
+   128→  },
+   129→  display: {
+   130→    currency: "USD",
+   131→    theme: "dark",
+   132→    compactMode: false,
+   133→    showSparklines: true,
+   134→  },
+   135→};
+   136→
+   137→interface MobyState {
+   138→  // navigation
+   139→  activeTab: TabKey;
+   140→  setActiveTab: (t: TabKey) => void;
+   141→
+   142→  // live prices keyed by token id
+   143→  prices: Record<string, { price: number; prev: number; ts: number }>;
+   144→  tickPrices: () => void;
+   145→  setPrice: (id: string, price: number) => void;
+   146→
+   147→  // selected token (opens detail sheet)
+   148→  selectedTokenId: string | null;
+   149→  openToken: (id: string | null) => void;
+   150→
+   151→  // selected trader (opens trader sheet)
+   152→  selectedTraderId: string | null;
+   153→  openTrader: (id: string | null) => void;
+   154→
+   155→  // watchlist (token ids)
+   156→  watchlist: string[];
+   157→  toggleWatch: (id: string) => void;
+   158→
+   159→  // followed traders
+   160→  followedTraders: string[];
+   161→  toggleFollow: (id: string) => void;
+   162→
+   163→  // signal dismissal / save
+   164→  savedSignals: string[];
+   165→  dismissedSignals: string[];
+   166→  toggleSaveSignal: (id: string) => void;
+   167→  dismissSignal: (id: string) => void;
+   168→
+   169→  // AI copilot
+   170→  copilotOpen: boolean;
+   171→  setCopilotOpen: (open: boolean) => void;
+   172→  chat: ChatMessage[];
+   173→  sendChat: (content: string) => void;
+   174→  clearChat: () => void;
+   175→
+   176→  // search modal
+   177→  searchOpen: boolean;
+   178→  setSearchOpen: (open: boolean) => void;
+   179→
+   180→  // notifications panel
+   181→  notifOpen: boolean;
+   182→  setNotifOpen: (open: boolean) => void;
+   183→
+   184→  // toasts / live alerts feed
+   185→  alerts: ToastLike[];
+   186→  pushAlert: (a: Omit<ToastLike, "id">) => void;
+   187→  dismissAlert: (id: string) => void;
+   188→
+   189→  // live data feeds
+   190→  signals: SmartSignal[];
+   191→  flows: WhaleFlow[];
+   192→
+   193→  // refresh feeds (simulated)
+   194→  refreshFeeds: () => void;
+   195→
+   196→  // ===== NEW: Wallet connect =====
+   197→  walletOpen: boolean;
+   198→  setWalletOpen: (open: boolean) => void;
+   199→  wallet: { connected: boolean; address: string; label: string; balanceUsd: number } | null;
+   200→  connectWallet: (label: string) => void;
+   201→  disconnectWallet: () => void;
+   202→
+   203→  // ===== NEW: Token screener =====
+   204→  screenerOpen: boolean;
+   205→  setScreenerOpen: (open: boolean) => void;
+   206→  screenerFilters: ScreenerFilters;
+   207→  setScreenerFilters: (f: Partial<ScreenerFilters>) => void;
+   208→  resetScreenerFilters: () => void;
+   209→
+   210→  // ===== NEW: Trade / swap modal =====
+   211→  tradeOpen: boolean;
+   212→  tradeTokenId: string | null;
+   213→  tradeSide: "BUY" | "SELL";
+   214→  openTrade: (tokenId: string, side: "BUY" | "SELL") => void;
+   215→  closeTrade: () => void;
+   216→
+   217→  // ===== NEW: Tax calculator =====
+   218→  taxOpen: boolean;
+   219→  setTaxOpen: (open: boolean) => void;
+   220→
+   221→  // ===== NEW: Custom alert creator =====
+   222→  alertCreatorOpen: boolean;
+   223→  alertCreatorTokenId: string | null;
+   224→  openAlertCreator: (tokenId: string | null) => void;
+   225→  closeAlertCreator: () => void;
+   226→  customAlerts: CustomAlert[];
+   227→  addCustomAlert: (a: Omit<CustomAlert, "id" | "createdAt">) => void;
+   228→  removeCustomAlert: (id: string) => void;
+   229→
+   230→  // ===== NEW: Settings =====
+   231→  settingsOpen: boolean;
+   232→  setSettingsOpen: (open: boolean) => void;
+   233→  settings: AppSettings;
+   234→  setSettings: (s: Partial<AppSettings>) => void;
+   235→
+   236→  // ===== NEW: Onboarding =====
+   237→  onboarded: boolean;
+   238→  setOnboarded: (v: boolean) => void;
+   239→
+   240→  // ===== NEW: Token comparison =====
+   241→  compareOpen: boolean;
+   242→  compareIds: string[];
+   243→  setCompareOpen: (open: boolean) => void;
+   244→  toggleCompareId: (id: string) => void;
+   245→  clearCompare: () => void;
+   246→
+   247→  // ===== BATCH 3: Copy trading =====
+   248→  copyTradeOpen: boolean;
+   249→  setCopyTradeOpen: (open: boolean) => void;
+   250→  copyTrades: CopyTradeConfig[];
+   251→  addCopyTrade: (c: Omit<CopyTradeConfig, "id" | "createdAt">) => void;
+   252→  removeCopyTrade: (id: string) => void;
+   253→  toggleCopyTrade: (id: string) => void;
+   254→
+   255→  // ===== BATCH 3: Limit orders =====
+   256→  limitOrdersOpen: boolean;
+   257→  setLimitOrdersOpen: (open: boolean) => void;
+   258→  limitOrders: LimitOrder[];
+   259→  addLimitOrder: (o: Omit<LimitOrder, "id" | "createdAt">) => void;
+   260→  cancelLimitOrder: (id: string) => void;
+   261→
+   262→  // ===== BATCH 3: DCA scheduler =====
+   263→  dcaOpen: boolean;
+   264→  setDcaOpen: (open: boolean) => void;
+   265→  dcaStrategies: DcaStrategy[];
+   266→  addDcaStrategy: (s: Omit<DcaStrategy, "id" | "createdAt" | "nextRun" | "totalInvested" | "runs">) => void;
+   267→  removeDcaStrategy: (id: string) => void;
+   268→  toggleDcaStrategy: (id: string) => void;
+   269→
+   270→  // ===== BATCH 3: Wallet activity =====
+   271→  walletActivityOpen: boolean;
+   272→  setWalletActivityOpen: (open: boolean) => void;
+   273→
+   274→  // ===== BATCH 3: Solana stats =====
+   275→  solanaStatsOpen: boolean;
+   276→  setSolanaStatsOpen: (open: boolean) => void;
+   277→
+   278→  // ===== BATCH 3: PNL leaderboard =====
+   279→  pnlLeaderboardOpen: boolean;
+   280→  setPnlLeaderboardOpen: (open: boolean) => void;
+   281→
+   282→  // ===== BATCH 3: Social sentiment =====
+   283→  socialOpen: boolean;
+   284→  setSocialOpen: (open: boolean) => void;
+   285→
+   286→  // ===== BATCH 3: Rebalancing =====
+   287→  rebalanceOpen: boolean;
+   288→  setRebalanceOpen: (open: boolean) => void;
+   289→
+   290→  // ===== BATCH 3: Referral =====
+   291→  referralOpen: boolean;
+   292→  setReferralOpen: (open: boolean) => void;
+   293→
+   294→  // ===== BATCH 3: Achievements detail =====
+   295→  achievementsOpen: boolean;
+   296→  setAchievementsOpen: (open: boolean) => void;
+   297→
+   298→  // ===== BATCH 4: Perpetuals =====
+   299→  perpsOpen: boolean;
+   300→  setPerpsOpen: (open: boolean) => void;
+   301→  selectedPerpId: string | null;
+   302→  openPerp: (id: string | null) => void;
+   303→
+   304→  // ===== BATCH 4: NFT detail =====
+   305→  nftDetailOpen: boolean;
+   306→  setNftDetailOpen: (open: boolean) => void;
+   307→  selectedNftId: string | null;
+   308→  openNft: (id: string | null) => void;
+   309→
+   310→  // ===== BATCH 4: Launch scanner =====
+   311→  launchScannerOpen: boolean;
+   312→  setLaunchScannerOpen: (open: boolean) => void;
+   313→
+   314→  // ===== BATCH 4: Bridge =====
+   315→  bridgeOpen: boolean;
+   316→  setBridgeOpen: (open: boolean) => void;
+   317→
+   318→  // ===== BATCH 4: Staking =====
+   319→  stakingOpen: boolean;
+   320→  setStakingOpen: (open: boolean) => void;
+   321→
+   322→  // ===== BATCH 4: Gas optimizer =====
+   323→  gasOptimizerOpen: boolean;
+   324→  setGasOptimizerOpen: (open: boolean) => void;
+   325→
+   326→  // ===== BATCH 4: Airdrop center =====
+   327→  airdropOpen: boolean;
+   328→  setAirdropOpen: (open: boolean) => void;
+   329→  claimedAirdrops: string[];
+   330→  claimAirdrop: (id: string) => void;
+   331→
+   332→  // ===== BATCH 4: Toast notifications =====
+   333→  toasts: ToastItem[];
+   334→  pushToast: (t: Omit<ToastItem, "id" | "ts">) => void;
+   335→  dismissToast: (id: string) => void;
+   336→
+   337→  // ===== BATCH 5: Full-screen chart =====
+   338→  chartOpen: boolean;
+   339→  chartTokenId: string | null;
+   340→  openChart: (tokenId: string) => void;
+   341→  closeChart: () => void;
+   342→
+   343→  // ===== BATCH 5: Narrative detail =====
+   344→  narrativeDetailOpen: boolean;
+   345→  selectedNarrativeId: string | null;
+   346→  openNarrative: (id: string | null) => void;
+   347→  setNarrativeDetailOpen: (open: boolean) => void;
+   348→
+   349→  // ===== BATCH 5: Smart money map =====
+   350→  smartMoneyMapOpen: boolean;
+   351→  setSmartMoneyMapOpen: (open: boolean) => void;
+   352→
+   353→  // ===== BATCH 5: Push notifications =====
+   354→  pushPermission: "default" | "granted" | "denied";
+   355→  requestPushPermission: () => void;
+   356→  setPushPermission: (p: "default" | "granted" | "denied") => void;
+   357→
+   358→  // ===== BATCH 6: Portfolio analytics =====
+   359→  analyticsOpen: boolean;
+   360→  setAnalyticsOpen: (open: boolean) => void;
+   361→
+   362→  // ===== BATCH 6: Yield farming =====
+   363→  yieldOpen: boolean;
+   364→  setYieldOpen: (open: boolean) => void;
+   365→
+   366→  // ===== BATCH 6: Token unlocks =====
+   367→  unlocksOpen: boolean;
+   368→  setUnlocksOpen: (open: boolean) => void;
+   369→
+   370→  // ===== BATCH 6: Governance =====
+   371→  governanceOpen: boolean;
+   372→  setGovernanceOpen: (open: boolean) => void;
+   373→  votedProposals: Record<string, "for" | "against" | "abstain">;
+   374→  vote: (proposalId: string, vote: "for" | "against" | "abstain") => void;
+   375→
+   376→  // ===== BATCH 6: DeFi positions =====
+   377→  defiOpen: boolean;
+   378→  setDefiOpen: (open: boolean) => void;
+   379→
+   380→  // ===== BATCH 6: Market calendar =====
+   381→  calendarOpen: boolean;
+   382→  setCalendarOpen: (open: boolean) => void;
+   383→
+   384→  // ===== BATCH 6: Transaction simulator =====
+   385→  simulatorOpen: boolean;
+   386→  setSimulatorOpen: (open: boolean) => void;
+   387→
+   388→  // ===== BATCH 6: Multi-wallet manager =====
+   389→  multiWalletOpen: boolean;
+   390→  setMultiWalletOpen: (open: boolean) => void;
+   391→  activeWalletId: string;
+   392→  setActiveWalletId: (id: string) => void;
+   393→
+   394→  // ===== BATCH 6: Watchlist performance =====
+   395→  watchlistPerfOpen: boolean;
+   396→  setWatchlistPerfOpen: (open: boolean) => void;
+   397→
+   398→  // ===== BATCH 6: Theme toggle =====
+   399→  theme: "dark" | "light";
+   400→  toggleTheme: () => void;
+   401→
+   402→  // ===== BATCH 7: Token security audit =====
+   403→  securityAuditOpen: boolean;
+   404→  securityAuditTokenId: string | null;
+   405→  openSecurityAudit: (tokenId: string) => void;
+   406→  setSecurityAuditOpen: (open: boolean) => void;
+   407→
+   408→  // ===== BATCH 7: Tokenized stocks =====
+   409→  stocksOpen: boolean;
+   410→  setStocksOpen: (open: boolean) => void;
+   411→
+   412→  // ===== BATCH 7: Wallet PnL tracker =====
+   413→  walletPnlOpen: boolean;
+   414→  walletPnlAddress: string;
+   415→  setWalletPnlOpen: (open: boolean) => void;
+   416→  setWalletPnlAddress: (addr: string) => void;
+   417→
+   418→  // ===== BATCH 7: Snipe bot =====
+   419→  snipeBotOpen: boolean;
+   420→  setSnipeBotOpen: (open: boolean) => void;
+   421→
+   422→  // ===== BATCH 7: Price prediction =====
+   423→  predictionOpen: boolean;
+   424→  predictionTokenId: string | null;
+   425→  openPrediction: (tokenId: string) => void;
+   426→  setPredictionOpen: (open: boolean) => void;
+   427→
+   428→  // ===== BATCH 7: Liquidity depth =====
+   429→  liquidityDepthOpen: boolean;
+   430→  liquidityDepthTokenId: string | null;
+   431→  openLiquidityDepth: (tokenId: string) => void;
+   432→  setLiquidityDepthOpen: (open: boolean) => void;
+   433→
+   434→  // ===== BATCH 7: Trading journal =====
+   435→  journalOpen: boolean;
+   436→  setJournalOpen: (open: boolean) => void;
+   437→
+   438→  // ===== BATCH 7: DeFi health monitor =====
+   439→  defiHealthOpen: boolean;
+   440→  setDefiHealthOpen: (open: boolean) => void;
+   441→
+   442→  // ===== BATCH 7: Tax loss harvesting =====
+   443→  harvestOpen: boolean;
+   444→  setHarvestOpen: (open: boolean) => void;
+   445→
+   446→  // ===== BATCH 8: Trailing stops =====
+   447→  trailingStopsOpen: boolean;
+   448→  setTrailingStopsOpen: (open: boolean) => void;
+   449→
+   450→  // ===== BATCH 8: Hot wallets =====
+   451→  hotWalletsOpen: boolean;
+   452→  setHotWalletsOpen: (open: boolean) => void;
+   453→
+   454→  // ===== BATCH 8: Token migrations =====
+   455→  migrationsOpen: boolean;
+   456→  setMigrationsOpen: (open: boolean) => void;
+   457→
+   458→  // ===== BATCH 8: MEV protection info =====
+   459→  mevInfoOpen: boolean;
+   460→  setMevInfoOpen: (open: boolean) => void;
+   461→
+   462→  // ===== BATCH 8: Wallet import =====
+   463→  walletImportOpen: boolean;
+   464→  setWalletImportOpen: (open: boolean) => void;
+   465→
+   466→  // ===== BATCH 8: Watchlist alerts =====
+   467→  watchlistAlertsOpen: boolean;
+   468→  setWatchlistAlertsOpen: (open: boolean) => void;
+   469→
+   470→  // Recently viewed tokens
+   471→  recentlyViewed: string[];
+   472→  addRecentlyViewed: (id: string) => void;
+   473→
+   474→  // ===== BATCH 9: Pump.fun explorer =====
+   475→  pumpFunOpen: boolean;
+   476→  setPumpFunOpen: (open: boolean) => void;
+   477→}
+   478→
+   479→// ===== BATCH 3 types =====
+   480→export interface CopyTradeConfig {
+   481→  id: string;
+   482→  traderId: string;
+   483→  traderHandle: string;
+   484→  traderGlyph: string;
+   485→  traderColor: string;
+   486→  enabled: boolean;
+   487→  maxPerTradeUsd: number;
+   488→  dailyLimitUsd: number;
+   489→  totalAllocatedUsd: number;
+   490→  totalCopiedUsd: number;
+   491→  tradesCopied: number;
+   492→  slippage: number;
+   493→  onlyBuy: boolean;
+   494→  minTraderScore: number;
+   495→  createdAt: number;
+   496→}
+   497→
+   498→export interface LimitOrder {
+   499→  id: string;
+   500→  tokenId: string;
+   501→  tokenSymbol: string;
+   502→  side: "BUY" | "SELL";
+   503→  targetPrice: number;
+   504→  amountUsd: number;
+   505→  expiry: "1d" | "7d" | "30d" | "90d" | "gtc";
+   506→  status: "open" | "filled" | "cancelled" | "expired";
+   507→  createdAt: number;
+   508→  filledAt?: number;
+   509→  fillPrice?: number;
+   510→}
+   511→
+   512→export interface DcaStrategy {
+   513→  id: string;
+   514→  name: string;
+   515→  tokenIds: string[];
+   516→  frequency: "daily" | "weekly" | "biweekly" | "monthly";
+   517→  amountUsd: number;
+   518→  enabled: boolean;
+   519→  totalInvested: number;
+   520→  runs: number;
+   521→  nextRun: number; // timestamp
+   522→  createdAt: number;
+   523→}
+   524→
+   525→const initialPrices: Record<string, { price: number; prev: number; ts: number }> = {};
+   526→TOKENS.forEach((t) => {
+   527→  initialPrices[t.id] = { price: t.price, prev: t.price, ts: 0 };
+   528→});
+   529→
+   530→// Use a fixed timestamp for the initial chat message — avoids SSR/CSR hydration mismatch.
+   531→// Once the user interacts, ts is updated to Date.now() on the client only.
+   532→const initialChat: ChatMessage[] = [
+   533→  {
+   534→    id: "intro",
+   535→    role: "assistant",
+   536→    content:
+   537→      "Hey — I'm Moby, your on-chain copilot. Ask me to analyze a token, validate a trade idea, or summarize what smart money is doing right now.",
+   538→    ts: 0,
+   539→    suggestedTokens: ["wif", "jup", "io"],
+   540→  },
+   541→];
+   542→
+   543→let chatIdCounter = 0;
+   544→function nextChatId(): string {
+   545→  chatIdCounter += 1;
+   546→  return `c-${chatIdCounter}`;
+   547→}
+   548→
+   549→// Very small heuristic "AI" response generator (client-side, deterministic-ish).
+   550→function generateAssistantReply(userText: string): { content: string; suggestedTokens?: string[] } {
+   551→  const lower = userText.toLowerCase();
+   552→  // Try to find a token mentioned in the user message.
+   553→  const matched = TOKENS.find(
+   554→    (t) =>
+   555→      lower.includes(`$${t.symbol.toLowerCase()}`) ||
+   556→      lower.includes(t.symbol.toLowerCase()) ||
+   557→      lower.includes(t.name.toLowerCase())
+   558→  );
+   559→
+   560→  if (matched) {
+   561→    const bull = matched.change24h >= 0;
+   562→    const inflowAbs = Math.abs(matched.smartMoneyInflow24h);
+   563→    const inflowStr =
+   564→      inflowAbs >= 1_000_000
+   565→        ? `$${(inflowAbs / 1_000_000).toFixed(2)}M`
+   566→        : `$${(inflowAbs / 1000).toFixed(0)}K`;
+   567→    const smart =
+   568→      matched.smartMoneyInflow24h >= 0
+   569→        ? `Smart money has net ${bull ? "accumulated" : "distributed"} ${inflowStr} over the last 24h across ${matched.smartMoneyHolders} tracked wallets.`
+   570→        : `Smart money has net distributed ${inflowStr} over the last 24h.`;
+   571→    return {
+   572→      content: `${matched.name} (${matched.symbol}) is trading at $${matched.price.toFixed(
+   573→        matched.price < 1 ? 4 : 2
+   574→      )}, ${bull ? "up" : "down"} ${Math.abs(matched.change24h).toFixed(2)}% in 24h. ${smart} ${
+   575→        matched.smartMoneyHolders >= 100
+   576→          ? "That's a healthy concentration of smart money."
+   577→          : "Smart money concentration is low — proceed with caution."
+   578→      } Liquidity: $${(matched.liquidity / 1_000_000).toFixed(1)}M. Volume 24h: $${(
+   579→          matched.volume24h / 1_000_000
+   580→        ).toFixed(0)}M.`,
+   581→      suggestedTokens: [matched.id],
+   582→    };
+   583→  }
+   584→
+   585→  if (lower.includes("portfolio")) {
+   586→    return {
+   587→      content:
+   588→        "Your portfolio is up 4.2% in the last 24h, led by WIF (+14.3%) and BONK (+22.1%). Your largest concentration is SOL at 32% — consider trimming if you want to reduce L1 beta. You have 3 untracked smart-money alerts waiting in your Signals tab.",
+   589→    };
+   590→  }
+   591→  if (lower.includes("smart money") || lower.includes("whale")) {
+   592→    return {
+   593→      content:
+   594→        "Over the last hour, smart money has been accumulating WIF, MNGO, and IO. The strongest signal is on MNGO — 7 wallets clustered in within 60 minutes for $1.24M inflow. Want me to open the MNGO detail?",
+   595→      suggestedTokens: ["mngo", "wif", "io"],
+   596→    };
+   597→  }
+   598→  if (lower.includes("trend") || lower.includes("narrative")) {
+   599→    return {
+   600→      content:
+   601→        "Top narrative today is Cat Coins (+64%), driven by MOON launching 18h ago. Meme Season (+28%) and AI Agents (+12%) are also strong. DePIN is flat.",
+   602→      suggestedTokens: ["moon", "popcat", "io"],
+   603→    };
+   604→  }
+   605→  if (lower.includes("tax")) {
+   606→    return {
+   607→      content:
+   608→        "I can help estimate your crypto taxes. Based on your realized activity this year, you have ~$18.4K in short-term gains and $4.2K in long-term gains. Want me to break it down by chain?",
+   609→    };
+   610→  }
+   611→  return {
+   612→    content:
+   613→      "I can analyze tokens, summarize smart money flow, validate trade ideas, check your portfolio, or estimate taxes. Try asking about a specific token like $WIF or $JUP, or just say \"what's smart money doing?\"",
+   614→    suggestedTokens: ["wif", "jup", "io"],
+   615→  };
+   616→}
+   617→
+   618→export const useMoby = create<MobyState>()(
+   619→  persist(
+   620→    (set, get) => ({
+   621→  activeTab: "discover",
+   622→  setActiveTab: (t) => set({ activeTab: t }),
+   623→
+   624→  prices: initialPrices,
+   625→  tickPrices: () => {
+   626→    const cur = get().prices;
+   627→    const next: typeof cur = {};
+   628→    Object.keys(cur).forEach((id) => {
+   629→      const p = cur[id];
+   630→      const np = nextPriceTick(p.price, 0.003);
+   631→      next[id] = { price: np, prev: p.price, ts: Date.now() };
+   632→    });
+   633→    set({ prices: next });
+   634→  },
+   635→  setPrice: (id, price) =>
+   636→    set((s) => ({
+   637→      prices: {
+   638→        ...s.prices,
+   639→        [id]: { price, prev: s.prices[id]?.price ?? price, ts: Date.now() },
+   640→      },
+   641→    })),
+   642→
+   643→  selectedTokenId: null,
+   644→  openToken: (id) => set((s) => ({
+   645→    selectedTokenId: id,
+   646→    recentlyViewed: id ? [id, ...s.recentlyViewed.filter((x) => x !== id)].slice(0, 10) : s.recentlyViewed,
+   647→  })),
+   648→
+   649→  selectedTraderId: null,
+   650→  openTrader: (id) => set({ selectedTraderId: id }),
+   651→
+   652→  watchlist: ["wif", "jup", "io", "mngo"],
+   653→  toggleWatch: (id) =>
+   654→    set((s) => ({
+   655→      watchlist: s.watchlist.includes(id)
+   656→        ? s.watchlist.filter((w) => w !== id)
+   657→        : [...s.watchlist, id],
+   658→    })),
+   659→
+   660→  followedTraders: TRADERS.filter((t) => t.following).map((t) => t.id),
+   661→  toggleFollow: (id) =>
+   662→    set((s) => ({
+   663→      followedTraders: s.followedTraders.includes(id)
+   664→        ? s.followedTraders.filter((w) => w !== id)
+   665→        : [...s.followedTraders, id],
+   666→    })),
+   667→
+   668→  savedSignals: [],
+   669→  dismissedSignals: [],
+   670→  toggleSaveSignal: (id) =>
+   671→    set((s) => ({
+   672→      savedSignals: s.savedSignals.includes(id)
+   673→        ? s.savedSignals.filter((x) => x !== id)
+   674→        : [...s.savedSignals, id],
+   675→    })),
+   676→  dismissSignal: (id) =>
+   677→    set((s) => ({ dismissedSignals: [...s.dismissedSignals, id] })),
+   678→
+   679→  copilotOpen: false,
+   680→  setCopilotOpen: (open) => set({ copilotOpen: open }),
+   681→  chat: initialChat,
+   682→  sendChat: (content) => {
+   683→    const userMsg: ChatMessage = {
+   684→      id: nextChatId(),
+   685→      role: "user",
+   686→      content,
+   687→      ts: typeof window === "undefined" ? 0 : Date.now(),
+   688→    };
+   689→    const pendingId = nextChatId();
+   690→    const pending: ChatMessage = {
+   691→      id: pendingId,
+   692→      role: "assistant",
+   693→      content: "",
+   694→      ts: typeof window === "undefined" ? 0 : Date.now(),
+   695→      pending: true,
+   696→    };
+   697→    set((s) => ({ chat: [...s.chat, userMsg, pending] }));
+   698→
+   699→    // Try real LLM API first, fall back to heuristic
+   700→    (async () => {
+   701→      try {
+   702→        const res = await fetch("/api/chat", {
+   703→          method: "POST",
+   704→          headers: { "Content-Type": "application/json" },
+   705→          body: JSON.stringify({
+   706→            messages: get().chat
+   707→              .filter((m) => !m.pending && m.content)
+   708→              .slice(-6) // Last 6 messages for context
+   709→              .map((m) => ({ role: m.role, content: m.content })),
+   710→          }),
+   711→        });
+   712→        const data = await res.json();
+   713→        set((s) => ({
+   714→          chat: s.chat.map((m) =>
+   715→            m.id === pendingId
+   716→              ? {
+   717→                  ...m,
+   718→                  pending: false,
+   719→                  content: data.content,
+   720→                  suggestedTokens: data.suggestedTokens,
+   721→                  ts: Date.now(),
+   722→                }
+   723→              : m
+   724→          ),
+   725→        }));
+   726→      } catch {
+   727→        // Fallback to heuristic
+   728→        const reply = generateAssistantReply(content);
+   729→        set((s) => ({
+   730→          chat: s.chat.map((m) =>
+   731→            m.id === pendingId
+   732→              ? {
+   733→                  ...m,
+   734→                  pending: false,
+   735→                  content: reply.content,
+   736→                  suggestedTokens: reply.suggestedTokens,
+   737→                  ts: Date.now(),
+   738→                }
+   739→              : m
+   740→          ),
+   741→        }));
+   742→      }
+   743→    })();
+   744→  },
+   745→  clearChat: () => set({ chat: initialChat }),
+   746→
+   747→  searchOpen: false,
+   748→  setSearchOpen: (open) => set({ searchOpen: open }),
+   749→
+   750→  notifOpen: false,
+   751→  setNotifOpen: (open) => set({ notifOpen: open }),
+   752→
+   753→  alerts: [
+   754→    {
+   755→      id: "a1",
+   756→      title: "Smart money entered MNGO",
+   757→      description: "7 wallets accumulated $1.24M in the last hour",
+   758→      type: "alert",
+   759→    },
+   760→    {
+   761→      id: "a2",
+   762→      title: "WIF +14% in 24h",
+   763→      description: "Your position is up $11.2K",
+   764→      type: "success",
+   765→    },
+   766→    {
+   767→      id: "a3",
+   768→      title: "New token: MOON",
+   769→      description: "3 smart wallets bought within 12 minutes of launch",
+   770→      type: "alert",
+   771→    },
+   772→  ],
+   773→  pushAlert: (a) =>
+   774→    set((s) => ({
+   775→      alerts: [{ ...a, id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }, ...s.alerts],
+   776→    })),
+   777→  dismissAlert: (id) =>
+   778→    set((s) => ({ alerts: s.alerts.filter((x) => x.id !== id) })),
+   779→
+   780→  signals: SIGNALS,
+   781→  flows: WHALE_FLOWS,
+   782→
+   783→  refreshFeeds: () => {
+   784→    // Shuffle flows and signals timestamps to simulate "new" live activity.
+   785→    const flows = [...get().flows].map((f, i) => ({
+   786→      ...f,
+   787→      id: `wf-${Date.now()}-${i}`,
+   788→      agoSeconds: Math.max(8, Math.floor(Math.random() * 60)),
+   789→    }));
+   790→    const sig = [...get().signals];
+   791→    // Move the first signal to the back and bump its timestamp.
+   792→    if (sig.length > 0) {
+   793→      const [first, ...rest] = sig;
+   794→      const bumped: SmartSignal = {
+   795→        ...first,
+   796→        id: `s-${Date.now()}`,
+   797→        agoSeconds: Math.max(5, Math.floor(Math.random() * 30)),
+   798→      };
+   799→      set({
+   800→        flows: [flows[0], ...get().flows.slice(0, 8)],
+   801→        signals: [...rest, bumped],
+   802→        alerts: [
+   803→          {
+   804→            id: `a-${Date.now()}`,
+   805→            title: `New ${bumped.type.replace(/_/g, " ").toLowerCase()} on ${bumped.tokenSymbol}`,
+   806→            description: `${bumped.smartWalletsCount} smart wallets · $${(
+   807→              bumped.usdInflow / 1000
+   808→            ).toFixed(0)}K inflow`,
+   809→            type: "alert",
+   810→          },
+   811→          ...get().alerts,
+   812→        ],
+   813→      });
+   814→    }
+   815→  },
+   816→
+   817→  // ===== NEW: Wallet connect =====
+   818→  walletOpen: false,
+   819→  setWalletOpen: (open) => set({ walletOpen: open }),
+   820→  wallet: null,
+   821→  connectWallet: (label) => {
+   822→    const addr = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
+   823→    set({
+   824→      wallet: { connected: true, address: addr, label, balanceUsd: 8420.5 },
+   825→      walletOpen: false,
+   826→    });
+   827→    get().pushAlert({
+   828→      title: "Wallet connected",
+   829→      description: `${label} · ${addr}`,
+   830→      type: "success",
+   831→    });
+   832→  },
+   833→  disconnectWallet: () => {
+   834→    set({ wallet: null });
+   835→    get().pushAlert({
+   836→      title: "Wallet disconnected",
+   837→      type: "info",
+   838→    });
+   839→  },
+   840→
+   841→  // ===== NEW: Token screener =====
+   842→  screenerOpen: false,
+   843→  setScreenerOpen: (open) => set({ screenerOpen: open }),
+   844→  screenerFilters: DEFAULT_SCREENER_FILTERS,
+   845→  setScreenerFilters: (f) =>
+   846→    set((s) => ({ screenerFilters: { ...s.screenerFilters, ...f } })),
+   847→  resetScreenerFilters: () => set({ screenerFilters: DEFAULT_SCREENER_FILTERS }),
+   848→
+   849→  // ===== NEW: Trade / swap =====
+   850→  tradeOpen: false,
+   851→  tradeTokenId: null,
+   852→  tradeSide: "BUY",
+   853→  openTrade: (tokenId, side) =>
+   854→    set({ tradeOpen: true, tradeTokenId: tokenId, tradeSide: side }),
+   855→  closeTrade: () => set({ tradeOpen: false }),
+   856→
+   857→  // ===== NEW: Tax calculator =====
+   858→  taxOpen: false,
+   859→  setTaxOpen: (open) => set({ taxOpen: open }),
+   860→
+   861→  // ===== NEW: Custom alert creator =====
+   862→  alertCreatorOpen: false,
+   863→  alertCreatorTokenId: null,
+   864→  openAlertCreator: (tokenId) => set({ alertCreatorOpen: true, alertCreatorTokenId: tokenId }),
+   865→  closeAlertCreator: () => set({ alertCreatorOpen: false }),
+   866→  customAlerts: [
+   867→    {
+   868→      id: "ca-1",
+   869→      tokenId: "wif",
+   870→      tokenSymbol: "WIF",
+   871→      condition: "price_above",
+   872→      threshold: 3.5,
+   873→      channels: ["push"],
+   874→      createdAt: 0,
+   875→      active: true,
+   876→      triggered: false,
+   877→    },
+   878→    {
+   879→      id: "ca-2",
+   880→      tokenId: "sol",
+   881→      tokenSymbol: "SOL",
+   882→      condition: "smart_money_inflow",
+   883→      threshold: 5_000_000,
+   884→      channels: ["push", "telegram"],
+   885→      createdAt: 0,
+   886→      active: true,
+   887→      triggered: false,
+   888→    },
+   889→  ],
+   890→  addCustomAlert: (a) =>
+   891→    set((s) => ({
+   892→      customAlerts: [
+   893→        { ...a, id: `ca-${Date.now()}`, createdAt: Date.now() },
+   894→        ...s.customAlerts,
+   895→      ],
+   896→      alertCreatorOpen: false,
+   897→      alerts: [
+   898→        {
+   899→          id: `a-${Date.now()}`,
+   900→          title: "Alert created",
+   901→          description: `${a.tokenSymbol} ${a.condition.replace(/_/g, " ")} ${a.threshold}`,
+   902→          type: "success",
+   903→        },
+   904→        ...s.alerts,
+   905→      ],
+   906→    })),
+   907→  removeCustomAlert: (id) =>
+   908→    set((s) => ({ customAlerts: s.customAlerts.filter((x) => x.id !== id) })),
+   909→
+   910→  // ===== NEW: Settings =====
+   911→  settingsOpen: false,
+   912→  setSettingsOpen: (open) => set({ settingsOpen: open }),
+   913→  settings: DEFAULT_SETTINGS,
+   914→  setSettings: (s) => set((state) => ({ settings: { ...state.settings, ...s } })),
+   915→
+   916→  // ===== NEW: Onboarding =====
+   917→  onboarded: false,
+   918→  setOnboarded: (v) => set({ onboarded: v }),
+   919→
+   920→  // ===== NEW: Token comparison =====
+   921→  compareOpen: false,
+   922→  compareIds: [],
+   923→  setCompareOpen: (open) => set({ compareOpen: open }),
+   924→  toggleCompareId: (id) =>
+   925→    set((s) => ({
+   926→      compareIds: s.compareIds.includes(id)
+   927→        ? s.compareIds.filter((x) => x !== id)
+   928→        : s.compareIds.length >= 3
+   929→        ? [...s.compareIds.slice(1), id]
+   930→        : [...s.compareIds, id],
+   931→    })),
+   932→  clearCompare: () => set({ compareIds: [] }),
+   933→
+   934→  // ===== BATCH 3: Copy trading =====
+   935→  copyTradeOpen: false,
+   936→  setCopyTradeOpen: (open) => set({ copyTradeOpen: open }),
+   937→  copyTrades: [
+   938→    {
+   939→      id: "ct-1",
+   940→      traderId: "t1",
+   941→      traderHandle: "0xMoby",
+   942→      traderGlyph: "M",
+   943→      traderColor: "from-[#14F195] to-[#9945FF]",
+   944→      enabled: true,
+   945→      maxPerTradeUsd: 500,
+   946→      dailyLimitUsd: 2000,
+   947→      totalAllocatedUsd: 10_000,
+   948→      totalCopiedUsd: 4_280,
+   949→      tradesCopied: 18,
+   950→      slippage: 1.5,
+   951→      onlyBuy: false,
+   952→      minTraderScore: 85,
+   953→      createdAt: 0,
+   954→    },
+   955→  ],
+   956→  addCopyTrade: (c) =>
+   957→    set((s) => ({
+   958→      copyTrades: [...s.copyTrades, { ...c, id: `ct-${Date.now()}`, createdAt: Date.now() }],
+   959→      copyTradeOpen: false,
+   960→    })),
+   961→  removeCopyTrade: (id) =>
+   962→    set((s) => ({ copyTrades: s.copyTrades.filter((x) => x.id !== id) })),
+   963→  toggleCopyTrade: (id) =>
+   964→    set((s) => ({
+   965→      copyTrades: s.copyTrades.map((x) =>
+   966→        x.id === id ? { ...x, enabled: !x.enabled } : x
+   967→      ),
+   968→    })),
+   969→
+   970→  // ===== BATCH 3: Limit orders =====
+   971→  limitOrdersOpen: false,
+   972→  setLimitOrdersOpen: (open) => set({ limitOrdersOpen: open }),
+   973→  limitOrders: [
+   974→    {
+   975→      id: "lo-1",
+   976→      tokenId: "wif",
+   977→      tokenSymbol: "WIF",
+   978→      side: "BUY",
+   979→      targetPrice: 2.4,
+   980→      amountUsd: 1000,
+   981→      expiry: "7d",
+   982→      status: "open",
+   983→      createdAt: 0,
+   984→    },
+   985→    {
+   986→      id: "lo-2",
+   987→      tokenId: "sol",
+   988→      tokenSymbol: "SOL",
+   989→      side: "SELL",
+   990→      targetPrice: 220,
+   991→      amountUsd: 2500,
+   992→      expiry: "30d",
+   993→      status: "open",
+   994→      createdAt: 0,
+   995→    },
+   996→    {
+   997→      id: "lo-3",
+   998→      tokenId: "jup",
+   999→      tokenSymbol: "JUP",
+  1000→      side: "BUY",
+  1001→      targetPrice: 0.7,
+  1002→      amountUsd: 500,
+  1003→      expiry: "gtc",
+  1004→      status: "filled",
+  1005→      createdAt: 0,
+  1006→      filledAt: 0,
+  1007→      fillPrice: 0.68,
+  1008→    },
+  1009→  ],
+  1010→  addLimitOrder: (o) =>
+  1011→    set((s) => ({
+  1012→      limitOrders: [
+  1013→        { ...o, id: `lo-${Date.now()}`, createdAt: Date.now() },
+  1014→        ...s.limitOrders,
+  1015→      ],
+  1016→    })),
+  1017→  cancelLimitOrder: (id) =>
+  1018→    set((s) => ({
+  1019→      limitOrders: s.limitOrders.map((x) =>
+  1020→        x.id === id && x.status === "open" ? { ...x, status: "cancelled" } : x
+  1021→      ),
+  1022→    })),
+  1023→
+  1024→  // ===== BATCH 3: DCA scheduler =====
+  1025→  dcaOpen: false,
+  1026→  setDcaOpen: (open) => set({ dcaOpen: open }),
+  1027→  dcaStrategies: [
+  1028→    {
+  1029→      id: "dca-1",
+  1030→      name: "Weekly SOL stack",
+  1031→      tokenIds: ["sol"],
+  1032→      frequency: "weekly",
+  1033→      amountUsd: 200,
+  1034→      enabled: true,
+  1035→      totalInvested: 4_200,
+  1036→      runs: 21,
+  1037→      nextRun: 0,
+  1038→      createdAt: 0,
+  1039→    },
+  1040→    {
+  1041→      id: "dca-2",
+  1042→      name: "AI Infrastructure",
+  1043→      tokenIds: ["io", "rndr"],
+  1044→      frequency: "biweekly",
+  1045→      amountUsd: 300,
+  1046→      enabled: false,
+  1047→      totalInvested: 1_800,
+  1048→      runs: 6,
+  1049→      nextRun: 0,
+  1050→      createdAt: 0,
+  1051→    },
+  1052→  ],
+  1053→  addDcaStrategy: (s) =>
+  1054→    set((state) => ({
+  1055→      dcaStrategies: [
+  1056→        ...state.dcaStrategies,
+  1057→        {
+  1058→          ...s,
+  1059→          id: `dca-${Date.now()}`,
+  1060→          createdAt: Date.now(),
+  1061→          nextRun: Date.now() + 7 * 86400_000,
+  1062→          totalInvested: 0,
+  1063→          runs: 0,
+  1064→        },
+  1065→      ],
+  1066→      dcaOpen: false,
+  1067→    })),
+  1068→  removeDcaStrategy: (id) =>
+  1069→    set((s) => ({ dcaStrategies: s.dcaStrategies.filter((x) => x.id !== id) })),
+  1070→  toggleDcaStrategy: (id) =>
+  1071→    set((s) => ({
+  1072→      dcaStrategies: s.dcaStrategies.map((x) =>
+  1073→        x.id === id ? { ...x, enabled: !x.enabled } : x
+  1074→      ),
+  1075→    })),
+  1076→
+  1077→  // ===== BATCH 3: Wallet activity =====
+  1078→  walletActivityOpen: false,
+  1079→  setWalletActivityOpen: (open) => set({ walletActivityOpen: open }),
+  1080→
+  1081→  // ===== BATCH 3: Solana stats =====
+  1082→  solanaStatsOpen: false,
+  1083→  setSolanaStatsOpen: (open) => set({ solanaStatsOpen: open }),
+  1084→
+  1085→  // ===== BATCH 3: PNL leaderboard =====
+  1086→  pnlLeaderboardOpen: false,
+  1087→  setPnlLeaderboardOpen: (open) => set({ pnlLeaderboardOpen: open }),
+  1088→
+  1089→  // ===== BATCH 3: Social sentiment =====
+  1090→  socialOpen: false,
+  1091→  setSocialOpen: (open) => set({ socialOpen: open }),
+  1092→
+  1093→  // ===== BATCH 3: Rebalancing =====
+  1094→  rebalanceOpen: false,
+  1095→  setRebalanceOpen: (open) => set({ rebalanceOpen: open }),
+  1096→
+  1097→  // ===== BATCH 3: Referral =====
+  1098→  referralOpen: false,
+  1099→  setReferralOpen: (open) => set({ referralOpen: open }),
+  1100→
+  1101→  // ===== BATCH 3: Achievements detail =====
+  1102→  achievementsOpen: false,
+  1103→  setAchievementsOpen: (open) => set({ achievementsOpen: open }),
+  1104→
+  1105→  // ===== BATCH 4: Perpetuals =====
+  1106→  perpsOpen: false,
+  1107→  setPerpsOpen: (open) => set({ perpsOpen: open }),
+  1108→  selectedPerpId: null,
+  1109→  openPerp: (id) => set({ selectedPerpId: id }),
+  1110→
+  1111→  // ===== BATCH 4: NFT detail =====
+  1112→  nftDetailOpen: false,
+  1113→  setNftDetailOpen: (open) => set({ nftDetailOpen: open }),
+  1114→  selectedNftId: null,
+  1115→  openNft: (id) => set({ selectedNftId: id }),
+  1116→
+  1117→  // ===== BATCH 4: Launch scanner =====
+  1118→  launchScannerOpen: false,
+  1119→  setLaunchScannerOpen: (open) => set({ launchScannerOpen: open }),
+  1120→
+  1121→  // ===== BATCH 4: Bridge =====
+  1122→  bridgeOpen: false,
+  1123→  setBridgeOpen: (open) => set({ bridgeOpen: open }),
+  1124→
+  1125→  // ===== BATCH 4: Staking =====
+  1126→  stakingOpen: false,
+  1127→  setStakingOpen: (open) => set({ stakingOpen: open }),
+  1128→
+  1129→  // ===== BATCH 4: Gas optimizer =====
+  1130→  gasOptimizerOpen: false,
+  1131→  setGasOptimizerOpen: (open) => set({ gasOptimizerOpen: open }),
+  1132→
+  1133→  // ===== BATCH 4: Airdrop center =====
+  1134→  airdropOpen: false,
+  1135→  setAirdropOpen: (open) => set({ airdropOpen: open }),
+  1136→  claimedAirdrops: ["ad2"], // Drift already claimed
+  1137→  claimAirdrop: (id) =>
+  1138→    set((s) => ({
+  1139→      claimedAirdrops: [...s.claimedAirdrops, id],
+  1140→      toasts: [
+  1141→        {
+  1142→          id: `toast-${Date.now()}`,
+  1143→          ts: Date.now(),
+  1144→          title: "Airdrop claimed!",
+  1145→          description: "Tokens will arrive in your wallet shortly.",
+  1146→          type: "success",
+  1147→        },
+  1148→        ...s.toasts,
+  1149→      ],
+  1150→    })),
+  1151→
+  1152→  // ===== BATCH 4: Toast notifications =====
+  1153→  toasts: [],
+  1154→  pushToast: (t) =>
+  1155→    set((s) => ({
+  1156→      toasts: [
+  1157→        { ...t, id: `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, ts: Date.now() },
+  1158→        ...s.toasts,
+  1159→      ].slice(0, 5), // Keep only 5 most recent
+  1160→    })),
+  1161→  dismissToast: (id) =>
+  1162→    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  1163→
+  1164→  // ===== BATCH 5: Full-screen chart =====
+  1165→  chartOpen: false,
+  1166→  chartTokenId: null,
+  1167→  openChart: (tokenId) => set({ chartOpen: true, chartTokenId: tokenId }),
+  1168→  closeChart: () => set({ chartOpen: false }),
+  1169→
+  1170→  // ===== BATCH 5: Narrative detail =====
+  1171→  narrativeDetailOpen: false,
+  1172→  selectedNarrativeId: null,
+  1173→  openNarrative: (id) => set({ selectedNarrativeId: id, narrativeDetailOpen: true }),
+  1174→  setNarrativeDetailOpen: (open) => set({ narrativeDetailOpen: open }),
+  1175→
+  1176→  // ===== BATCH 5: Smart money map =====
+  1177→  smartMoneyMapOpen: false,
+  1178→  setSmartMoneyMapOpen: (open) => set({ smartMoneyMapOpen: open }),
+  1179→
+  1180→  // ===== BATCH 5: Push notifications =====
+  1181→  pushPermission: typeof window !== "undefined" && "Notification" in window
+  1182→    ? Notification.permission
+  1183→    : "default",
+  1184→  requestPushPermission: () => {
+  1185→    if (typeof window !== "undefined" && "Notification" in window) {
+  1186→      Notification.requestPermission().then((p) => {
+  1187→        useMoby.getState().setPushPermission(p as "default" | "granted" | "denied");
+  1188→        if (p === "granted") {
+  1189→          useMoby.getState().pushToast({
+  1190→            title: "Push notifications enabled",
+  1191→            description: "You'll get alerts for whale moves and smart money entries.",
+  1192→            type: "success",
+  1193→          });
+  1194→        }
+  1195→      });
+  1196→    }
+  1197→  },
+  1198→  setPushPermission: (p) => set({ pushPermission: p }),
+  1199→
+  1200→  // ===== BATCH 6: Portfolio analytics =====
+  1201→  analyticsOpen: false,
+  1202→  setAnalyticsOpen: (open) => set({ analyticsOpen: open }),
+  1203→
+  1204→  // ===== BATCH 6: Yield farming =====
+  1205→  yieldOpen: false,
+  1206→  setYieldOpen: (open) => set({ yieldOpen: open }),
+  1207→
+  1208→  // ===== BATCH 6: Token unlocks =====
+  1209→  unlocksOpen: false,
+  1210→  setUnlocksOpen: (open) => set({ unlocksOpen: open }),
+  1211→
+  1212→  // ===== BATCH 6: Governance =====
+  1213→  governanceOpen: false,
+  1214→  setGovernanceOpen: (open) => set({ governanceOpen: open }),
+  1215→  votedProposals: { g2: "for", g3: "for", g5: "against" },
+  1216→  vote: (proposalId, voteChoice) =>
+  1217→    set((s) => ({
+  1218→      votedProposals: { ...s.votedProposals, [proposalId]: voteChoice },
+  1219→      toasts: [
+  1220→        {
+  1221→          id: `toast-${Date.now()}`,
+  1222→          ts: Date.now(),
+  1223→          title: "Vote submitted",
+  1224→          description: `You voted ${voteChoice} on this proposal.`,
+  1225→          type: "success",
+  1226→        },
+  1227→        ...s.toasts,
+  1228→      ],
+  1229→    })),
+  1230→
+  1231→  // ===== BATCH 6: DeFi positions =====
+  1232→  defiOpen: false,
+  1233→  setDefiOpen: (open) => set({ defiOpen: open }),
+  1234→
+  1235→  // ===== BATCH 6: Market calendar =====
+  1236→  calendarOpen: false,
+  1237→  setCalendarOpen: (open) => set({ calendarOpen: open }),
+  1238→
+  1239→  // ===== BATCH 6: Transaction simulator =====
+  1240→  simulatorOpen: false,
+  1241→  setSimulatorOpen: (open) => set({ simulatorOpen: open }),
+  1242→
+  1243→  // ===== BATCH 6: Multi-wallet manager =====
+  1244→  multiWalletOpen: false,
+  1245→  setMultiWalletOpen: (open) => set({ multiWalletOpen: open }),
+  1246→  activeWalletId: "mw1",
+  1247→  setActiveWalletId: (id) => set({ activeWalletId: id }),
+  1248→
+  1249→  // ===== BATCH 6: Watchlist performance =====
+  1250→  watchlistPerfOpen: false,
+  1251→  setWatchlistPerfOpen: (open) => set({ watchlistPerfOpen: open }),
+  1252→
+  1253→  // ===== BATCH 6: Theme toggle =====
+  1254→  theme: "dark",
+  1255→  toggleTheme: () => set((s) => ({ theme: s.theme === "dark" ? "light" : "dark" })),
+  1256→
+  1257→  // ===== BATCH 7: Token security audit =====
+  1258→  securityAuditOpen: false,
+  1259→  securityAuditTokenId: null,
+  1260→  openSecurityAudit: (tokenId) => set({ securityAuditTokenId: tokenId, securityAuditOpen: true }),
+  1261→  setSecurityAuditOpen: (open) => set({ securityAuditOpen: open }),
+  1262→
+  1263→  // ===== BATCH 7: Tokenized stocks =====
+  1264→  stocksOpen: false,
+  1265→  setStocksOpen: (open) => set({ stocksOpen: open }),
+  1266→
+  1267→  // ===== BATCH 7: Wallet PnL tracker =====
+  1268→  walletPnlOpen: false,
+  1269→  walletPnlAddress: "0x7a3f...b9c2",
+  1270→  setWalletPnlOpen: (open) => set({ walletPnlOpen: open }),
+  1271→  setWalletPnlAddress: (addr) => set({ walletPnlAddress: addr }),
+  1272→
+  1273→  // ===== BATCH 7: Snipe bot =====
+  1274→  snipeBotOpen: false,
+  1275→  setSnipeBotOpen: (open) => set({ snipeBotOpen: open }),
+  1276→
+  1277→  // ===== BATCH 7: Price prediction =====
+  1278→  predictionOpen: false,
+  1279→  predictionTokenId: null,
+  1280→  openPrediction: (tokenId) => set({ predictionTokenId: tokenId, predictionOpen: true }),
+  1281→  setPredictionOpen: (open) => set({ predictionOpen: open }),
+  1282→
+  1283→  // ===== BATCH 7: Liquidity depth =====
+  1284→  liquidityDepthOpen: false,
+  1285→  liquidityDepthTokenId: null,
+  1286→  openLiquidityDepth: (tokenId) => set({ liquidityDepthTokenId: tokenId, liquidityDepthOpen: true }),
+  1287→  setLiquidityDepthOpen: (open) => set({ liquidityDepthOpen: open }),
+  1288→
+  1289→  // ===== BATCH 7: Trading journal =====
+  1290→  journalOpen: false,
+  1291→  setJournalOpen: (open) => set({ journalOpen: open }),
+  1292→
+  1293→  // ===== BATCH 7: DeFi health monitor =====
+  1294→  defiHealthOpen: false,
+  1295→  setDefiHealthOpen: (open) => set({ defiHealthOpen: open }),
+  1296→
+  1297→  // ===== BATCH 7: Tax loss harvesting =====
+  1298→  harvestOpen: false,
+  1299→  setHarvestOpen: (open) => set({ harvestOpen: open }),
+  1300→
+  1301→  // ===== BATCH 8: Trailing stops =====
+  1302→  trailingStopsOpen: false,
+  1303→  setTrailingStopsOpen: (open) => set({ trailingStopsOpen: open }),
+  1304→
+  1305→  // ===== BATCH 8: Hot wallets =====
+  1306→  hotWalletsOpen: false,
+  1307→  setHotWalletsOpen: (open) => set({ hotWalletsOpen: open }),
+  1308→
+  1309→  // ===== BATCH 8: Token migrations =====
+  1310→  migrationsOpen: false,
+  1311→  setMigrationsOpen: (open) => set({ migrationsOpen: open }),
+  1312→
+  1313→  // ===== BATCH 8: MEV protection info =====
+  1314→  mevInfoOpen: false,
+  1315→  setMevInfoOpen: (open) => set({ mevInfoOpen: open }),
+  1316→
+  1317→  // ===== BATCH 8: Wallet import =====
+  1318→  walletImportOpen: false,
+  1319→  setWalletImportOpen: (open) => set({ walletImportOpen: open }),
+  1320→
+  1321→  // ===== BATCH 8: Watchlist alerts =====
+  1322→  watchlistAlertsOpen: false,
+  1323→  setWatchlistAlertsOpen: (open) => set({ watchlistAlertsOpen: open }),
+  1324→
+  1325→  // Recently viewed tokens
+  1326→  recentlyViewed: [],
+  1327→  addRecentlyViewed: (id) =>
+  1328→    set((s) => ({
+  1329→      recentlyViewed: [id, ...s.recentlyViewed.filter((x) => x !== id)].slice(0, 10),
+  1330→    })),
+  1331→
+  1332→  // ===== BATCH 9: Pump.fun explorer =====
+  1333→  pumpFunOpen: false,
+  1334→  setPumpFunOpen: (open) => set({ pumpFunOpen: open }),
+  1335→  }),
+  1336→  {
+  1337→    name: "moby-storage",
+  1338→    storage: createJSONStorage(() => localStorage),
+  1339→    partialize: (s) => ({
+  1340→      watchlist: s.watchlist,
+  1341→      followedTraders: s.followedTraders,
+  1342→      savedSignals: s.savedSignals,
+  1343→      customAlerts: s.customAlerts,
+  1344→      copyTrades: s.copyTrades,
+  1345→      limitOrders: s.limitOrders,
+  1346→      dcaStrategies: s.dcaStrategies,
+  1347→      settings: s.settings,
+  1348→      onboarded: s.onboarded,
+  1349→      claimedAirdrops: s.claimedAirdrops,
+  1350→      votedProposals: s.votedProposals,
+  1351→      activeWalletId: s.activeWalletId,
+  1352→      theme: s.theme,
+  1353→      pushPermission: s.pushPermission,
+  1354→      recentlyViewed: s.recentlyViewed,
+  1355→    }),
+  1356→  }
+  1357→  )
+  1358→);
+  1359→
+  1360→// Convenience hook selectors
+  1361→export function useToken(id: string | null): Token | null {
+  1362→  return useMoby((s) => (id ? TOKENS.find((t) => t.id === id) ?? null : null));
+  1363→}
+  1364→
+  1365→export function useTrader(id: string | null): Trader | null {
+  1366→  return useMoby((s) => (id ? TRADERS.find((t) => t.id === id) ?? null : null));
+  1367→}
+  1368→

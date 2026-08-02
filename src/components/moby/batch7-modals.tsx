@@ -156,8 +156,30 @@ export function TokenizedStocksModal() {
                     <div><span className="text-muted-foreground">Shares: </span><span className="font-semibold tabular">{s.shares}</span></div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    <button className="py-1.5 rounded-lg bg-bear/15 text-bear border border-bear/30 text-xs font-bold">Sell</button>
-                    <button className="py-1.5 rounded-lg bg-bull text-background text-xs font-bold">Buy</button>
+                    <button
+                      onClick={() =>
+                        useMoby.getState().pushToast({
+                          title: "Stock sell pending",
+                          description: `Demo: Sell order for ${s.shares} ${s.ticker} would be routed.`,
+                          type: "info",
+                        })
+                      }
+                      className="py-1.5 rounded-lg bg-bear/15 text-bear border border-bear/30 text-xs font-bold"
+                    >
+                      Sell
+                    </button>
+                    <button
+                      onClick={() =>
+                        useMoby.getState().pushToast({
+                          title: "Stock buy pending",
+                          description: `Demo: Buy order for ${s.ticker} at ${fmtUsd(s.price)} would be routed.`,
+                          type: "info",
+                        })
+                      }
+                      className="py-1.5 rounded-lg bg-bull text-background text-xs font-bold"
+                    >
+                      Buy
+                    </button>
                   </div>
                 </div>
               );
@@ -245,7 +267,18 @@ export function SnipeBotModal() {
             <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center"><div className="text-lg font-bold tabular text-bull">{fmtUsd(SNIPE_RULES.reduce((s, r) => s + r.stats.pnl, 0), { compact: true })}</div><div className="text-[10px] text-muted-foreground">Total PnL</div></div>
           </div>
           {SNIPE_RULES.map((r) => <SnipeRuleCard key={r.id} rule={r} onTrigger={() => pushToast({ title: "🎯 Snipe rule triggered!", description: `${r.name} matched a new token`, type: "alert" })} />)}
-          <button className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5">+ Create snipe rule</button>
+          <button
+            onClick={() =>
+              pushToast({
+                title: "Snipe rule builder",
+                description: "Snipe rule creation requires connecting a wallet.",
+                type: "info",
+              })
+            }
+            className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5"
+          >
+            + Create snipe rule
+          </button>
         </ModalShell>
       )}
     </AnimatePresence>
@@ -273,8 +306,30 @@ function SnipeRuleCard({ rule, onTrigger }: { rule: SnipeRule; onTrigger: () => 
       </div>
       <div className="grid grid-cols-3 gap-1.5">
         <button onClick={onTrigger} className="py-1.5 rounded-md border border-border text-[11px] font-semibold text-muted-foreground hover:text-foreground">Test trigger</button>
-        <button className="py-1.5 rounded-md border border-border text-[11px] font-semibold text-muted-foreground hover:text-foreground">Edit</button>
-        <button className={cn("py-1.5 rounded-md text-[11px] font-bold", rule.enabled ? "bg-bear/15 text-bear border border-bear/30" : "bg-bull text-background")}>{rule.enabled ? "Pause" : "Start"}</button>
+        <button
+          onClick={() =>
+            useMoby.getState().pushToast({
+              title: "Edit snipe rule",
+              description: `Editing "${rule.name}" — requires wallet connection.`,
+              type: "info",
+            })
+          }
+          className="py-1.5 rounded-md border border-border text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() =>
+            useMoby.getState().pushToast({
+              title: rule.enabled ? "Snipe rule paused" : "Snipe rule started",
+              description: `"${rule.name}" is now ${rule.enabled ? "paused" : "live"}.`,
+              type: rule.enabled ? "info" : "success",
+            })
+          }
+          className={cn("py-1.5 rounded-md text-[11px] font-bold", rule.enabled ? "bg-bear/15 text-bear border border-bear/30" : "bg-bull text-background")}
+        >
+          {rule.enabled ? "Pause" : "Start"}
+        </button>
       </div>
     </div>
   );

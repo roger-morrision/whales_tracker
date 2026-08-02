@@ -1,0 +1,552 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo } from "react";
+     4→import { X, ShieldCheck, ShieldAlert, ShieldX, TrendingUp, TrendingDown, Activity, Bot, BookOpen, Heart, AlertTriangle, Zap, DollarSign } from "lucide-react";
+     5→import {
+     6→  getSecurityAudit,
+     7→  TOKENIZED_STOCKS,
+     8→  getWalletPnl,
+     9→  SNIPE_RULES,
+    10→  getPricePrediction,
+    11→  getLiquidityDepth,
+    12→  JOURNAL_ENTRIES,
+    13→  getDefiHealth,
+    14→  getHarvestOpportunities,
+    15→  TOKENS_BY_ID,
+    16→  fmtUsd,
+    17→  fmtPrice,
+    18→  fmtPct,
+    19→  fmtNum,
+    20→  fmtAge,
+    21→  type SnipeRule,
+    22→} from "@/lib/moby-data";
+    23→import { useMoby } from "@/lib/moby-store";
+    24→import { TokenIcon, Chip, Sparkline, SectionHeader } from "./primitives";
+    25→import { motion, AnimatePresence } from "framer-motion";
+    26→import { cn } from "@/lib/utils";
+    27→
+    28→const RISK_COLORS = {
+    29→  low: { text: "text-bull", bg: "bg-bull/10", label: "Low Risk" },
+    30→  medium: { text: "text-gold", bg: "bg-gold/10", label: "Medium Risk" },
+    31→  high: { text: "text-bear", bg: "bg-bear/10", label: "High Risk" },
+    32→  extreme: { text: "text-bear", bg: "bg-bear/20", label: "Extreme Risk" },
+    33→};
+    34→
+    35→// ========== TOKEN SECURITY AUDIT ==========
+    36→export function SecurityAuditModal() {
+    37→  const open = useMoby((s) => s.securityAuditOpen);
+    38→  const setOpen = useMoby((s) => s.setSecurityAuditOpen);
+    39→  const tokenId = useMoby((s) => s.securityAuditTokenId);
+    40→  const audit = useMemo(() => (tokenId ? getSecurityAudit(tokenId) : null), [tokenId]);
+    41→  const token = tokenId ? TOKENS_BY_ID[tokenId] : null;
+    42→  if (!audit || !token) return null;
+    43→  const risk = RISK_COLORS[audit.riskLevel];
+    44→
+    45→  return (
+    46→    <AnimatePresence>
+    47→      {open && (
+    48→        <ModalShell open={open} onClose={() => setOpen(false)} title="Security audit" icon={<ShieldCheck className="h-4 w-4 text-bull" />}>
+    49→          {/* Overall score */}
+    50→          <div className={cn("rounded-2xl p-4 border", risk.bg, audit.riskLevel === "extreme" ? "border-bear/40" : audit.riskLevel === "high" ? "border-bear/30" : audit.riskLevel === "medium" ? "border-gold/30" : "border-bull/30")}>
+    51→            <div className="flex items-center gap-3">
+    52→              <TokenIcon symbol={token.symbol} glyph={token.logoGlyph} color={token.logoColor} size="lg" />
+    53→              <div className="flex-1">
+    54→                <div className="flex items-center gap-1.5">
+    55→                  <span className="font-bold text-base">{token.symbol}</span>
+    56→                  <span className={cn("text-[10px] font-bold uppercase px-1.5 py-0.5 rounded", risk.bg, risk.text)}>{risk.label}</span>
+    57→                </div>
+    58→                <div className="text-[11px] text-muted-foreground">{token.name}</div>
+    59→              </div>
+    60→              <div className="text-right">
+    61→                <div className={cn("text-3xl font-bold tabular", risk.text)}>{audit.overallScore}</div>
+    62→                <div className="text-[10px] text-muted-foreground">/ 100</div>
+    63→              </div>
+    64→            </div>
+    65→            <div className="h-2 rounded-full bg-surface-3 overflow-hidden mt-2">
+    66→              <div className={cn("h-full rounded-full", audit.overallScore > 70 ? "bg-bull" : audit.overallScore > 50 ? "bg-gold" : "bg-bear")} style={{ width: `${audit.overallScore}%` }} />
+    67→            </div>
+    68→          </div>
+    69→
+    70→          {/* Warnings */}
+    71→          {audit.warnings.length > 0 && (
+    72→            <div className="rounded-xl border border-bear/30 bg-bear/5 p-3 space-y-1">
+    73→              <div className="text-xs font-semibold text-bear flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Warnings</div>
+    74→              {audit.warnings.map((w, i) => <div key={i} className="text-[11px] text-bear">• {w}</div>)}
+    75→            </div>
+    76→          )}
+    77→
+    78→          {/* Checks list */}
+    79→          <div>
+    80→            <SectionHeader title="Security checks" emoji="🔍" />
+    81→            <div className="space-y-1.5">
+    82→              {audit.checks.map((c, i) => (
+    83→                <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-border">
+    84→                  <div className={cn("h-5 w-5 rounded grid place-items-center shrink-0 mt-0.5",
+    85→                    c.status === "pass" ? "bg-bull/15 text-bull" : c.status === "warning" ? "bg-gold/15 text-gold" : "bg-bear/15 text-bear"
+    86→                  )}>
+    87→                    {c.status === "pass" ? <ShieldCheck className="h-3 w-3" /> : c.status === "warning" ? <ShieldAlert className="h-3 w-3" /> : <ShieldX className="h-3 w-3" />}
+    88→                  </div>
+    89→                  <div className="flex-1">
+    90→                    <div className="text-xs font-semibold">{c.label}</div>
+    91→                    <div className="text-[10px] text-muted-foreground">{c.detail}</div>
+    92→                  </div>
+    93→                </div>
+    94→              ))}
+    95→            </div>
+    96→          </div>
+    97→
+    98→          {/* Tax scan */}
+    99→          <div className="rounded-xl border border-border p-3">
+   100→            <div className="text-xs font-semibold mb-2">Tax scan</div>
+   101→            <div className="grid grid-cols-3 gap-2 text-center">
+   102→              <div><div className="text-[9px] text-muted-foreground">Buy tax</div><div className="text-sm font-bold tabular text-bull">{audit.taxScan.buyTax}%</div></div>
+   103→              <div><div className="text-[9px] text-muted-foreground">Sell tax</div><div className="text-sm font-bold tabular text-bull">{audit.taxScan.sellTax}%</div></div>
+   104→              <div><div className="text-[9px] text-muted-foreground">Transfer</div><div className="text-sm font-bold tabular text-bull">{audit.taxScan.transferTax}%</div></div>
+   105→            </div>
+   106→          </div>
+   107→
+   108→          {/* Honeypot check */}
+   109→          <div className="rounded-xl border border-bull/30 bg-bull/5 p-3">
+   110→            <div className="flex items-center gap-2">
+   111→              <ShieldCheck className="h-4 w-4 text-bull" />
+   112→              <div className="flex-1">
+   113→                <div className="text-xs font-semibold text-bull">Honeypot check passed</div>
+   114→                <div className="text-[10px] text-muted-foreground">Buy and sell simulation successful — token is freely tradable</div>
+   115→              </div>
+   116→            </div>
+   117→          </div>
+   118→        </ModalShell>
+   119→      )}
+   120→    </AnimatePresence>
+   121→  );
+   122→}
+   123→
+   124→// ========== TOKENIZED STOCKS ==========
+   125→export function TokenizedStocksModal() {
+   126→  const open = useMoby((s) => s.stocksOpen);
+   127→  const setOpen = useMoby((s) => s.setStocksOpen);
+   128→  return (
+   129→    <AnimatePresence>
+   130→      {open && (
+   131→        <ModalShell open={open} onClose={() => setOpen(false)} title="Tokenized stocks" icon={<span className="text-base">📈</span>}>
+   132→          <div className="text-[11px] text-muted-foreground mb-3">Trade fractional shares of pre-IPO and public companies, 24/7 on-chain.</div>
+   133→          <div className="space-y-2">
+   134→            {TOKENIZED_STOCKS.map((s) => {
+   135→              const isBull = s.change24h >= 0;
+   136→              return (
+   137→                <div key={s.id} className="rounded-xl border border-border p-3 hover:bg-surface-2 transition-colors">
+   138→                  <div className="flex items-center gap-2.5">
+   139→                    <div className={cn("h-10 w-10 rounded-full bg-gradient-to-br grid place-items-center font-bold text-white text-xs", s.color)}>{s.glyph}</div>
+   140→                    <div className="flex-1 min-w-0">
+   141→                      <div className="flex items-center gap-1.5">
+   142→                        <span className="font-semibold text-sm">{s.ticker}</span>
+   143→                        {s.isPreIPO && <Chip variant="gold">Pre-IPO</Chip>}
+   144→                      </div>
+   145→                      <div className="text-[11px] text-muted-foreground truncate">{s.name}</div>
+   146→                    </div>
+   147→                    <Sparkline data={s.sparkline} width={50} height={20} bullish={isBull} />
+   148→                    <div className="text-right">
+   149→                      <div className="text-sm font-bold tabular">{s.price >= 1000 ? `$${(s.price / 1000).toFixed(1)}K` : `$${s.price.toFixed(2)}`}</div>
+   150→                      <div className={cn("text-[11px] tabular", isBull ? "text-bull" : "text-bear")}>{isBull ? "+" : ""}{s.change24h.toFixed(1)}%</div>
+   151→                    </div>
+   152→                  </div>
+   153→                  <div className="grid grid-cols-3 gap-2 mt-2 text-[10px]">
+   154→                    <div><span className="text-muted-foreground">Mcap: </span><span className="font-semibold tabular">{fmtUsd(s.marketCap, { compact: true })}</span></div>
+   155→                    <div><span className="text-muted-foreground">Vol: </span><span className="font-semibold tabular">{fmtUsd(s.volume24h, { compact: true })}</span></div>
+   156→                    <div><span className="text-muted-foreground">Shares: </span><span className="font-semibold tabular">{s.shares}</span></div>
+   157→                  </div>
+   158→                  <div className="grid grid-cols-2 gap-2 mt-2">
+   159→                    <button className="py-1.5 rounded-lg bg-bear/15 text-bear border border-bear/30 text-xs font-bold">Sell</button>
+   160→                    <button className="py-1.5 rounded-lg bg-bull text-background text-xs font-bold">Buy</button>
+   161→                  </div>
+   162→                </div>
+   163→              );
+   164→            })}
+   165→          </div>
+   166→        </ModalShell>
+   167→      )}
+   168→    </AnimatePresence>
+   169→  );
+   170→}
+   171→
+   172→// ========== WALLET PNL TRACKER ==========
+   173→export function WalletPnlModal() {
+   174→  const open = useMoby((s) => s.walletPnlOpen);
+   175→  const setOpen = useMoby((s) => s.setWalletPnlOpen);
+   176→  const address = useMoby((s) => s.walletPnlAddress);
+   177→  const setAddress = useMoby((s) => s.setWalletPnlAddress);
+   178→  const [inputAddr, setInputAddr] = useState(address);
+   179→  const pnl = useMemo(() => getWalletPnl(address), [address]);
+   180→
+   181→  return (
+   182→    <AnimatePresence>
+   183→      {open && (
+   184→        <ModalShell open={open} onClose={() => setOpen(false)} title="Wallet PnL tracker" icon={<Activity className="h-4 w-4 text-bull" />}>
+   185→          {/* Address input */}
+   186→          <div className="flex gap-2 mb-3">
+   187→            <input
+   188→              type="text"
+   189→              value={inputAddr}
+   190→              onChange={(e) => setInputAddr(e.target.value)}
+   191→              placeholder="Enter wallet address (0x...)"
+   192→              className="flex-1 bg-surface-2 border border-border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-bull/40"
+   193→            />
+   194→            <button onClick={() => setAddress(inputAddr || "0x7a3f...b9c2")} className="px-3 py-2 rounded-lg bg-bull text-background text-xs font-bold">Track</button>
+   195→          </div>
+   196→
+   197→          {/* Summary */}
+   198→          <div className="grid grid-cols-3 gap-2 mb-3">
+   199→            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{fmtUsd(pnl.totalInvested, { compact: true })}</div><div className="text-[10px] text-muted-foreground">Invested</div></div>
+   200→            <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center"><div className={cn("text-lg font-bold tabular", pnl.totalPnl >= 0 ? "text-bull" : "text-bear")}>{pnl.totalPnl >= 0 ? "+" : ""}{fmtUsd(pnl.totalPnl, { compact: true })}</div><div className="text-[10px] text-muted-foreground">Total PnL</div></div>
+   201→            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{pnl.winRate}%</div><div className="text-[10px] text-muted-foreground">Win rate</div></div>
+   202→          </div>
+   203→
+   204→          {/* Positions */}
+   205→          <div>
+   206→            <SectionHeader title="Positions" emoji="📊" />
+   207→            <div className="space-y-1.5">
+   208→              {pnl.positions.map((p) => (
+   209→                <div key={p.tokenSymbol} className="rounded-lg border border-border p-2.5">
+   210→                  <div className="flex items-center gap-2 mb-1">
+   211→                    <span className="font-semibold text-sm">${p.tokenSymbol}</span>
+   212→                    <span className="text-[10px] text-muted-foreground">{p.firstBuyDays}d held</span>
+   213→                    <span className={cn("ml-auto text-sm font-bold tabular", p.totalPnl >= 0 ? "text-bull" : "text-bear")}>
+   214→                      {p.totalPnl >= 0 ? "+" : ""}{fmtUsd(p.totalPnl)} ({fmtPct(p.pnlPct)})
+   215→                    </span>
+   216→                  </div>
+   217→                  <div className="grid grid-cols-4 gap-1 text-[10px]">
+   218→                    <div><span className="text-muted-foreground">Bought: </span><span className="font-semibold tabular">{fmtUsd(p.boughtUsd, { compact: true })}</span></div>
+   219→                    <div><span className="text-muted-foreground">Current: </span><span className="font-semibold tabular">{fmtUsd(p.currentUsd, { compact: true })}</span></div>
+   220→                    <div><span className="text-muted-foreground">Realized: </span><span className={cn("font-semibold tabular", p.realizedPnl >= 0 ? "text-bull" : "text-bear")}>{p.realizedPnl >= 0 ? "+" : ""}{fmtUsd(p.realizedPnl)}</span></div>
+   221→                    <div><span className="text-muted-foreground">Unrealized: </span><span className={cn("font-semibold tabular", p.unrealizedPnl >= 0 ? "text-bull" : "text-bear")}>{p.unrealizedPnl >= 0 ? "+" : ""}{fmtUsd(p.unrealizedPnl)}</span></div>
+   222→                  </div>
+   223→                </div>
+   224→              ))}
+   225→            </div>
+   226→          </div>
+   227→        </ModalShell>
+   228→      )}
+   229→    </AnimatePresence>
+   230→  );
+   231→}
+   232→
+   233→// ========== SNIPE BOT ==========
+   234→export function SnipeBotModal() {
+   235→  const open = useMoby((s) => s.snipeBotOpen);
+   236→  const setOpen = useMoby((s) => s.setSnipeBotOpen);
+   237→  const pushToast = useMoby((s) => s.pushToast);
+   238→  return (
+   239→    <AnimatePresence>
+   240→      {open && (
+   241→        <ModalShell open={open} onClose={() => setOpen(false)} title="Snipe bot" icon={<Bot className="h-4 w-4 text-bull" />}>
+   242→          <div className="grid grid-cols-3 gap-2 mb-3">
+   243→            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{SNIPE_RULES.reduce((s, r) => s + r.stats.triggered, 0)}</div><div className="text-[10px] text-muted-foreground">Triggered</div></div>
+   244→            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{SNIPE_RULES.reduce((s, r) => s + r.stats.filled, 0)}</div><div className="text-[10px] text-muted-foreground">Filled</div></div>
+   245→            <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center"><div className="text-lg font-bold tabular text-bull">{fmtUsd(SNIPE_RULES.reduce((s, r) => s + r.stats.pnl, 0), { compact: true })}</div><div className="text-[10px] text-muted-foreground">Total PnL</div></div>
+   246→          </div>
+   247→          {SNIPE_RULES.map((r) => <SnipeRuleCard key={r.id} rule={r} onTrigger={() => pushToast({ title: "🎯 Snipe rule triggered!", description: `${r.name} matched a new token`, type: "alert" })} />)}
+   248→          <button className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5">+ Create snipe rule</button>
+   249→        </ModalShell>
+   250→      )}
+   251→    </AnimatePresence>
+   252→  );
+   253→}
+   254→
+   255→function SnipeRuleCard({ rule, onTrigger }: { rule: SnipeRule; onTrigger: () => void }) {
+   256→  return (
+   257→    <div className={cn("rounded-xl border p-3 mb-2", rule.enabled ? "border-bull/30 bg-bull/5" : "border-border")}>
+   258→      <div className="flex items-center gap-2 mb-2">
+   259→        <Bot className={cn("h-4 w-4", rule.enabled ? "text-bull" : "text-muted-foreground")} />
+   260→        <span className="font-semibold text-sm flex-1">{rule.name}</span>
+   261→        {rule.enabled ? <Chip variant="bull">LIVE</Chip> : <Chip variant="default">PAUSED</Chip>}
+   262→      </div>
+   263→      <div className="grid grid-cols-2 gap-2 text-[10px] mb-2">
+   264→        <div><span className="text-muted-foreground">Min liq: </span><span className="font-semibold tabular">{fmtUsd(rule.conditions.minLiquidity, { compact: true })}</span></div>
+   265→        <div><span className="text-muted-foreground">Max mcap: </span><span className="font-semibold tabular">{fmtUsd(rule.conditions.maxMarketCap, { compact: true })}</span></div>
+   266→        <div><span className="text-muted-foreground">Smart wallets: </span><span className="font-semibold tabular">≥{rule.conditions.minSmartMoneyEntries}</span></div>
+   267→        <div><span className="text-muted-foreground">Max age: </span><span className="font-semibold tabular">{rule.conditions.maxAgeMinutes}m</span></div>
+   268→        <div><span className="text-muted-foreground">Buy: </span><span className="font-semibold tabular">{fmtUsd(rule.actions.buyAmountUsd)}</span></div>
+   269→        <div><span className="text-muted-foreground">SL/TP: </span><span className="font-semibold tabular">-{rule.actions.autoSellAtLoss}%/+{rule.actions.autoSellAtProfit}%</span></div>
+   270→      </div>
+   271→      <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2">
+   272→        <span>Stats: {rule.stats.triggered} triggered · {rule.stats.filled} filled · {rule.stats.winRate}% WR · PnL {fmtUsd(rule.stats.pnl, { compact: true })}</span>
+   273→      </div>
+   274→      <div className="grid grid-cols-3 gap-1.5">
+   275→        <button onClick={onTrigger} className="py-1.5 rounded-md border border-border text-[11px] font-semibold text-muted-foreground hover:text-foreground">Test trigger</button>
+   276→        <button className="py-1.5 rounded-md border border-border text-[11px] font-semibold text-muted-foreground hover:text-foreground">Edit</button>
+   277→        <button className={cn("py-1.5 rounded-md text-[11px] font-bold", rule.enabled ? "bg-bear/15 text-bear border border-bear/30" : "bg-bull text-background")}>{rule.enabled ? "Pause" : "Start"}</button>
+   278→      </div>
+   279→    </div>
+   280→  );
+   281→}
+   282→
+   283→// ========== PRICE PREDICTION ==========
+   284→export function PricePredictionModal() {
+   285→  const open = useMoby((s) => s.predictionOpen);
+   286→  const setOpen = useMoby((s) => s.setPredictionOpen);
+   287→  const tokenId = useMoby((s) => s.predictionTokenId);
+   288→  const pred = useMemo(() => (tokenId ? getPricePrediction(tokenId) : null), [tokenId]);
+   289→  const token = tokenId ? TOKENS_BY_ID[tokenId] : null;
+   290→  if (!pred || !token) return null;
+   291→
+   292→  return (
+   293→    <AnimatePresence>
+   294→      {open && (
+   295→        <ModalShell open={open} onClose={() => setOpen(false)} title="AI price prediction" icon={<Zap className="h-4 w-4 text-bull" />}>
+   296→          {/* Token header */}
+   297→          <div className="flex items-center gap-2.5 mb-3">
+   298→            <TokenIcon symbol={token.symbol} glyph={token.logoGlyph} color={token.logoColor} size="md" />
+   299→            <div className="flex-1"><div className="font-bold text-sm">{token.symbol}</div><div className="text-[11px] text-muted-foreground">{fmtPrice(pred.currentPrice)} now</div></div>
+   300→            <Chip variant={pred.signals.overall === "bullish" ? "bull" : pred.signals.overall === "bearish" ? "bear" : "default"}>{pred.signals.overall}</Chip>
+   301→          </div>
+   302→
+   303→          {/* Predictions */}
+   304→          <div className="space-y-2 mb-3">
+   305→            {pred.predictions.map((p) => (
+   306→              <div key={p.timeframe} className="rounded-xl border border-border p-3 flex items-center gap-3">
+   307→                <div className="w-12 text-center"><div className="text-[10px] text-muted-foreground uppercase">{p.timeframe}</div></div>
+   308→                <div className="flex-1">
+   309→                  <div className="text-sm font-bold tabular">{fmtPrice(p.predictedPrice)}</div>
+   310→                  <div className={cn("text-[11px] tabular font-semibold", p.direction === "up" ? "text-bull" : "text-bear")}>{p.changePct >= 0 ? "+" : ""}{p.changePct.toFixed(1)}%</div>
+   311→                </div>
+   312→                <div className="text-right"><div className="text-[10px] text-muted-foreground">Confidence</div><div className={cn("text-sm font-bold tabular", p.confidence > 65 ? "text-bull" : p.confidence > 50 ? "text-gold" : "text-bear")}>{p.confidence}%</div></div>
+   313→              </div>
+   314→            ))}
+   315→          </div>
+   316→
+   317→          {/* Signal breakdown */}
+   318→          <div className="grid grid-cols-3 gap-2 mb-3">
+   319→            {[
+   320→              { label: "Technical", value: pred.signals.technical },
+   321→              { label: "Smart money", value: pred.signals.smartMoney },
+   322→              { label: "Social", value: pred.signals.social },
+   323→            ].map((s) => (
+   324→              <div key={s.label} className="rounded-xl border border-border p-2.5 text-center">
+   325→                <div className="text-[9px] text-muted-foreground uppercase">{s.label}</div>
+   326→                <div className={cn("text-xs font-bold", s.value === "bullish" ? "text-bull" : s.value === "bearish" ? "text-bear" : "text-muted-foreground")}>{s.value}</div>
+   327→              </div>
+   328→            ))}
+   329→          </div>
+   330→
+   331→          {/* AI summary */}
+   332→          <div className="rounded-xl p-3 bg-gradient-to-br from-[#14F195]/12 to-transparent border border-bull/20">
+   333→            <div className="flex items-center gap-1.5 mb-1"><Zap className="h-3.5 w-3.5 text-bull" /><span className="text-xs font-semibold">Moby AI analysis</span></div>
+   334→            <p className="text-[12px] text-foreground/90 leading-relaxed">{pred.aiSummary}</p>
+   335→          </div>
+   336→        </ModalShell>
+   337→      )}
+   338→    </AnimatePresence>
+   339→  );
+   340→}
+   341→
+   342→// ========== LIQUIDITY DEPTH ==========
+   343→export function LiquidityDepthModal() {
+   344→  const open = useMoby((s) => s.liquidityDepthOpen);
+   345→  const setOpen = useMoby((s) => s.setLiquidityDepthOpen);
+   346→  const tokenId = useMoby((s) => s.liquidityDepthTokenId);
+   347→  const token = tokenId ? TOKENS_BY_ID[tokenId] : null;
+   348→  const depth = useMemo(() => (tokenId ? getLiquidityDepth(tokenId) : null), [tokenId]);
+   349→  if (!depth || !token) return null;
+   350→  const maxTotal = Math.max(...depth.bids.map((b) => b.total), ...depth.asks.map((a) => a.total));
+   351→
+   352→  return (
+   353→    <AnimatePresence>
+   354→      {open && (
+   355→        <ModalShell open={open} onClose={() => setOpen(false)} title="Liquidity depth" icon={<Activity className="h-4 w-4 text-bull" />}>
+   356→          <div className="flex items-center gap-2 mb-3">
+   357→            <TokenIcon symbol={token.symbol} glyph={token.logoGlyph} color={token.logoColor} size="sm" />
+   358→            <span className="font-semibold text-sm">{token.symbol}</span>
+   359→            <span className="text-[11px] text-muted-foreground tabular">{fmtPrice(token.price)}</span>
+   360→            <span className="text-[11px] text-muted-foreground ml-auto">{fmtUsd(token.liquidity, { compact: true })} liq</span>
+   361→          </div>
+   362→
+   363→          {/* Depth visualization */}
+   364→          <div className="rounded-xl border border-border p-3">
+   365→            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Order book depth</div>
+   366→            <div className="space-y-px">
+   367→              {/* Asks (sells) - top */}
+   368→              {depth.asks.slice(0, 10).map((a, i) => (
+   369→                <div key={i} className="flex items-center gap-2 text-[10px] relative">
+   370→                  <div className="absolute right-0 h-full bg-bear/10 rounded" style={{ width: `${(a.total / maxTotal) * 100}%` }} />
+   371→                  <span className="font-mono text-bear tabular relative z-10 w-20">{fmtPrice(a.price)}</span>
+   372→                  <span className="text-muted-foreground tabular relative z-10 flex-1">{fmtNum(a.amount)}</span>
+   373→                  <span className="text-muted-foreground tabular relative z-10 w-20 text-right">{fmtUsd(a.total * token.price, { compact: true })}</span>
+   374→                </div>
+   375→              ))}
+   376→              {/* Spread */}
+   377→              <div className="flex items-center justify-center py-1 text-[10px] text-muted-foreground border-y border-border">
+   378→                <span>Spread: {fmtPrice(depth.asks[0].price - depth.bids[depth.bids.length - 1].price)} ({(((depth.asks[0].price - depth.bids[depth.bids.length - 1].price) / token.price) * 100).toFixed(2)}%)</span>
+   379→              </div>
+   380→              {/* Bids (buys) - bottom */}
+   381→              {depth.bids.slice(-10).reverse().map((b, i) => (
+   382→                <div key={i} className="flex items-center gap-2 text-[10px] relative">
+   383→                  <div className="absolute right-0 h-full bg-bull/10 rounded" style={{ width: `${(b.total / maxTotal) * 100}%` }} />
+   384→                  <span className="font-mono text-bull tabular relative z-10 w-20">{fmtPrice(b.price)}</span>
+   385→                  <span className="text-muted-foreground tabular relative z-10 flex-1">{fmtNum(b.amount)}</span>
+   386→                  <span className="text-muted-foreground tabular relative z-10 w-20 text-right">{fmtUsd(b.total * token.price, { compact: true })}</span>
+   387→                </div>
+   388→              ))}
+   389→            </div>
+   390→          </div>
+   391→
+   392→          <div className="grid grid-cols-2 gap-2 mt-3">
+   393→            <div className="rounded-xl border border-bull/30 bg-bull/5 p-3 text-center"><div className="text-lg font-bold tabular text-bull">{fmtUsd(depth.bids.reduce((s, b) => s + b.amount * token.price, 0), { compact: true })}</div><div className="text-[10px] text-muted-foreground">Bid liquidity</div></div>
+   394→            <div className="rounded-xl border border-bear/30 bg-bear/5 p-3 text-center"><div className="text-lg font-bold tabular text-bear">{fmtUsd(depth.asks.reduce((s, a) => s + a.amount * token.price, 0), { compact: true })}</div><div className="text-[10px] text-muted-foreground">Ask liquidity</div></div>
+   395→          </div>
+   396→        </ModalShell>
+   397→      )}
+   398→    </AnimatePresence>
+   399→  );
+   400→}
+   401→
+   402→// ========== TRADING JOURNAL ==========
+   403→export function TradingJournalModal() {
+   404→  const open = useMoby((s) => s.journalOpen);
+   405→  const setOpen = useMoby((s) => s.setJournalOpen);
+   406→  const totalPnl = JOURNAL_ENTRIES.filter((e) => e.pnl !== 0).reduce((s, e) => s + e.pnl, 0);
+   407→  const wins = JOURNAL_ENTRIES.filter((e) => e.pnl > 0).length;
+   408→  const losses = JOURNAL_ENTRIES.filter((e) => e.pnl < 0).length;
+   409→
+   410→  return (
+   411→    <AnimatePresence>
+   412→      {open && (
+   413→        <ModalShell open={open} onClose={() => setOpen(false)} title="Trading journal" icon={<BookOpen className="h-4 w-4 text-bull" />}>
+   414→          <div className="grid grid-cols-3 gap-2 mb-3">
+   415→            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{JOURNAL_ENTRIES.length}</div><div className="text-[10px] text-muted-foreground">Entries</div></div>
+   416→            <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center"><div className={cn("text-lg font-bold tabular", totalPnl >= 0 ? "text-bull" : "text-bear")}>{totalPnl >= 0 ? "+" : ""}{fmtUsd(totalPnl, { compact: true })}</div><div className="text-[10px] text-muted-foreground">Realized PnL</div></div>
+   417→            <div className="rounded-xl border border-border p-2.5 text-center"><div className="text-lg font-bold tabular">{wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0}%</div><div className="text-[10px] text-muted-foreground">Win rate</div></div>
+   418→          </div>
+   419→          <div className="space-y-2">
+   420→            {JOURNAL_ENTRIES.map((e) => (
+   421→              <div key={e.id} className="rounded-xl border border-border p-3">
+   422→                <div className="flex items-center gap-2 mb-1">
+   423→                  <Chip variant={e.side === "BUY" ? "bull" : "bear"}>{e.side}</Chip>
+   424→                  <span className="font-semibold text-sm">${e.tokenSymbol}</span>
+   425→                  <span className="text-[10px] text-muted-foreground">{e.date}</span>
+   426→                  {e.pnl !== 0 && <span className={cn("ml-auto text-sm font-bold tabular", e.pnl >= 0 ? "text-bull" : "text-bear")}>{e.pnl >= 0 ? "+" : ""}{fmtUsd(e.pnl)} ({fmtPct(e.pnlPct)})</span>}
+   427→                </div>
+   428→                <p className="text-[11px] text-muted-foreground mb-1">{e.note}</p>
+   429→                <div className="flex items-center gap-2 flex-wrap">
+   430→                  {e.tags.map((t) => <span key={t} className="text-[9px] font-semibold text-muted-foreground bg-surface-3 px-1.5 py-0.5 rounded">#{t}</span>)}
+   431→                  <span className="text-[9px] text-muted-foreground ml-auto">{e.mood} · {"⭐".repeat(e.rating)}</span>
+   432→                </div>
+   433→              </div>
+   434→            ))}
+   435→          </div>
+   436→          <button className="w-full py-2.5 rounded-xl border border-dashed border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center justify-center gap-1.5 mt-2">+ New journal entry</button>
+   437→        </ModalShell>
+   438→      )}
+   439→    </AnimatePresence>
+   440→  );
+   441→}
+   442→
+   443→// ========== DEFI HEALTH MONITOR ==========
+   444→export function DefiHealthModal() {
+   445→  const open = useMoby((s) => s.defiHealthOpen);
+   446→  const setOpen = useMoby((s) => s.setDefiHealthOpen);
+   447→  const health = useMemo(() => getDefiHealth(), []);
+   448→  const riskColor = health.riskLevel === "safe" ? "text-bull" : health.riskLevel === "moderate" ? "text-gold" : "text-bear";
+   449→
+   450→  return (
+   451→    <AnimatePresence>
+   452→      {open && (
+   453→        <ModalShell open={open} onClose={() => setOpen(false)} title="DeFi health monitor" icon={<Heart className="h-4 w-4 text-bull" />}>
+   454→          <div className={cn("rounded-2xl p-4 border mb-3", health.riskLevel === "safe" ? "bg-bull/5 border-bull/30" : health.riskLevel === "moderate" ? "bg-gold/5 border-gold/30" : "bg-bear/5 border-bear/30")}>
+   455→            <div className="flex items-center justify-between mb-2">
+   456→              <div><div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Health factor</div><div className={cn("text-3xl font-bold tabular", riskColor)}>{health.healthFactor.toFixed(2)}</div></div>
+   457→              <div className="text-right"><div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Risk level</div><div className={cn("text-lg font-bold capitalize", riskColor)}>{health.riskLevel}</div></div>
+   458→            </div>
+   459→            <div className="grid grid-cols-2 gap-2 text-[11px]">
+   460→              <div><span className="text-muted-foreground">Total collateral: </span><span className="font-semibold tabular">{fmtUsd(health.totalCollateral, { compact: true })}</span></div>
+   461→              <div><span className="text-muted-foreground">Total debt: </span><span className="font-semibold tabular">{fmtUsd(health.totalDebt, { compact: true })}</span></div>
+   462→            </div>
+   463→          </div>
+   464→
+   465→          {health.recommendations.length > 0 && (
+   466→            <div className="rounded-xl border border-gold/30 bg-gold/5 p-3 mb-3">
+   467→              <div className="text-xs font-semibold text-gold mb-1">⚠️ Recommendations</div>
+   468→              {health.recommendations.map((r, i) => <div key={i} className="text-[11px] text-muted-foreground">• {r}</div>)}
+   469→            </div>
+   470→          )}
+   471→
+   472→          <div className="space-y-2">
+   473→            {health.positions.map((p, i) => (
+   474→              <div key={i} className="rounded-xl border border-border p-3">
+   475→                <div className="flex items-center gap-2 mb-2">
+   476→                  <span className="font-semibold text-sm">{p.protocol}</span>
+   477→                  <Chip variant="outline">{p.type}</Chip>
+   478→                  <Chip variant="outline">{p.asset}</Chip>
+   479→                  <span className={cn("ml-auto text-sm font-bold tabular", p.healthFactor > 2 ? "text-bull" : p.healthFactor > 1.5 ? "text-gold" : "text-bear")}>HF {p.healthFactor.toFixed(2)}</span>
+   480→                </div>
+   481→                <div className="grid grid-cols-3 gap-2 text-[10px]">
+   482→                  <div><span className="text-muted-foreground">Collateral: </span><span className="font-semibold tabular">{fmtUsd(p.collateral, { compact: true })}</span></div>
+   483→                  <div><span className="text-muted-foreground">Debt: </span><span className="font-semibold tabular">{fmtUsd(p.debt, { compact: true })}</span></div>
+   484→                  <div><span className="text-muted-foreground">Liq. distance: </span><span className={cn("font-semibold tabular", p.distancePct < 20 ? "text-bear" : "text-bull")}>{p.distancePct.toFixed(1)}%</span></div>
+   485→                </div>
+   486→                <div className="mt-2"><div className="h-1.5 rounded-full bg-surface-3 overflow-hidden"><div className={cn("h-full rounded-full", p.distancePct < 20 ? "bg-bear" : p.distancePct < 40 ? "bg-gold" : "bg-bull")} style={{ width: `${Math.min(100, p.distancePct * 2)}%` }} /></div></div>
+   487→              </div>
+   488→            ))}
+   489→          </div>
+   490→        </ModalShell>
+   491→      )}
+   492→    </AnimatePresence>
+   493→  );
+   494→}
+   495→
+   496→// ========== TAX LOSS HARVESTING ==========
+   497→export function HarvestModal() {
+   498→  const open = useMoby((s) => s.harvestOpen);
+   499→  const setOpen = useMoby((s) => s.setHarvestOpen);
+   500→  const opps = useMemo(() => getHarvestOpportunities(), []);
+   501→  const totalSavings = opps.reduce((s, o) => s + o.potentialTaxSavings, 0);
+   502→  const totalLoss = opps.reduce((s, o) => s + Math.abs(o.unrealizedLoss), 0);
+   503→
+   504→  return (
+   505→    <AnimatePresence>
+   506→      {open && (
+   507→        <ModalShell open={open} onClose={() => setOpen(false)} title="Tax loss harvesting" icon={<DollarSign className="h-4 w-4 text-bull" />}>
+   508→          <div className="rounded-2xl p-4 bg-gradient-to-br from-bull/10 to-transparent border border-bull/20 mb-3">
+   509→            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Potential tax savings</div>
+   510→            <div className="text-3xl font-bold tabular text-bull">{fmtUsd(totalSavings)}</div>
+   511→            <div className="text-[11px] text-muted-foreground">From {fmtUsd(totalLoss)} in unrealized losses</div>
+   512→          </div>
+   513→          <div className="space-y-2">
+   514→            {opps.map((o) => (
+   515→              <div key={o.id} className="rounded-xl border border-border p-3">
+   516→                <div className="flex items-center gap-2 mb-1">
+   517→                  <span className="font-semibold text-sm">${o.tokenSymbol}</span>
+   518→                  <Chip variant="bear">{fmtUsd(o.unrealizedLoss)} loss</Chip>
+   519→                  <Chip variant="outline">{o.holdingPeriodDays}d held</Chip>
+   520→                  <span className="ml-auto text-sm font-bold tabular text-bull">Save {fmtUsd(o.potentialTaxSavings)}</span>
+   521→                </div>
+   522→                <p className="text-[11px] text-muted-foreground mb-2">{o.recommendation}</p>
+   523→                <button className="w-full py-1.5 rounded-lg bg-bull/15 text-bull border border-bull/30 text-xs font-bold">Harvest {o.tokenSymbol} loss</button>
+   524→              </div>
+   525→            ))}
+   526→          </div>
+   527→          <div className="rounded-xl border border-border p-3 mt-3 bg-surface-2/50">
+   528→            <div className="text-[10px] text-muted-foreground">⚠️ Wash sale rule: Wait 30 days before rebuying the same token to preserve the tax loss. Consider swapping to a similar token to maintain market exposure.</div>
+   529→          </div>
+   530→        </ModalShell>
+   531→      )}
+   532→    </AnimatePresence>
+   533→  );
+   534→}
+   535→
+   536→// ========== MODAL SHELL (shared) ==========
+   537→function ModalShell({ open, onClose, title, icon, children }: { open: boolean; onClose: () => void; title: string; icon: React.ReactNode; children: React.ReactNode }) {
+   538→  return (
+   539→    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+   540→      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+   541→      <motion.div initial={{ y: "100%", opacity: 0.5 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0.5 }} transition={{ type: "spring", damping: 30, stiffness: 320 }} onClick={(e) => e.stopPropagation()} className="relative w-full sm:max-w-md h-[88vh] flex flex-col bg-background border-t sm:border border-bull/20 rounded-t-3xl sm:rounded-3xl overflow-hidden">
+   542→        <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+   543→          {icon}
+   544→          <h2 className="font-semibold text-sm flex-1">{title}</h2>
+   545→          <button onClick={onClose} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+   546→        </div>
+   547→        <div className="flex-1 overflow-y-auto scrollbar-thin p-4">{children}</div>
+   548→      </motion.div>
+   549→    </motion.div>
+   550→  );
+   551→}
+   552→

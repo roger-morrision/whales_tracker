@@ -35,6 +35,7 @@ export function ProfileView() {
   const disconnectWallet = useMoby((s) => s.disconnectWallet);
   const wallet = useMoby((s) => s.wallet);
   const setWalletOpen = useMoby((s) => s.setWalletOpen);
+  const pushPermission = useMoby((s) => s.pushPermission);
 
   const watchlistTokens = useMemo(
     () => watchlist.map((id) => TOKENS.find((t) => t.id === id)).filter(Boolean),
@@ -183,9 +184,9 @@ export function ProfileView() {
             icon={<Bell className="h-4 w-4" />}
             label="Push notifications"
             sub={
-              useMoby.getState().pushPermission === "granted"
+              pushPermission === "granted"
                 ? "✓ Enabled"
-                : useMoby.getState().pushPermission === "denied"
+                : pushPermission === "denied"
                 ? "Denied"
                 : "Tap to enable"
             }

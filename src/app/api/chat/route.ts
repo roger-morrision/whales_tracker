@@ -9,20 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
  * Falls back to heuristic responses if the LLM is unavailable.
  */
 
-// Dynamic import to avoid bundling issues
-async function callLLM(messages: any[]) {
-  try {
-    const ZAI = (await import("z-ai-web-dev-sdk")).default;
-    const zai = await ZAI.create();
-    const completion = await zai.chat.completions.create({
-      messages,
-      thinking: { type: "disabled" },
-    });
-    return completion.choices[0]?.message?.content;
-  } catch {
-    return null;
-  }
-}
+// Note: LLM is dynamically imported inside POST handler to avoid bundling issues.
 
 const TOKEN_CONTEXT = `
 You are Moby, an AI crypto trading copilot built on Solana. You help users:
@@ -112,12 +99,13 @@ export async function POST(req: NextRequest) {
     const messages = body.messages || [];
     const lastMessage = messages[messages.length - 1]?.content || "";
 
-    // Try real LLM via z-ai-web-dev-sdk
+    // Try real LLM via z-ai-web-dev-sdk (dynamic import to avoid bundling issues)
     try {
+      const ZAI = (await import("z-ai-web-dev-sdk")).default;
       const zai = await ZAI.create();
       const completion = await zai.chat.completions.create({
         messages: [
-          { role: "assistant", content: TOKEN_CONTEXT },
+          { role: "system", content: TOKEN_CONTEXT },
           ...messages.map((m: any) => ({
             role: m.role === "user" ? "user" : "assistant",
             content: m.content,
@@ -152,4 +140,14 @@ export async function POST(req: NextRequest) {
       suggestedTokens: [],
     });
   }
+}
+
+// GET handler for health checks (frontend pings this for connectivity)
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    endpoint: "/api/chat",
+    method: "POST",
+    description: "AI copilot chat endpoint",
+  });
 }
