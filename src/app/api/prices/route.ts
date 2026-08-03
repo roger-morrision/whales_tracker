@@ -32,8 +32,8 @@ const MINT_ADDRESSES: Record<string, string> = {
 };
 
 const FALLBACK_PRICES: Record<string, { price: number; change24h: number; volume24h: number; marketCap: number }> = {
-  SOL: { price: 184.32, change24h: 6.42, volume24h: 3_820_000_000, marketCap: 87_200_000_000 },
-  WIF: { price: 2.84, change24h: 14.27, volume24h: 412_000_000, marketCap: 2_840_000_000 },
+  SOL: { price: 72.97, change24h: 6.42, volume24h: 3_820_000_000, marketCap: 87_200_000_000 },
+  WIF: { price: 0.142, change24h: 14.27, volume24h: 412_000_000, marketCap: 2_840_000_000 },
   JUP: { price: 0.842, change24h: 3.18, volume24h: 84_000_000, marketCap: 1_150_000_000 },
   BONK: { price: 0.0000284, change24h: 22.14, volume24h: 312_000_000, marketCap: 2_100_000_000 },
   JTO: { price: 3.12, change24h: -1.24, volume24h: 48_000_000, marketCap: 380_000_000 },
@@ -41,14 +41,14 @@ const FALLBACK_PRICES: Record<string, { price: number; change24h: number; volume
   DRIFT: { price: 1.84, change24h: 5.42, volume24h: 18_000_000, marketCap: 220_000_000 },
   IO: { price: 2.94, change24h: 9.18, volume24h: 12_000_000, marketCap: 280_000_000 },
   RNDR: { price: 8.42, change24h: 4.12, volume24h: 42_000_000, marketCap: 4_100_000_000 },
-  POPCAT: { price: 0.84, change24h: 18.2, volume24h: 82_000_000, marketCap: 840_000_000 },
+  POPCAT: { price: 0.044, change24h: 18.2, volume24h: 82_000_000, marketCap: 840_000_000 },
   HNT: { price: 7.42, change24h: -2.14, volume24h: 14_000_000, marketCap: 1_280_000_000 },
   MNGO: { price: 0.042, change24h: 38.12, volume24h: 8_400_000, marketCap: 42_000_000 },
   MOON: { price: 0.00042, change24h: 142.8, volume24h: 2_100_000, marketCap: 420_000 },
   ETH: { price: 3420, change24h: 1.84, volume24h: 12_400_000_000, marketCap: 410_000_000_000 },
   BTC: { price: 64280, change24h: 2.14, volume24h: 24_800_000_000, marketCap: 1_270_000_000_000 },
   NEON: { price: 0.42, change24h: -3.14, volume24h: 1_200_000, marketCap: 42_000_000 },
-  RAY: { price: 2.42, change24h: 3.84, volume24h: 18_000_000, marketCap: 640_000_000 },
+  RAY: { price: 0.607, change24h: 3.84, volume24h: 18_000_000, marketCap: 640_000_000 },
   TNSR: { price: 0.52, change24h: -4.12, volume24h: 4_200_000, marketCap: 62_000_000 },
 };
 

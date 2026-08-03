@@ -14,16 +14,31 @@ import { fetchTrending, fetchHotSearches } from "@/lib/gmgn";
 // Note: LLM is dynamically imported inside POST handler to avoid bundling issues.
 
 async function buildLiveContext(): Promise<string> {
-  // Base context with static token data
+  // Fetch real prices from our own /api/prices endpoint
+  let priceLine = "Available tokens (real prices from DexScreener):";
+  try {
+    const priceRes = await fetch("http://localhost:3000/api/prices?symbols=SOL,WIF,JUP,BONK,JTO,PYTH,DRIFT,IO,RNDR,POPCAT,HNT,MNGO,ETH,BTC,NEON,RAY");
+    const priceData = await priceRes.json();
+    if (priceData?.prices) {
+      const parts: string[] = [];
+      for (const [sym, info] of Object.entries(priceData.prices)) {
+        const p = info as any;
+        const change = p.change24h ? `, ${p.change24h >= 0 ? "+" : ""}${p.change24h.toFixed(1)}%` : "";
+        parts.push(`${sym} ($${p.price.toFixed(p.price < 0.01 ? 8 : p.price < 1 ? 4 : 2)}${change})`);
+      }
+      priceLine = `Available tokens (live DexScreener prices): ${parts.join(", ")}.`;
+    }
+  } catch {
+    priceLine = "Available tokens: SOL ($73), WIF ($0.14), JUP ($0.84), BONK ($0.0000284), POPCAT ($0.044), RAY ($0.61), DRIFT ($1.84), IO ($2.94).";
+  }
+
   let ctx = `You are Moby, an AI crypto trading copilot built on Solana. You help users:
 - Analyze tokens (price, smart money flow, security, predictions)
 - Validate trade ideas with on-chain data
 - Track portfolio performance
 - Discover trending narratives
 
-Available tokens: SOL ($184), WIF ($2.84, +14%), JUP ($0.84), BONK ($0.0000284, +22%), 
-JTO ($3.12), PYTH ($0.38), DRIFT ($1.84), IO ($2.94), RNDR ($8.42), POPCAT ($0.84, +18%),
-HNT ($7.42), TNSR ($0.52), MNGO ($0.042, +38%), MOON ($0.00042, +142%), BTC ($64,280), ETH ($3,420).
+${priceLine}
 
 Current narratives: AI Agents (+12%), Meme Season (+28%), DePIN (+5%), Cat Coins (+64%), Solana DeFi (+6%).
 
@@ -90,11 +105,11 @@ function heuristicReply(userText: string): string {
   const lower = userText.toLowerCase();
 
   const tokenMap: Record<string, string> = {
-    "sol": "SOL is trading at $184.32, up 6.42% in 24h. Smart money has net accumulated $12.4M across 412 tracked wallets. Liquidity: $1.24B. Strong L1 fundamentals with growing DeFi TVL.",
-    "wif": "WIF is at $2.84, up 14.27% in 24h. Smart money net accumulated $4.22M from 184 wallets — that's a healthy concentration. Liquidity: $84M. Volume 24h: $412M.",
+    "sol": "SOL is trading at $72.97, up 6.42% in 24h. Smart money has net accumulated $12.4M across 412 tracked wallets. Liquidity: $1.24B. Strong L1 fundamentals with growing DeFi TVL.",
+    "wif": "WIF is at $0.142, up 14.27% in 24h. Smart money net accumulated $4.22M from 184 wallets — that's a healthy concentration. Liquidity: $84M. Volume 24h: $412M.",
     "jup": "JUP is at $0.842, up 3.18% in 24h. Smart money inflow: $1.82M from 221 wallets. Liquidity: $48M. Solid DeFi infrastructure play.",
     "bonk": "BONK at $0.0000284, up 22.14%. Smart money inflow: $3.12M from 168 wallets. High volatility meme — position size accordingly.",
-    "mngo": "MNGO at $0.0421, up 38.12% — strongest mover today. 7 smart wallets clustered in within 60 minutes for $1.24M inflow at 92% confidence. This is a high-conviction smart money signal.",
+    "mngo": "MNGO at $0.042, up 38.12% — strongest mover today. 7 smart wallets clustered in within 60 minutes for $1.24M inflow at 92% confidence. This is a high-conviction smart money signal.",
     "io": "IO at $2.94, up 9.18%. Smart money inflow: $980K from 102 wallets. AI infrastructure narrative with real utility. Liquidity: $12.4M.",
     "moon": "MOON at $0.00042, up 142.8% — just launched 18h ago! 3 smart wallets bought within 12 minutes of launch. Extremely high risk/high reward. Only invest what you can afford to lose.",
   };

@@ -30,9 +30,9 @@ const SYMBOL_TO_MINT: Record<string, string> = {
 };
 
 const TOKEN_PRICES: Record<string, { symbol: string; price: number; liquidity: number }> = {
-  "So11111111111111111111111111111111111111112": { symbol: "SOL", price: 184.32, liquidity: 1_240_000_000 },
+  "So11111111111111111111111111111111111111112": { symbol: "SOL", price: 72.97, liquidity: 1_240_000_000 },
   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": { symbol: "USDC", price: 1.0, liquidity: 2_400_000_000 },
-  "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm": { symbol: "WIF", price: 2.84, liquidity: 84_000_000 },
+  "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm": { symbol: "WIF", price: 0.142, liquidity: 84_000_000 },
   "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbHedv8mX5qQK": { symbol: "JUP", price: 0.842, liquidity: 48_000_000 },
   "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pgPNw": { symbol: "BONK", price: 0.0000284, liquidity: 56_000_000 },
   "jtojtomepa8beP8AuQc6baXW3BHW4fomxFhNt2kkoRJ": { symbol: "JTO", price: 3.12, liquidity: 12_000_000 },
@@ -40,7 +40,7 @@ const TOKEN_PRICES: Record<string, { symbol: string; price: number; liquidity: n
   "DriFtupJYLTosbwoN8koMbEYSx54aFqk4VYxwqXf9YqT": { symbol: "DRIFT", price: 1.84, liquidity: 6_000_000 },
   "GoMwV1h3EuxKNvj7HfVJns2NdvhLamgoG4YNLEFLUHKY": { symbol: "IO", price: 2.94, liquidity: 4_000_000 },
   "rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof": { symbol: "RNDR", price: 8.42, liquidity: 8_000_000 },
-  "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": { symbol: "POPCAT", price: 0.84, liquidity: 12_000_000 },
+  "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": { symbol: "POPCAT", price: 0.044, liquidity: 12_000_000 },
 };
 
 export async function GET(req: NextRequest) {

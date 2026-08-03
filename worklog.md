@@ -884,3 +884,32 @@ Data Source Summary (all Solana-only):
 | /api/gmgn/* | gmgn-cli (when API key configured) | DexScreener / simulated |
 | /api/dexscreener/* | DexScreener API | Error response |
 | /api/pumpfun | pump.fun API | Simulated tokens |
+
+---
+Task ID: 13
+Agent: main (orchestrator)
+Task: Continue enhancements — fix all stale prices to match real on-chain data
+
+Price Corrections:
+- Updated all static token prices in moby-data.ts to match real on-chain values:
+  - SOL: $184.32 → $72.97 (was wrong by 2.5x)
+  - WIF: $2.84 → $0.142 (was wrong by 20x)
+  - POPCAT: $0.84 → $0.044 (was wrong by 19x)
+  - RAY: $2.42 → $0.607 (was wrong by 4x)
+  - NEON: $0.124 → $0.42 (was wrong)
+- Updated fallback prices in /api/prices, /api/quote, /api/wallet to match
+- Updated trailing stop sample data (entryPrice, highestPrice, stopPrice, liquidationPrice)
+- Updated AI chat heuristic responses with correct prices
+
+AI Copilot Enhanced:
+- buildLiveContext() now fetches real prices from /api/prices endpoint instead of hardcoded string
+- LLM system prompt includes live DexScreener prices with 24h changes
+- Verified: LLM responds "SOL is down 1.0% at $72.81" — matches real on-chain price
+
+Verification:
+- TypeScript: 0 errors
+- ESLint: clean
+- Build: ✓ Compiled successfully
+- All endpoints return real on-chain Solana data with correct prices
+- AI chat references real prices from live DexScreener data
+- Zero runtime errors

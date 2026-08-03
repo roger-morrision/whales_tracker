@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
   const prices = await fetchTokenPrices(tokenMints);
 
   // SOL price — fetch via DexScreener too
-  const solPrice = prices["So11111111111111111111111111111111111111112"] ?? 184;
+  const solPrice = prices["So11111111111111111111111111111111111111112"] ?? 72.97;
 
   // Compute USD values
   let totalUsd = solBalance * solPrice;
