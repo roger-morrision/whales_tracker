@@ -95,6 +95,52 @@
   --sidebar-ring: oklch(0.78 0.18 152 / 60%);
 }
 
+/* Light theme — activated when <html class="light"> */
+.light {
+  --radius: 0.875rem;
+  --background: oklch(0.98 0.003 240);
+  --foreground: oklch(0.15 0.005 240);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.005 240);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.005 240);
+  --primary: oklch(0.55 0.15 152);
+  --primary-foreground: oklch(0.98 0.003 240);
+  --secondary: oklch(0.95 0.004 240);
+  --secondary-foreground: oklch(0.15 0.005 240);
+  --muted: oklch(0.96 0.004 240);
+  --muted-foreground: oklch(0.45 0.01 240);
+  --accent: oklch(0.55 0.15 152);
+  --accent-foreground: oklch(0.98 0.003 240);
+  --destructive: oklch(0.55 0.20 22);
+  --border: oklch(0 0 0 / 10%);
+  --input: oklch(0 0 0 / 8%);
+  --ring: oklch(0.55 0.15 152 / 60%);
+
+  /* Moby-specific — keep brand colors but adjust for light bg */
+  --bull: oklch(0.55 0.15 152);
+  --bear: oklch(0.55 0.20 22);
+  --gold: oklch(0.60 0.14 85);
+  --surface: oklch(0.97 0.003 240);
+  --surface-2: oklch(0.95 0.004 240);
+  --surface-3: oklch(0.92 0.005 240);
+
+  --chart-1: oklch(0.55 0.15 152);
+  --chart-2: oklch(0.60 0.14 85);
+  --chart-3: oklch(0.50 0.18 250);
+  --chart-4: oklch(0.55 0.16 12);
+  --chart-5: oklch(0.48 0.12 200);
+
+  --sidebar: oklch(0.97 0.003 240);
+  --sidebar-foreground: oklch(0.15 0.005 240);
+  --sidebar-primary: oklch(0.55 0.15 152);
+  --sidebar-primary-foreground: oklch(0.98 0.003 240);
+  --sidebar-accent: oklch(0.95 0.004 240);
+  --sidebar-accent-foreground: oklch(0.15 0.005 240);
+  --sidebar-border: oklch(0 0 0 / 10%);
+  --sidebar-ring: oklch(0.55 0.15 152 / 60%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

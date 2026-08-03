@@ -228,6 +228,22 @@ export default function Home() {
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       tickPrices();
+      // ===== Enhancement: Real-time price alert checking =====
+      // After each price tick, check all active, non-triggered custom alerts.
+      const ts = useMoby.getState();
+      const ps = ts.prices;
+      for (const alert of ts.customAlerts) {
+        if (!alert.active || alert.triggered) continue;
+        const live = ps[alert.tokenId]?.price;
+        if (!live || live <= 0) continue;
+        if (alert.condition === "price_above" && live >= alert.threshold) {
+          ts.triggerCustomAlert(alert.id);
+        } else if (alert.condition === "price_below" && live <= alert.threshold) {
+          ts.triggerCustomAlert(alert.id);
+        }
+        // smart_money_inflow / smart_money_outflow / new_whale_buy conditions
+        // are checked by the whale alert pusher + GMGN feed pollers, not here.
+      }
       // ===== Enhancement #12: Trailing-stop price tracking =====
       // After each tick, update peaks and check for triggers.
       const state = useMoby.getState();

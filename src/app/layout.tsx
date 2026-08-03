@@ -54,8 +54,24 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Inline script prevents flash-of-dark-theme for users who selected light theme.
+  // Runs before React hydrates — reads from localStorage (moby-storage) and sets the class.
+  const themeScript = `(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('moby-storage') || '{}');
+      const theme = stored.state?.theme;
+      if (theme === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      }
+    } catch (e) {}
+  })();`;
+
   return (
     <html lang="en" suppressHydrationWarning className="dark">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

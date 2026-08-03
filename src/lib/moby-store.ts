@@ -364,6 +364,7 @@ interface MobyState {
   customAlerts: CustomAlert[];
   addCustomAlert: (a: Omit<CustomAlert, "id" | "createdAt">) => void;
   removeCustomAlert: (id: string) => void;
+  triggerCustomAlert: (id: string) => void;
 
   // ===== NEW: Settings =====
   settingsOpen: boolean;
@@ -1211,6 +1212,39 @@ export const useMoby = create<MobyState>()(
     })),
   removeCustomAlert: (id) =>
     set((s) => ({ customAlerts: s.customAlerts.filter((x) => x.id !== id) })),
+  triggerCustomAlert: (id) => {
+    const alert = get().customAlerts.find((a) => a.id === id);
+    if (!alert || alert.triggered || !alert.active) return;
+    set((s) => ({
+      customAlerts: s.customAlerts.map((a) =>
+        a.id === id ? { ...a, triggered: true } : a
+      ),
+    }));
+    const condLabel = alert.condition === "price_above" ? "crossed above" :
+                      alert.condition === "price_below" ? "dropped below" :
+                      alert.condition === "smart_money_inflow" ? "smart money inflow detected" :
+                      alert.condition === "smart_money_outflow" ? "smart money outflow detected" :
+                      "new whale buy detected";
+    get().pushToast({
+      title: `🔔 Alert: ${alert.tokenSymbol} ${condLabel}`,
+      description: `Threshold: ${fmtUsd(alert.threshold, { compact: true })} · Channels: ${alert.channels.join(", ")}`,
+      type: "alert",
+      actionLabel: `View ${alert.tokenSymbol}`,
+      actionId: alert.tokenId,
+    });
+    // Fire browser notification if permission granted
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      try {
+        new Notification(`🔔 ${alert.tokenSymbol} ${condLabel}`, {
+          body: `Threshold: ${fmtUsd(alert.threshold, { compact: true })}`,
+          icon: "/logo.svg",
+          tag: alert.id,
+        });
+      } catch {
+        // ignore
+      }
+    }
+  },
 
   // ===== NEW: Settings =====
   settingsOpen: false,

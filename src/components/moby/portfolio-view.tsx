@@ -85,6 +85,44 @@ export function PortfolioView() {
   const totalPnlPct = (totalPnl / totalCost) * 100;
   const isBull = dayChange >= 0;
 
+  // Compute realized P&L from trade history (profit from completed sells)
+  const tradeHistory = useMoby((s) => s.tradeHistory);
+  const realizedPnl = useMemo(() => {
+    // Group trades by token to compute per-token realized P&L
+    const byToken: Record<string, { buys: { usd: number; amount: number }[]; sells: { usd: number; amount: number }[] }> = {};
+    for (const t of tradeHistory) {
+      if (!byToken[t.tokenId]) byToken[t.tokenId] = { buys: [], sells: [] };
+      if (t.side === "BUY") {
+        byToken[t.tokenId].buys.push({ usd: t.usdAmount, amount: t.tokenAmount });
+      } else {
+        byToken[t.tokenId].sells.push({ usd: t.usdAmount, amount: t.tokenAmount });
+      }
+    }
+    // For each token, compute realized P&L using FIFO matching
+    let totalRealized = 0;
+    for (const [tokenId, { buys, sells }] of Object.entries(byToken)) {
+      let buyIdx = 0;
+      let remainingBuyAmount = buys[0]?.amount ?? 0;
+      for (const sell of sells) {
+        let sellAmount = sell.amount;
+        let costBasis = 0;
+        while (sellAmount > 0 && buyIdx < buys.length) {
+          const matched = Math.min(sellAmount, remainingBuyAmount);
+          const buyPrice = buys[buyIdx].usd / Math.max(0.000001, buys[buyIdx].amount);
+          costBasis += matched * buyPrice;
+          sellAmount -= matched;
+          remainingBuyAmount -= matched;
+          if (remainingBuyAmount <= 0.000001) {
+            buyIdx++;
+            remainingBuyAmount = buys[buyIdx]?.amount ?? 0;
+          }
+        }
+        totalRealized += sell.usd - costBasis;
+      }
+    }
+    return totalRealized;
+  }, [tradeHistory]);
+
   // Slice history by range
   const history = useMemo(() => {
     const h = PORTFOLIO.history;
@@ -142,6 +180,15 @@ export function PortfolioView() {
             {totalPnl >= 0 ? "+" : "-"}
             {fmtUsd(Math.abs(totalPnl), { compact: true })} ({fmtPct(totalPnlPct)})
           </span>
+          {tradeHistory.length > 0 && (
+            <>
+              {" · "}
+              Realized:{" "}
+              <span className={cn("font-semibold tabular", realizedPnl >= 0 ? "text-bull" : "text-bear")}>
+                {realizedPnl >= 0 ? "+" : "-"}{fmtUsd(Math.abs(realizedPnl), { compact: true })}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="h-32 mt-3 -mx-2">

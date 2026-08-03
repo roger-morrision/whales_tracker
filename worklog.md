@@ -761,3 +761,58 @@ Verification:
 - All 8 tested endpoints return 200
 - AI chat returns source="llm" with real GMGN trending data in response
 - Zero runtime errors in dev.log
+
+---
+Task ID: 11
+Agent: main (orchestrator)
+Task: Continue all enhancements and bug fixes (round 11 — light theme, price alerts, realized P&L)
+
+Features Shipped:
+
+Light Theme CSS (globals.css + layout.tsx + page.tsx)
+- The theme toggle was added in round 10 but had no visual effect — no light theme CSS existed
+- Added complete `.light` class in globals.css with all CSS variables overridden:
+  - Background: white (oklch 0.98) instead of dark (oklch 0.13)
+  - Foreground: dark text (oklch 0.15) instead of light (oklch 0.97)
+  - Card/popover: pure white
+  - Surfaces: light grays (0.92-0.97)
+  - Bull/bear/gold: slightly darker shades for contrast on light backgrounds
+  - Borders: dark-on-light (oklch 0 0 0 / 10%) instead of light-on-dark
+  - All sidebar, chart, and muted variables adjusted
+- Added inline script in layout.tsx `<head>` to prevent FOUC:
+  - Reads `moby-storage` from localStorage before React hydrates
+  - If theme is "light", removes "dark" class and adds "light" to `<html>`
+  - Prevents flash of dark theme for light-theme users
+- page.tsx useEffect already applies theme class on mount
+
+Real-Time Price Alert Checking (moby-store.ts + page.tsx)
+- Users created custom alerts (price_above, price_below) but nothing ever checked them
+- New `triggerCustomAlert(id)` store action:
+  - Marks alert as triggered (prevents re-firing)
+  - Pushes toast with condition label + threshold + channels
+  - Fires browser Notification if permission granted
+- Price alert checking loop integrated into the 2.5s price-tick effect:
+  - Iterates all active, non-triggered custom alerts
+  - For price_above: fires when live price >= threshold
+  - For price_below: fires when live price <= threshold
+  - smart_money_inflow/outflow/new_whale_buy checked by separate GMGN feed pollers
+  - Skips when tab hidden
+
+Realized P&L from Trade History (portfolio-view.tsx)
+- Portfolio header previously showed only unrealized P&L (total value - cost basis)
+- Now also shows realized P&L computed from trade history using FIFO matching:
+  - Groups all trades by tokenId
+  - For each token, matches sells against buys in FIFO order
+  - Computes cost basis for each sell from the matched buy prices
+  - Realized P&L = sell USD - matched cost basis
+  - Aggregates across all tokens
+- Displayed as "Realized: +$X" alongside the existing "All-time PnL" line
+- Only shows when tradeHistory has entries (hidden for new users with no trades)
+
+Verification:
+- TypeScript: 0 errors in src/
+- ESLint: clean
+- Production build: ✓ Compiled successfully in 16.7s
+- All 8 endpoints return 200
+- AI chat returns source="llm" with live GMGN trending data
+- Zero runtime errors
