@@ -70,6 +70,15 @@ export default function Home() {
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
   const setCopilotOpen = useMoby((s) => s.setCopilotOpen);
   const wallet = useMoby((s) => s.wallet);
+  const theme = useMoby((s) => s.theme);
+
+  // Apply theme to document element
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.remove("dark", "light");
+      document.documentElement.classList.add(theme);
+    }
+  }, [theme]);
 
   // Register PWA service worker
   useEffect(() => {

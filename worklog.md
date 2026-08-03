@@ -721,3 +721,43 @@ Final Codebase Stats:
 - ~1400-line GMGN client lib (gmgn-cli integration + DexScreener fallback)
 - 9 rounds of enhancements documented in worklog.md
 - All 25 features from the original GMGN/DexScreener research audit implemented
+
+---
+Task ID: 10
+Agent: main (orchestrator)
+Task: Continue all enhancements and bug fixes (round 10 — theme toggle, trade history, AI copilot GMGN)
+
+Features Shipped:
+
+Theme Toggle (settings-modal.tsx + page.tsx)
+- Store already had `theme: "dark" | "light"` + `toggleTheme` action (persisted)
+- Was never rendered in the Settings UI or applied to the document
+- Added "🌓 Theme" section to DisplaySettings with Dark/Light toggle buttons
+- Added useEffect in page.tsx that applies `dark`/`light` class to `document.documentElement`
+- Theme persists across page reloads via store partialize
+
+Trade History View (portfolio-view.tsx — TradeHistoryView)
+- New "History" tab in Portfolio (4th tab alongside Crypto/NFTs/Stocks)
+- Shows stats summary: total trades, total buy USD, total sell USD
+- Trade list with: token symbol, BUY/SELL badge, amount @ price, timestamp, USD value, tx hash
+- Each trade row is clickable (opens token detail)
+- Shows up to 50 most recent trades from `tradeHistory` store slice
+- Empty state with "📊 No trades yet" message
+- Trades are populated by: manual trades via TradeModal, snipe-bot auto-execution, copy-trade mirroring, trailing-stop fires, batch trades
+
+AI Copilot Enhanced with Live GMGN Data (api/chat/route.ts)
+- Replaced static `TOKEN_CONTEXT` with dynamic `buildLiveContext()` function
+- Fetches live GMGN trending tokens (top 5 by volume) — includes symbol, price, 24h change, market cap, volume, smart money count
+- Fetches GMGN hot searches (top 3) — includes symbol + search count
+- Appends live data to the system prompt sent to the LLM
+- LLM now references real trending tokens in its responses (verified: "GMGN trending: AURACAT (+325%), BRICK (+55.7%)")
+- Falls back to static context if GMGN/DexScreener unavailable
+- System prompt instructs LLM to mention "GMGN live data" when referencing trending tokens
+
+Verification:
+- TypeScript: 0 errors in src/
+- ESLint: clean
+- Production build: ✓ Compiled successfully in 16.4s
+- All 8 tested endpoints return 200
+- AI chat returns source="llm" with real GMGN trending data in response
+- Zero runtime errors in dev.log

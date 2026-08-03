@@ -340,8 +340,31 @@ function DisplaySettings({
   settings: AppSettings;
   setSettings: (s: Partial<AppSettings>) => void;
 }) {
+  const theme = useMoby((s) => s.theme);
+  const toggleTheme = useMoby((s) => s.toggleTheme);
   return (
     <div className="space-y-4">
+      <Section title="Theme" emoji="🌓">
+        <div className="flex gap-1.5">
+          {(["dark", "light"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => {
+                if (theme !== t) toggleTheme();
+              }}
+              className={cn(
+                "flex-1 py-2 rounded-lg text-xs font-semibold border",
+                theme === t
+                  ? "bg-bull/15 text-bull border-bull/30"
+                  : "bg-surface-2 text-muted-foreground border-border"
+              )}
+            >
+              {t === "dark" ? "🌙 Dark" : "☀️ Light"}
+            </button>
+          ))}
+        </div>
+      </Section>
+
       <Section title="Currency" emoji="💵">
         <div className="flex gap-1.5">
           {(["USD", "EUR", "JPY", "CNY"] as const).map((c) => (

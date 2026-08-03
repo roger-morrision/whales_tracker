@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchTrending, fetchHotSearches } from "@/lib/gmgn";
 
 /**
  * POST /api/chat
@@ -7,12 +8,14 @@ import { NextRequest, NextResponse } from "next/server";
  * AI copilot chat endpoint.
  * Uses z-ai-web-dev-sdk (server-side only) for real LLM responses.
  * Falls back to heuristic responses if the LLM is unavailable.
+ * Enhanced with live GMGN trending + hot-search data for real-time context.
  */
 
 // Note: LLM is dynamically imported inside POST handler to avoid bundling issues.
 
-const TOKEN_CONTEXT = `
-You are Moby, an AI crypto trading copilot built on Solana. You help users:
+async function buildLiveContext(): Promise<string> {
+  // Base context with static token data
+  let ctx = `You are Moby, an AI crypto trading copilot built on Solana. You help users:
 - Analyze tokens (price, smart money flow, security, predictions)
 - Validate trade ideas with on-chain data
 - Track portfolio performance
@@ -25,11 +28,40 @@ HNT ($7.42), TNSR ($0.52), MNGO ($0.042, +38%), MOON ($0.00042, +142%), BTC ($64
 Current narratives: AI Agents (+12%), Meme Season (+28%), DePIN (+5%), Cat Coins (+64%), Solana DeFi (+6%).
 
 Smart money signals: MNGO cluster buy (7 wallets, $1.24M), WIF whale accumulation ($4.22M), 
-IO smart money entry (5 wallets, $980K).
+IO smart money entry (5 wallets, $980K).`;
+
+  // Fetch live GMGN trending tokens
+  try {
+    const trending = await fetchTrending("1h", "volume", 5);
+    if (trending && trending.length > 0) {
+      const trendingStr = trending
+        .map((t, i) => `${i + 1}. ${t.symbol} — $${t.price?.toFixed(6) || "?"} (${t.price_change_24h >= 0 ? "+" : ""}${t.price_change_24h?.toFixed(1) || "?"}%) MC $${(t.market_cap / 1e6).toFixed(1)}M Vol $${(t.volume_24h / 1e3).toFixed(0)}K${t.smart_money_holders ? ` ${t.smart_money_holders} smart` : ""}`)
+        .join("\n");
+      ctx += `\n\nLive GMGN trending (top 5 by volume):\n${trendingStr}`;
+    }
+  } catch {
+    // GMGN unavailable — use static context only
+  }
+
+  // Fetch hot searches
+  try {
+    const hot = await fetchHotSearches(["sol"], "1h", 3);
+    if (hot && hot.length > 0) {
+      const hotStr = hot.map((h, i) => `${i + 1}. ${h.symbol} (${h.search_count_24h.toLocaleString()} searches)`).join(", ");
+      ctx += `\n\nHot searches: ${hotStr}`;
+    }
+  } catch {
+    // skip
+  }
+
+  ctx += `
 
 Keep responses concise (2-4 sentences max). Use token symbols with $ prefix. Be direct and actionable.
 If asked about non-crypto topics, redirect to crypto trading.
-`;
+When referencing trending tokens, mention they're from GMGN live data.`;
+
+  return ctx;
+}
 
 const HEURISTIC_RESPONSES: { keywords: string[]; response: string }[] = [
   {
@@ -100,6 +132,9 @@ export async function POST(req: NextRequest) {
     const lastMessage = messages[messages.length - 1]?.content || "";
 
     // Try real LLM via z-ai-web-dev-sdk (dynamic import to avoid bundling issues)
+    // Build live context with GMGN trending + hot searches
+    const TOKEN_CONTEXT = await buildLiveContext();
+
     try {
       const ZAI = (await import("z-ai-web-dev-sdk")).default;
       const zai = await ZAI.create();

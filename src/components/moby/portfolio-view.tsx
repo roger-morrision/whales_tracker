@@ -39,7 +39,7 @@ type Range = "1D" | "1W" | "1M" | "ALL";
 
 export function PortfolioView() {
   const [range, setRange] = useState<Range>("1M");
-  const [assetTab, setAssetTab] = useState<"crypto" | "nft" | "stocks">("crypto");
+  const [assetTab, setAssetTab] = useState<"crypto" | "nft" | "stocks" | "history">("crypto");
   const prices = useMoby((s) => s.prices);
   const portfolioHoldings = useMoby((s) => s.portfolioHoldings);
 
@@ -218,6 +218,7 @@ export function PortfolioView() {
             { k: "crypto", label: "Crypto" },
             { k: "nft", label: "NFTs" },
             { k: "stocks", label: "Stocks" },
+            { k: "history", label: "History" },
           ].map((s) => (
             <button
               key={s.k}
@@ -234,6 +235,7 @@ export function PortfolioView() {
         {assetTab === "crypto" && <CryptoHoldings />}
         {assetTab === "nft" && <NftCollectionsList />}
         {assetTab === "stocks" && <StockHoldings />}
+        {assetTab === "history" && <TradeHistoryView />}
       </section>
 
       {/* Trading automation tools */}
@@ -407,6 +409,106 @@ function StockHoldings() {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// ===== Trade History View =====
+function TradeHistoryView() {
+  const tradeHistory = useMoby((s) => s.tradeHistory);
+  const openToken = useMoby((s) => s.openToken);
+
+  if (tradeHistory.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-3xl mb-2">📊</div>
+        <div className="text-sm text-muted-foreground">No trades yet.</div>
+        <div className="text-[11px] text-muted-foreground mt-1">
+          Your executed trades will appear here with P&L tracking.
+        </div>
+      </div>
+    );
+  }
+
+  // Compute aggregate stats
+  const totalBuyUsd = tradeHistory.filter((t) => t.side === "BUY").reduce((s, t) => s + t.usdAmount, 0);
+  const totalSellUsd = tradeHistory.filter((t) => t.side === "SELL").reduce((s, t) => s + t.usdAmount, 0);
+  const buyCount = tradeHistory.filter((t) => t.side === "BUY").length;
+  const sellCount = tradeHistory.filter((t) => t.side === "SELL").length;
+
+  return (
+    <div className="space-y-3">
+      {/* Stats summary */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-border p-2.5 text-center">
+          <div className="text-lg font-bold tabular">{tradeHistory.length}</div>
+          <div className="text-[10px] text-muted-foreground">Total trades</div>
+        </div>
+        <div className="rounded-xl border border-bull/30 bg-bull/5 p-2.5 text-center">
+          <div className="text-lg font-bold tabular text-bull">{fmtUsd(totalBuyUsd, { compact: true })}</div>
+          <div className="text-[10px] text-muted-foreground">{buyCount} buys</div>
+        </div>
+        <div className="rounded-xl border border-bear/30 bg-bear/5 p-2.5 text-center">
+          <div className="text-lg font-bold tabular text-bear">{fmtUsd(totalSellUsd, { compact: true })}</div>
+          <div className="text-[10px] text-muted-foreground">{sellCount} sells</div>
+        </div>
+      </div>
+
+      {/* Trade list */}
+      <div className="space-y-1">
+        {tradeHistory.slice(0, 50).map((trade) => {
+          const isBuy = trade.side === "BUY";
+          const date = new Date(trade.ts);
+          const timeStr = date.toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          });
+          return (
+            <div
+              key={trade.id}
+              onClick={() => openToken(trade.tokenId)}
+              className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-surface-2 cursor-pointer transition-colors"
+            >
+              <div className={cn(
+                "h-8 w-8 rounded-lg grid place-items-center shrink-0",
+                isBuy ? "bg-bull/15" : "bg-bear/15"
+              )}>
+                {isBuy ? (
+                  <ArrowUpRight className="h-4 w-4 text-bull" />
+                ) : (
+                  <ArrowDownRight className="h-4 w-4 text-bear" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold">{trade.tokenSymbol}</span>
+                  <span className={cn(
+                    "text-[9px] font-bold px-1 py-0.5 rounded",
+                    isBuy ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
+                  )}>
+                    {trade.side}
+                  </span>
+                </div>
+                <div className="text-[10px] text-muted-foreground tabular">
+                  {fmtNum(trade.tokenAmount)} @ {fmtPrice(trade.price)} · {timeStr}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={cn("text-sm font-bold tabular", isBuy ? "text-bull" : "text-bear")}>
+                  {isBuy ? "+" : "-"}{fmtUsd(trade.usdAmount, { compact: true })}
+                </div>
+                {trade.txHash && (
+                  <div className="text-[9px] text-muted-foreground font-mono truncate max-w-[80px]">
+                    {trade.txHash.slice(0, 12)}…
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
