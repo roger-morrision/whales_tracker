@@ -347,53 +347,119 @@ function DiscoverMoreModal() {
   );
 }
 
-// ===== Whale Buy/Sell Flows Row (live on-chain) =====
+// ===== Whale Buy/Sell Flows Row (real GMGN smart-money feed) =====
 function WhaleFlowsRow() {
-  const flows = useMoby((s) => s.flows);
-  const openToken = useMoby((s) => s.openToken);
+  const { data, loading, source } = useGmgn<{ trades: any[] }>(
+    "/api/gmgn/smart-money-feed?chain=sol&limit=10",
+    { refreshMs: 30_000 }
+  );
 
   return (
     <section>
-      <SectionHeader
-        title="Whale buy/sell"
-        emoji="🐋"
-        action="All"
-        onAction={() => useMoby.getState().setActiveTab("whales")}
-      />
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold">🐋 Whale buy/sell</span>
+          {source && (
+            <Chip variant={source === "gmgn" || source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
+              {source === "gmgn" || source === "dexscreener" ? "live" : "demo"}
+            </Chip>
+          )}
+        </div>
+        <button
+          onClick={() => useMoby.getState().setActiveTab("whales")}
+          className="text-[11px] text-muted-foreground hover:text-bull"
+        >
+          All →
+        </button>
+      </div>
       <div className="space-y-1">
-        {flows.slice(0, 6).map((flow) => {
-          const isBuy = flow.type === "ACCUMULATE" || flow.type === "NEW_POSITION";
-          const tk = TOKENS.find((t) => t.symbol === flow.tokenSymbol);
-          return (
-            <div
-              key={flow.id}
-              onClick={() => tk && openToken(tk.id)}
-              className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-surface-2 cursor-pointer transition-colors"
-            >
-              <div className={cn(
-                "h-8 w-8 rounded-lg grid place-items-center shrink-0",
-                isBuy ? "bg-bull/15" : "bg-bear/15"
-              )}>
-                {isBuy ? <ArrowUpRight className="h-3.5 w-3.5 text-bull" /> : <ArrowDownRight className="h-3.5 w-3.5 text-bear" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-semibold">{flow.tokenSymbol}</span>
-                  <Chip variant={isBuy ? "bull" : "bear"} className="text-[9px]">{isBuy ? "BUY" : "SELL"}</Chip>
-                  <span className="text-[10px] text-muted-foreground truncate">{flow.walletLabel}</span>
+        {loading && !data ? (
+          [1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="rounded-lg border border-border p-2 animate-pulse">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-surface-3" />
+                <div className="flex-1 space-y-1">
+                  <div className="h-3 w-20 bg-surface-3 rounded" />
+                  <div className="h-2 w-32 bg-surface-3 rounded" />
                 </div>
-                <div className="text-[10px] text-muted-foreground">
-                  {fmtUsd(flow.usdValue, { compact: true })} · {fmtAgo(flow.agoSeconds)}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className={cn("text-xs font-bold tabular", isBuy ? "text-bull" : "text-bear")}>
-                  {isBuy ? "+" : "-"}{fmtUsd(flow.usdValue, { compact: true })}
-                </div>
+                <div className="h-4 w-12 bg-surface-3 rounded" />
               </div>
             </div>
-          );
-        })}
+          ))
+        ) : data?.trades && data.trades.length > 0 ? (
+          data.trades.slice(0, 8).map((t: any, i: number) => {
+            const isBuy = t.type === "buy";
+            return (
+              <div
+                key={i}
+                onClick={() => {
+                  const tk = TOKENS.find((tt) => tt.mint === t.token_address);
+                  if (tk) {
+                    useMoby.getState().openToken(tk.id);
+                  } else {
+                    useMoby.getState().viewExternalToken({
+                      address: t.token_address,
+                      symbol: t.token_symbol,
+                      name: t.token_symbol,
+                      price: t.price ?? 0,
+                      change_24h: t.price_change_since ?? 0,
+                      volume_24h: t.amount_usd ?? 0,
+                      market_cap: 0,
+                      liquidity: 0,
+                      dex: "SOL",
+                    });
+                  }
+                }}
+                className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-surface-2 cursor-pointer transition-colors"
+              >
+                <div className={cn(
+                  "h-8 w-8 rounded-lg grid place-items-center shrink-0",
+                  isBuy ? "bg-bull/15" : "bg-bear/15"
+                )}>
+                  {isBuy ? <ArrowUpRight className="h-3.5 w-3.5 text-bull" /> : <ArrowDownRight className="h-3.5 w-3.5 text-bear" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-semibold">{t.token_symbol}</span>
+                    <Chip variant={isBuy ? "bull" : "bear"} className="text-[9px]">{isBuy ? "BUY" : "SELL"}</Chip>
+                    {t.wallet_tags?.includes("smart_degen") && <Chip variant="bull" className="text-[9px]">SMART</Chip>}
+                    {t.wallet_tags?.includes("renowned") && <Chip variant="gold" className="text-[9px]">KOL</Chip>}
+                    <span className="text-[10px] text-muted-foreground truncate">{t.wallet_label || "Whale"}</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {fmtUsd(t.amount_usd, { compact: true })} · {t.ts ? new Date(t.ts * 1000).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}
+                    {t.price_change_since && t.price_change_since > 0 && (
+                      <span className="text-bull ml-1">· since trade: +{t.price_change_since.toFixed(1)}x</span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={cn("text-xs font-bold tabular", isBuy ? "text-bull" : "text-bear")}>
+                    {isBuy ? "+" : "-"}{fmtUsd(t.amount_usd, { compact: true })}
+                  </div>
+                  {t.pnl_30d_usd !== undefined && (
+                    <div className={cn("text-[9px] tabular", t.pnl_30d_usd >= 0 ? "text-bull" : "text-bear")}>
+                      30d: {t.pnl_30d_usd >= 0 ? "+" : ""}{fmtUsd(t.pnl_30d_usd, { compact: true })}
+                    </div>
+                  )}
+                </div>
+                {/* Follow wallet button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    useMoby.getState().openWalletDetail(t.wallet_address || t.address, t.wallet_label || "Smart wallet");
+                  }}
+                  className="h-7 w-7 grid place-items-center rounded-md hover:bg-surface-3 text-muted-foreground shrink-0"
+                  aria-label="View wallet"
+                >
+                  <ArrowUpRight className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-4 text-xs text-muted-foreground">No recent whale activity.</div>
+        )}
       </div>
     </section>
   );

@@ -227,7 +227,10 @@ function Stat({
 }
 
 function LiveFlows() {
-  const flows = useMoby((s) => s.flows);
+  const { data, loading, source } = useGmgn<{ trades: any[] }>(
+    "/api/gmgn/smart-money-feed?chain=sol&limit=20",
+    { refreshMs: 30_000 }
+  );
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
   return (
     <div>
@@ -235,16 +238,64 @@ function LiveFlows() {
         <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
           <Activity className="h-3 w-3 text-bull" />
           <span className="h-1.5 w-1.5 rounded-full bg-bull live-dot" />
-          <span>Streaming live · last 5 min</span>
+          <span>Live smart money feed {source && `· ${source}`}</span>
         </div>
         <button onClick={refreshFeeds} className="text-[11px] text-bull hover:opacity-80">
           Refresh
         </button>
       </div>
       <div className="space-y-2">
-        {flows.map((f) => (
-          <FlowCard key={f.id} flow={f} />
-        ))}
+        {loading && !data ? (
+          [1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="rounded-xl border border-border p-3 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-surface-3" />
+                <div className="flex-1 space-y-1">
+                  <div className="h-3 w-24 bg-surface-3 rounded" />
+                  <div className="h-2 w-32 bg-surface-3 rounded" />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : data?.trades && data.trades.length > 0 ? (
+          data.trades.map((t: any, i: number) => (
+            <div
+              key={i}
+              onClick={() => useMoby.getState().openWalletDetail(t.wallet_address || t.address, t.wallet_label || "Smart wallet")}
+              className="rounded-xl border border-border p-2.5 flex items-center gap-2.5 hover:bg-surface-2 transition-colors cursor-pointer"
+            >
+              <div className={cn("h-9 w-9 rounded-lg grid place-items-center shrink-0", t.type === "buy" ? "bg-bull/15" : "bg-bear/15")}>
+                {t.type === "buy" ? <ArrowUpRight className="h-4 w-4 text-bull" /> : <ArrowDownRight className="h-4 w-4 text-bear" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold">{t.token_symbol}</span>
+                  <Chip variant={t.type === "buy" ? "bull" : "bear"} className="text-[9px]">{t.type === "buy" ? "BUY" : "SELL"}</Chip>
+                  {t.wallet_tags?.includes("smart_degen") && <Chip variant="bull" className="text-[9px]">SMART</Chip>}
+                  {t.wallet_tags?.includes("renowned") && <Chip variant="gold" className="text-[9px]">KOL</Chip>}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {t.wallet_label || "Wallet"} · {fmtUsd(t.amount_usd, { compact: true })} · {t.ts ? new Date(t.ts * 1000).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}
+                  {t.price_change_since && t.price_change_since > 0 && (
+                    <span className="text-bull ml-1">· +{t.price_change_since.toFixed(1)}x</span>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={cn("text-sm font-bold tabular", t.type === "buy" ? "text-bull" : "text-bear")}>
+                  {t.type === "buy" ? "+" : "-"}{fmtUsd(t.amount_usd, { compact: true })}
+                </div>
+                {t.pnl_30d_usd !== undefined && (
+                  <div className={cn("text-[10px] tabular", t.pnl_30d_usd >= 0 ? "text-bull" : "text-bear")}>
+                    30d {t.pnl_30d_usd >= 0 ? "+" : ""}{fmtUsd(t.pnl_30d_usd, { compact: true })}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-8 text-sm text-muted-foreground">No live whale activity. Pull to refresh.</div>
+        )}
       </div>
     </div>
   );
