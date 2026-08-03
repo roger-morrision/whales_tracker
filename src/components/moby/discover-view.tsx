@@ -775,7 +775,7 @@ function GmgnTrendingRow() {
         title="GMGN Trending"
         emoji="🔥"
         action="View all"
-        onAction={() => window.open("https://gmgn.ai/solana/rank/swaps/1h?orderby=volume", "_blank")}
+        onAction={() => useMoby.getState().setDiscoverMoreOpen(true)}
       />
       <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {loading && !data ? (
@@ -857,7 +857,7 @@ function GmgnHotSearchesRow() {
         title="GMGN Hot Searches"
         emoji="🔍"
         action="View all"
-        onAction={() => window.open("https://gmgn.ai/solana/hot-searches", "_blank")}
+        onAction={() => useMoby.getState().setDiscoverMoreOpen(true)}
       />
       <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {loading && !data ? (
@@ -929,7 +929,7 @@ function TopBoostsRow() {
         title="🚀 Top Boosted"
         emoji=""
         action="View all"
-        onAction={() => window.open("https://dexscreener.com/trending", "_blank")}
+        onAction={() => useMoby.getState().setDiscoverMoreOpen(true)}
       />
       <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {loading && !data ? (
@@ -940,9 +940,7 @@ function TopBoostsRow() {
           data.tokens.map((t: any, i: number) => (
             <a
               key={t.address || i}
-              href={`https://dexscreener.com/solana/${t.address}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              onClick={() => useMoby.getState().viewExternalToken(t)}
               className="shrink-0 w-32 rounded-xl border border-gold/20 bg-gradient-to-br from-gold/5 to-transparent p-2.5 hover:border-gold/40 transition-colors"
             >
               <div className="flex items-center gap-1.5 mb-1.5">
@@ -1016,17 +1014,13 @@ function RealTokenRow({ token, rank }: { token: any; rank?: number }) {
   return (
     <div
       onClick={() => {
-        // Try to find in local TOKENS first, otherwise push toast
+        // Try to find in local TOKENS first, otherwise view as external token in-app
         const tk = TOKENS.find((t) => t.mint === token.address);
         if (tk) {
           openToken(tk.id);
         } else {
-          useMoby.getState().pushToast({
-            title: `${token.symbol} — ${token.name}`,
-            description: `Price: ${fmtPrice(token.price)} · MC ${fmtUsd(token.market_cap, { compact: true })} · Liq ${fmtUsd(token.liquidity, { compact: true })} · ${token.dex}`,
-            type: "info",
-          });
-          window.open(token.pair_url || `https://dexscreener.com/solana/${token.address}`, "_blank");
+          // View external token in-app (no redirect to external websites)
+          useMoby.getState().viewExternalToken(token);
         }
       }}
       className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-2 cursor-pointer transition-colors"

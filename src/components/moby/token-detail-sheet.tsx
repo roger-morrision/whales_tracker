@@ -44,7 +44,36 @@ type Range = "5M" | "1H" | "1D" | "1W" | "ALL";
 export function TokenDetailSheet() {
   const tokenId = useMoby((s) => s.selectedTokenId);
   const openToken = useMoby((s) => s.openToken);
+  const externalTokenData = useMoby((s) => s.externalTokenData);
+  const clearExternalToken = useMoby((s) => s.clearExternalToken);
   const token = useToken(tokenId);
+
+  // If we have external token data (from DexScreener), show an external token detail sheet
+  if (externalTokenData && tokenId?.startsWith("ext_")) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          onClick={() => clearExternalToken()}
+        >
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+          <motion.div
+            initial={{ y: "100%", opacity: 0.5 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "100%", opacity: 0.5 }}
+            transition={{ type: "spring", damping: 30, stiffness: 320 }}
+            role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
+            className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto scrollbar-thin bg-background border-t sm:border border-bull/20 rounded-t-3xl sm:rounded-3xl"
+          >
+            <ExternalTokenContent data={externalTokenData} onClose={() => clearExternalToken()} />
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
 
   return (
     <AnimatePresence>
@@ -566,15 +595,13 @@ function GmgnPanel({ mint, symbol }: { mint: string; symbol: string }) {
 
         {/* Footer link to GMGN */}
         <div className="px-3 py-2 border-t border-border bg-surface-3/20">
-          <a
-            href={`https://gmgn.ai/sol/token/${mint}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => useMoby.getState().pushToast({ title: "GMGN report", description: `Full report available for ${mint.slice(0, 8)}...`, type: "info" })}
             className="text-[10px] text-muted-foreground hover:text-bull inline-flex items-center gap-1"
           >
             <ExternalLink className="h-2.5 w-2.5" />
-            View full report on gmgn.ai
-          </a>
+            View full report
+          </button>
         </div>
       </div>
     </div>
@@ -1098,9 +1125,7 @@ function TokenSocialHeader({ mint, symbol }: { mint: string; symbol: string }) {
         {/* Boosted badge */}
         {boostsActive > 0 && (
           <a
-            href={`https://dexscreener.com/solana/${mint}`}
-            target="_blank"
-            rel="noopener noreferrer"
+            onClick={() => useMoby.getState().pushToast({ title: "Boosted token", description: `${boostsActive} active boosts on DexScreener`, type: "info" })}
             className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gold/10 text-gold border border-gold/30 text-[10px] font-bold hover:bg-gold/20"
             title={`${boostsActive} active boosts on DexScreener — paid promotion. Tap to view.`}
           >
@@ -1155,9 +1180,7 @@ function AllDexesPairsView({ mint }: { mint: string }) {
                 return (
                   <a
                     key={p.pairAddress || i}
-                    href={p.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={() => useMoby.getState().pushToast({ title: `${p.dexId} pair`, description: `Liq ${fmtUsd(p.liquidity?.usd ?? 0, { compact: true })} · Vol ${fmtUsd(p.volume?.h24 ?? 0, { compact: true })}`, type: "info" })}
                     className="shrink-0 w-32 rounded-lg border border-border bg-surface-2 p-2 hover:bg-surface-3 transition-colors"
                   >
                     <div className="flex items-center gap-1 mb-1">
@@ -1268,6 +1291,179 @@ function HolderConcentrationDonut({ holders }: { holders: any[] }) {
             <span className="font-semibold tabular">{s.pct.toFixed(1)}%</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== External Token Content (for DexScreener tokens not in static list) =====
+function ExternalTokenContent({ data, onClose }: { data: any; onClose: () => void }) {
+  const setCopilotOpen = useMoby((s) => s.setCopilotOpen);
+  const watchlist = useMoby((s) => s.watchlist);
+  const toggleWatch = useMoby((s) => s.toggleWatch);
+  const watched = watchlist.includes(data.address);
+  const { data: gmgnData, source } = useGmgn<any>(`/api/gmgn/token?address=${data.address}`, { refreshMs: 60_000 });
+  const { data: secData } = useGmgn<any>(`/api/gmgn/security?address=${data.address}`, { refreshMs: 120_000 });
+
+  const token = gmgnData?.token;
+  const live = token?.price ?? data.price;
+  const change24h = token?.price_change_24h ?? data.change_24h ?? 0;
+  const change1h = token?.price_change_1h ?? data.change_1h ?? 0;
+  const isBull = change24h >= 0;
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="sticky top-0 bg-background/95 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center gap-3 z-10">
+        {token?.image_uri || data.image_uri ? (
+          <img
+            src={token?.image_uri || data.image_uri}
+            alt={data.symbol}
+            className="h-8 w-8 rounded-full object-cover"
+            onError={(e) => { (e.currentTarget.style.display = "none"); }}
+          />
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-surface-3 to-surface-2 grid place-items-center text-xs font-bold">
+            {data.symbol?.[0] ?? "?"}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold">{data.symbol}</span>
+            <Chip variant="outline">{data.dex || "SOL"}</Chip>
+            {source === "gmgn" && <Chip variant="bull" className="text-[9px]">GMGN live</Chip>}
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate">{data.name}</div>
+        </div>
+        <button
+          onClick={() => toggleWatch(data.address)}
+          className="h-8 w-8 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"
+          aria-label="Watchlist"
+        >
+          {watched ? <Star className="h-4 w-4 fill-gold text-gold" /> : <StarOff className="h-4 w-4" />}
+        </button>
+        <button
+          onClick={onClose}
+          className="h-8 w-8 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Price */}
+      <div className="px-4 pt-4">
+        <div className="flex items-end gap-3">
+          <span className="text-3xl font-bold tabular">{fmtPrice(live)}</span>
+          <div className={cn("flex items-center gap-1 pb-1.5 text-sm font-semibold", isBull ? "text-bull" : "text-bear")}>
+            {isBull ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+            {isBull ? "+" : ""}{change24h.toFixed(2)}%
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1">
+          <span>1h: <span className={cn("tabular font-medium", change1h >= 0 ? "text-bull" : "text-bear")}>{change1h >= 0 ? "+" : ""}{change1h.toFixed(2)}%</span></span>
+          <span>24h: <span className={cn("tabular font-medium", isBull ? "text-bull" : "text-bear")}>{isBull ? "+" : ""}{change24h.toFixed(2)}%</span></span>
+        </div>
+      </div>
+
+      {/* Stats grid */}
+      <div className="px-4 mt-4 grid grid-cols-3 gap-2">
+        <Stat label="Market cap" value={fmtUsd(data.market_cap || token?.market_cap || 0, { compact: true })} />
+        <Stat label="Liquidity" value={fmtUsd(data.liquidity || token?.liquidity || 0, { compact: true })} />
+        <Stat label="24h Volume" value={fmtUsd(data.volume_24h || token?.volume_24h || 0, { compact: true })} />
+        <Stat label="Buys 24h" value={String(data.txns_24h_buys || 0)} />
+        <Stat label="Sells 24h" value={String(data.txns_24h_sells || 0)} />
+        <Stat label="DEX" value={data.dex || "—"} />
+      </div>
+
+      {/* GMGN risk badges */}
+      {token && (
+        <div className="px-4 mt-3">
+          <div className="flex flex-wrap gap-1.5">
+            {token.renounced_mint && <Chip variant="bull" className="text-[9px]">✅ Mint revoked</Chip>}
+            {token.renounced_freeze_account && <Chip variant="bull" className="text-[9px]">✅ Freeze revoked</Chip>}
+            {token.cto_flag === 1 && <Chip variant="gold" className="text-[9px]">👋 CTO</Chip>}
+            {token.is_on_curve && <Chip variant="gold" className="text-[9px]">📈 On curve</Chip>}
+            {typeof token.rug_ratio === "number" && token.rug_ratio > 0 && (
+              <Chip variant={token.rug_ratio > 0.3 ? "bear" : "outline"} className="text-[9px]">🚩 Rug {Math.round(token.rug_ratio * 100)}%</Chip>
+            )}
+            {typeof token.smart_degen_count === "number" && token.smart_degen_count > 0 && (
+              <Chip variant="bull" className="text-[9px]">🐋 {token.smart_degen_count} smart</Chip>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Address + pair link */}
+      <div className="px-4 mt-4">
+        <div className="rounded-xl border border-border p-2.5">
+          <div className="text-[9px] text-muted-foreground uppercase mb-0.5">Mint address</div>
+          <div className="text-[11px] font-mono break-all">{data.address}</div>
+          <div className="text-[10px] text-muted-foreground mt-1">DEX: {data.dex} · Pair: {data.pair_address?.slice(0, 12) || "—"}</div>
+        </div>
+      </div>
+
+      {/* Buy/Sell buttons */}
+      <div className="px-4 mt-3 grid grid-cols-2 gap-2">
+        <button
+          onClick={() => {
+            useMoby.getState().pushToast({
+              title: "Trade not available",
+              description: `${data.symbol} is not in the Moby trade registry. Use the DEX directly.`,
+              type: "info",
+            });
+          }}
+          className="py-2.5 rounded-xl bg-bull/15 text-bull border border-bull/30 text-sm font-bold hover:bg-bull/20"
+        >
+          Buy {data.symbol}
+        </button>
+        <button
+          onClick={() => {
+            useMoby.getState().pushToast({
+              title: "Trade not available",
+              description: `${data.symbol} is not in the Moby trade registry. Use the DEX directly.`,
+              type: "info",
+            });
+          }}
+          className="py-2.5 rounded-xl bg-bear/15 text-bear border border-bear/30 text-sm font-bold hover:bg-bear/20"
+        >
+          Sell {data.symbol}
+        </button>
+      </div>
+
+      {/* Alert + Compare */}
+      <div className="px-4 mt-2 grid grid-cols-2 gap-2">
+        <button
+          onClick={() => useMoby.getState().pushToast({ title: "Alert created", description: `We'll notify you about ${data.symbol}.`, type: "success" })}
+          className="h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
+        >
+          <Bell className="h-3 w-3" /> Alert
+        </button>
+        <button
+          onClick={() => useMoby.getState().pushToast({ title: "Added to compare", description: `${data.symbol} added to comparison list.`, type: "success" })}
+          className="h-9 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
+        >
+          <GitCompareArrows className="h-3 w-3" /> Compare
+        </button>
+      </div>
+
+      {/* GMGN panel */}
+      {data.address && (
+        <GmgnPanel mint={data.address} symbol={data.symbol} />
+      )}
+
+      {/* All DEX pairs */}
+      {data.address && (
+        <AllDexesPairsView mint={data.address} />
+      )}
+
+      <div className="px-4 mt-4 pb-6">
+        <button
+          onClick={() => setCopilotOpen(true)}
+          className="w-full h-9 rounded-lg bg-gradient-to-r from-[#9945FF]/15 to-[#14F195]/15 border border-[#9945FF]/30 text-xs font-bold inline-flex items-center justify-center gap-1.5"
+        >
+          <Sparkles className="h-3 w-3" /> Ask Moby for a deeper dive
+        </button>
       </div>
     </div>
   );

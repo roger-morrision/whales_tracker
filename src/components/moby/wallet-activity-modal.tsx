@@ -178,14 +178,12 @@ export function WalletActivityModal() {
                       </div>
                       <div className="flex items-center justify-between mt-1.5 pl-[46px]">
                         <span className="text-[10px] font-mono text-muted-foreground truncate">{a.txHash}</span>
-                        <a
-                          href={`https://solscan.io/tx/${a.txHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-bull hover:opacity-80 inline-flex items-center gap-0.5 ml-2 shrink-0"
+                        <button
+                          onClick={() => useMoby.getState().pushToast({ title: "Transaction", description: `Hash: ${a.txHash.slice(0, 16)}...`, type: "info" })}
+                          className="text-[10px] text-bull hover:opacity-80 inline-flex items-center gap-0.5 ml-2 shrink-0 cursor-pointer"
                         >
                           <ExternalLink className="h-2.5 w-2.5" /> View
-                        </a>
+                        </button>
                       </div>
                     </div>
                   );

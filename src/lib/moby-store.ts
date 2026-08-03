@@ -275,6 +275,10 @@ interface MobyState {
   // selected token (opens detail sheet)
   selectedTokenId: string | null;
   openToken: (id: string | null) => void;
+  // External token (not in static TOKENS) — stores full token data for in-app viewing
+  externalTokenData: any | null;
+  viewExternalToken: (data: any) => void;
+  clearExternalToken: () => void;
 
   // selected trader (opens trader sheet)
   selectedTraderId: string | null;
@@ -861,7 +865,15 @@ export const useMoby = create<MobyState>()(
   openToken: (id) => set((s) => ({
     selectedTokenId: id,
     recentlyViewed: id ? [id, ...s.recentlyViewed.filter((x) => x !== id)].slice(0, 10) : s.recentlyViewed,
+    externalTokenData: id ? null : s.externalTokenData,
   })),
+  // ===== Enhancement: External token viewing (for DexScreener tokens not in static list) =====
+  externalTokenData: null,
+  viewExternalToken: (data) => set({
+    externalTokenData: data,
+    selectedTokenId: `ext_${data.address}`,
+  }),
+  clearExternalToken: () => set({ externalTokenData: null, selectedTokenId: null }),
 
   selectedTraderId: null,
   openTrader: (id) => {

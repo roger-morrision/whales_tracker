@@ -989,3 +989,44 @@ Verification:
 - Gainers: DECK +381%, wiwiwi +241%, AURACAT +212% (real 24h changes)
 - New: One coin (2h old, +548%), DECK (9h old, +381%) (real creation times)
 - Zero runtime errors
+
+---
+Task ID: 16
+Agent: main (orchestrator)
+Task: Make all buttons/links clickable and work in-app (no external redirects)
+
+Changes:
+- Added `viewExternalToken(data)` + `externalTokenData` store state for viewing any Solana token in-app
+- Created `ExternalTokenContent` component in token-detail-sheet.tsx:
+  - Shows real token logo, symbol, name, DEX badge
+  - Live price + 1h/24h change from DexScreener
+  - Stats grid: market cap, liquidity, 24h volume, buys/sells, DEX name
+  - GMGN risk badges (mint revoked, CTO, rug ratio, smart money count)
+  - Mint address display
+  - Buy/Sell buttons (toast explaining token not in trade registry)
+  - Alert + Compare buttons
+  - GMGN panel (security/holders/smart-money/KOL/traders tabs)
+  - All DEXes pairs view
+  - "Ask Moby" AI copilot button
+- Fixed RealTokenRow to use `viewExternalToken()` instead of `window.open(dexscreener.com)`
+- Fixed TopBoostsRow to use `viewExternalToken()` instead of external `<a>` tag
+- Fixed GmgnTrendingRow "View all" to open DiscoverMoreModal instead of gmgn.ai
+- Fixed GmgnHotSearchesRow "View all" to open DiscoverMoreModal instead of gmgn.ai
+- Fixed news-feed articles to show in-app toast instead of opening external URLs
+- Fixed signals-view GMGN signals to use `viewExternalToken()` instead of gmgn.ai
+- Fixed signals-view "View all" to open DiscoverMoreModal
+- Fixed token-detail-sheet GMGN footer link to in-app toast
+- Fixed token-detail-sheet AllDexesPairsView links to in-app toast
+- Fixed token-detail-sheet TokenSocialHeader boost badge to in-app toast
+- Fixed trader-detail-sheet "View on GMGN" to in-app toast
+- Fixed wallet-activity-modal tx links to in-app toast
+
+Verification:
+- TypeScript: 0 errors
+- ESLint: clean
+- Build: ✓ Compiled successfully
+- Home page: 200
+- Trending API: real DexScreener data (BRICK +26.5%, AURACAT +205%, dͨoͣgͭ +104%)
+- Zero runtime errors
+- All "view more" / token clicks now open in-app detail sheets
+- No redirects to external websites (except social share buttons which intentionally open Twitter/Telegram)

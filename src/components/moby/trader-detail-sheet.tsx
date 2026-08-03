@@ -257,14 +257,12 @@ function GmgnTraderPortfolio({ walletAddress }: { walletAddress: string }) {
               {(source === "gmgn" || source === "dexscreener") ? "live" : "demo"}
             </Chip>
           )}
-          <a
-            href={`https://gmgn.ai/sol/address/${walletAddress}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => useMoby.getState().pushToast({ title: "Wallet profile", description: `Viewing ${walletAddress.slice(0, 8)}...`, type: "info" })}
             className="ml-auto text-[10px] text-muted-foreground hover:text-bull"
           >
-            View on GMGN →
-          </a>
+            View profile →
+          </button>
         </div>
         <div className="p-3">
           {loading && !data ? (

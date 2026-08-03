@@ -61,20 +61,16 @@ function NewsCard({
       : "text-muted-foreground bg-surface-3";
 
   return (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
       onClick={() => {
-        // Don't preventDefault — let the anchor open the URL in a new tab.
-        // Also push a toast for in-app context.
+        // Show article in-app as a toast (no external redirect)
         useMoby.getState().pushToast({
-          title: "Opening article",
-          description: `${item.source} · ${item.headline.slice(0, 60)}...`,
+          title: item.headline.slice(0, 60) + "...",
+          description: `${item.source} · ${item.category} · ${item.agoMinutes < 60 ? `${item.agoMinutes}m ago` : `${Math.floor(item.agoMinutes / 60)}h ago`}`,
           type: "info",
         });
       }}
-      className="block rounded-xl border border-border p-3 hover:bg-surface-2 transition-colors"
+      className="block rounded-xl border border-border p-3 hover:bg-surface-2 transition-colors cursor-pointer"
     >
       <div className="flex items-start gap-2">
         <div className={cn("h-8 w-8 rounded-lg grid place-items-center shrink-0", sentColor)}>
@@ -120,6 +116,6 @@ function NewsCard({
           )}
         </div>
       </div>
-    </a>
+    </div>
   );
 }

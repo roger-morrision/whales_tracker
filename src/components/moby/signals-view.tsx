@@ -230,14 +230,12 @@ function GmgnSignalsSection() {
             {(source === "gmgn" || source === "dexscreener") ? "live" : "demo"}
           </Chip>
         )}
-        <a
-          href="https://gmgn.ai/solana/signal"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto text-[10px] text-muted-foreground hover:text-bull"
-        >
-          View all →
-        </a>
+          <button
+            onClick={() => useMoby.getState().setDiscoverMoreOpen(true)}
+            className="ml-auto text-[10px] text-muted-foreground hover:text-bull"
+          >
+            View all →
+          </button>
       </div>
       <div className="p-3 max-h-[400px] overflow-y-auto scrollbar-thin space-y-1.5">
         {loading && !data ? (
@@ -249,7 +247,7 @@ function GmgnSignalsSection() {
               <div
                 key={i}
                 className="rounded-lg border border-border p-2.5 flex items-center gap-2 hover:bg-surface-2 transition-colors cursor-pointer"
-                onClick={() => window.open(`https://gmgn.ai/sol/token/${s.token_address}`, "_blank")}
+          onClick={() => useMoby.getState().viewExternalToken({ address: s.token_address, symbol: s.symbol, name: s.name, price: s.price, change_24h: s.change_24h, volume_24h: s.amount_usd, market_cap: 0, liquidity: 0, dex: "SOL" })}
               >
                 <div className="h-8 w-8 rounded-lg bg-surface-3 grid place-items-center text-base shrink-0">
                   {meta.emoji}
