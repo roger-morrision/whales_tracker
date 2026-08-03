@@ -1121,15 +1121,23 @@ function RealTokenRow({ token, rank }: { token: any; rank?: number }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-sm truncate">{token.symbol}</span>
+          {/* SMART badge — shows when token has smart money activity */}
+          {(token.smart_money_holders > 0 || token.boosts_active > 0) && (
+            <Chip variant="bull" className="text-[9px]">SMART ↑</Chip>
+          )}
           <Chip variant="outline" className="text-[9px]">{token.dex}</Chip>
           {ageLabel && <span className="text-[9px] text-muted-foreground">{ageLabel}</span>}
         </div>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span className="truncate max-w-[100px]">{token.name}</span>
-          <span>·</span>
-          <span>MC {fmtUsd(token.market_cap, { compact: true })}</span>
+          <span className="truncate max-w-[80px]">{token.name}</span>
           <span>·</span>
           <span>Liq {fmtUsd(token.liquidity, { compact: true })}</span>
+          {token.smart_money_holders > 0 && (
+            <>
+              <span>·</span>
+              <span className="text-bull">{token.smart_money_holders} smart</span>
+            </>
+          )}
           {token.txns_24h_buys > 0 && (
             <>
               <span>·</span>

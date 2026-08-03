@@ -169,6 +169,9 @@ export function TokenListModal() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="font-semibold text-sm truncate">{t.symbol}</span>
+                            {(t.smart_money_holders > 0 || t.boosts_active > 0) && (
+                              <Chip variant="bull" className="text-[9px]">SMART ↑</Chip>
+                            )}
                             {t.dex && <Chip variant="outline" className="text-[9px]">{t.dex}</Chip>}
                             {ageLabel && <span className="text-[9px] text-muted-foreground">{ageLabel}</span>}
                             {t.boosts_active && <span className="text-[9px] text-gold">🚀 {t.boosts_active}</span>}
