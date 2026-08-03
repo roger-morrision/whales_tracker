@@ -231,7 +231,7 @@ function GmgnSignalsSection() {
           </Chip>
         )}
           <button
-            onClick={() => useMoby.getState().setDiscoverMoreOpen(true)}
+            onClick={() => useMoby.getState().openTokenList({ title: "GMGN Live Signals", endpoint: "/api/gmgn/signals?chain=sol&limit=30" })}
             className="ml-auto text-[10px] text-muted-foreground hover:text-bull"
           >
             View all →

@@ -39,6 +39,7 @@ import { ToastContainer, WhaleAlertPusher } from "@/components/moby/toast-system
 import { PushNotificationManager } from "@/components/moby/push-notifications";
 import { ErrorBoundary } from "@/components/moby/error-boundary";
 import { ShareModal } from "@/components/moby/share-modal";
+import { TokenListModal } from "@/components/moby/token-list-modal";
 import { AnimatePresence, motion } from "framer-motion";
 
 // Code-split heavy modals (recharts, lightweight-charts, large data sets)
@@ -598,6 +599,9 @@ export default function Home() {
 
       {/* Batch 9: Pump.fun explorer */}
       <PumpFunExplorerModal />
+
+      {/* Token list modal (for "View all" buttons on trending/boosted/hot-search) */}
+      <TokenListModal />
 
       {/* Share modal (global, store-driven) */}
       <StoreShareModal />

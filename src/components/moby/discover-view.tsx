@@ -775,7 +775,7 @@ function GmgnTrendingRow() {
         title="GMGN Trending"
         emoji="🔥"
         action="View all"
-        onAction={() => useMoby.getState().setDiscoverMoreOpen(true)}
+        onAction={() => useMoby.getState().openTokenList({ title: "🔥 GMGN Trending", endpoint: "/api/gmgn/trending?timeframe=1h&orderBy=volume&limit=30" })}
       />
       <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {loading && !data ? (
@@ -857,7 +857,7 @@ function GmgnHotSearchesRow() {
         title="GMGN Hot Searches"
         emoji="🔍"
         action="View all"
-        onAction={() => useMoby.getState().setDiscoverMoreOpen(true)}
+        onAction={() => useMoby.getState().openTokenList({ title: "🔍 Hot Searches", endpoint: "/api/gmgn/hot-searches?chain=sol&interval=1h&limit=30" })}
       />
       <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {loading && !data ? (
@@ -929,7 +929,7 @@ function TopBoostsRow() {
         title="🚀 Top Boosted"
         emoji=""
         action="View all"
-        onAction={() => useMoby.getState().setDiscoverMoreOpen(true)}
+        onAction={() => useMoby.getState().openTokenList({ title: "🚀 Top Boosted Tokens", endpoint: "/api/dexscreener/top-boosts?chain=solana&limit=30" })}
       />
       <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {loading && !data ? (

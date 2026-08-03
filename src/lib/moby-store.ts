@@ -631,6 +631,12 @@ interface MobyState {
   discoverMoreOpen: boolean;
   setDiscoverMoreOpen: (open: boolean) => void;
 
+  // ===== Enhancement: Token list modal (for "View all" buttons) =====
+  tokenListOpen: boolean;
+  tokenListConfig: { title: string; endpoint: string } | null;
+  openTokenList: (config: { title: string; endpoint: string }) => void;
+  setTokenListOpen: (open: boolean) => void;
+
   // ===== Enhancement: Portfolio holdings (persisted, mutated by trades) =====
   portfolioHoldings: PortfolioHolding[];
   applyTrade: (input: {
@@ -1749,6 +1755,12 @@ export const useMoby = create<MobyState>()(
   // ===== Enhancement: Discover "More" panels modal =====
   discoverMoreOpen: false,
   setDiscoverMoreOpen: (open) => set({ discoverMoreOpen: open }),
+
+  // ===== Enhancement: Token list modal (for "View all" buttons) =====
+  tokenListOpen: false,
+  tokenListConfig: null,
+  openTokenList: (config) => set({ tokenListOpen: true, tokenListConfig: config }),
+  setTokenListOpen: (open) => set({ tokenListOpen: open }),
 
   // ===== Enhancement: Portfolio holdings (persisted, mutated by trades) =====
   portfolioHoldings: initialPortfolioHoldings(),
