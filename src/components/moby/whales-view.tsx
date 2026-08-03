@@ -367,7 +367,7 @@ function GmgnSmartMoneyFeed() {
             activityData.activity.map((a: any, i: number) => {
               const isBuy = a.type === "buy";
               return (
-                <div key={i} className="rounded-xl border border-border p-2.5 flex items-center gap-2.5">
+                <div key={i} onClick={() => useMoby.getState().openWalletDetail(a.address, a.wallet_label || "Smart wallet")} className="rounded-xl border border-border p-2.5 flex items-center gap-2.5 cursor-pointer hover:bg-surface-2 transition-colors">
                   <div className={cn("h-9 w-9 rounded-lg grid place-items-center shrink-0", isBuy ? "bg-bull/15" : "bg-bear/15")}>
                     {isBuy ? <ArrowUpRight className="h-4 w-4 text-bull" /> : <ArrowDownRight className="h-4 w-4 text-bear" />}
                   </div>

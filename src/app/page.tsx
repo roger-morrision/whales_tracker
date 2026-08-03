@@ -40,6 +40,7 @@ import { PushNotificationManager } from "@/components/moby/push-notifications";
 import { ErrorBoundary } from "@/components/moby/error-boundary";
 import { ShareModal } from "@/components/moby/share-modal";
 import { TokenListModal } from "@/components/moby/token-list-modal";
+import { WalletDetailSheet } from "@/components/moby/wallet-detail-sheet";
 import { AnimatePresence, motion } from "framer-motion";
 
 // Code-split heavy modals (recharts, lightweight-charts, large data sets)
@@ -459,6 +460,8 @@ export default function Home() {
         const s = useMoby.getState();
         if (!s.onboarded) { s.setOnboarded(true); return; }
         if (s.shareOpen) { s.setShareOpen(false); return; }
+        if (s.walletDetailOpen) { s.setWalletDetailOpen(false); return; }
+        if (s.tokenListOpen) { s.setTokenListOpen(false); return; }
         // Trade modal closes before token-detail-sheet (it's visually on top)
         if (s.tradeOpen) { s.closeTrade(); return; }
         if (s.selectedTraderId) { s.openTrader(null); return; }
@@ -602,6 +605,9 @@ export default function Home() {
 
       {/* Token list modal (for "View all" buttons on trending/boosted/hot-search) */}
       <TokenListModal />
+
+      {/* Wallet detail sheet (for clicking wallets/holders/traders) */}
+      <WalletDetailSheet />
 
       {/* Share modal (global, store-driven) */}
       <StoreShareModal />

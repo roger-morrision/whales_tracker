@@ -637,6 +637,13 @@ interface MobyState {
   openTokenList: (config: { title: string; endpoint: string }) => void;
   setTokenListOpen: (open: boolean) => void;
 
+  // ===== Enhancement: Wallet detail sheet (for clicking wallets/holders/traders) =====
+  walletDetailOpen: boolean;
+  walletDetailAddress: string | null;
+  walletDetailLabel: string;
+  openWalletDetail: (address: string, label?: string) => void;
+  setWalletDetailOpen: (open: boolean) => void;
+
   // ===== Enhancement: Portfolio holdings (persisted, mutated by trades) =====
   portfolioHoldings: PortfolioHolding[];
   applyTrade: (input: {
@@ -1761,6 +1768,17 @@ export const useMoby = create<MobyState>()(
   tokenListConfig: null,
   openTokenList: (config) => set({ tokenListOpen: true, tokenListConfig: config }),
   setTokenListOpen: (open) => set({ tokenListOpen: open }),
+
+  // ===== Enhancement: Wallet detail sheet =====
+  walletDetailOpen: false,
+  walletDetailAddress: null,
+  walletDetailLabel: "",
+  openWalletDetail: (address, label) => set({
+    walletDetailOpen: true,
+    walletDetailAddress: address,
+    walletDetailLabel: label || "Wallet",
+  }),
+  setWalletDetailOpen: (open) => set({ walletDetailOpen: open }),
 
   // ===== Enhancement: Portfolio holdings (persisted, mutated by trades) =====
   portfolioHoldings: initialPortfolioHoldings(),

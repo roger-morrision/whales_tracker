@@ -1387,7 +1387,10 @@ export function fmtPrice(n: number): string {
   if (n >= 1) return `$${n.toFixed(3)}`;
   if (n >= 0.01) return `$${n.toFixed(4)}`;
   if (n >= 0.0001) return `$${n.toFixed(6)}`;
-  return `$${n.toExponential(2)}`;
+  if (n >= 0.0000001) return `$${n.toFixed(8)}`;
+  if (n >= 0.0000000001) return `$${n.toFixed(11)}`;
+  if (n > 0) return `$${n.toFixed(14)}`;
+  return `$0`;
 }
 
 export function fmtPct(n: number, withSign = true): string {

@@ -700,7 +700,7 @@ function GmgnHoldersView({ holders }: { holders: any[] }) {
       {/* Holder list */}
       <div className="space-y-1">
         {holders.slice(0, 15).map((h, i) => (
-          <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
+          <div key={i} onClick={() => useMoby.getState().openWalletDetail(h.address, h.is_smart_money ? "Smart wallet" : h.is_kol ? "KOL wallet" : "Holder")} className="rounded-lg border border-border p-2 flex items-center gap-2 cursor-pointer hover:bg-surface-2 transition-colors">
             <div className="text-[10px] font-semibold text-muted-foreground w-5">{i + 1}</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1">
@@ -761,7 +761,7 @@ function GmgnSmartView({ activity }: { activity: any[] }) {
       {activity.slice(0, 15).map((a, i) => {
         const isBuy = a.type === "buy";
         return (
-          <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
+          <div key={i} onClick={() => useMoby.getState().openWalletDetail(a.address, a.wallet_label || "Smart wallet")} className="rounded-lg border border-border p-2 flex items-center gap-2 cursor-pointer hover:bg-surface-2 transition-colors">
             <div className={cn("h-7 w-7 rounded-lg grid place-items-center shrink-0", isBuy ? "bg-bull/15" : "bg-bear/15")}>
               {isBuy ? <ArrowUpRight className="h-3.5 w-3.5 text-bull" /> : <ArrowDownRight className="h-3.5 w-3.5 text-bear" />}
             </div>
@@ -796,7 +796,7 @@ function GmgnKolView({ kols }: { kols: any[] }) {
   return (
     <div className="space-y-1">
       {kols.slice(0, 15).map((k, i) => (
-        <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
+        <div key={i} onClick={() => useMoby.getState().openWalletDetail(k.address, k.twitter_name || k.twitter_handle || "KOL")} className="rounded-lg border border-border p-2 flex items-center gap-2 cursor-pointer hover:bg-surface-2 transition-colors">
           <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#22D3EE] to-[#9945FF] grid place-items-center text-[10px] font-bold text-background shrink-0">
             {k.twitter_name?.[0] ?? "?"}
           </div>
@@ -827,7 +827,7 @@ function GmgnTradersView({ traders }: { traders: any[] }) {
       {traders.slice(0, 15).map((t, i) => {
         const isWin = t.pnl >= 0;
         return (
-          <div key={i} className="rounded-lg border border-border p-2 flex items-center gap-2">
+          <div key={i} onClick={() => useMoby.getState().openWalletDetail(t.address, t.is_smart_money ? "Smart trader" : t.is_kol ? "KOL trader" : "Trader")} className="rounded-lg border border-border p-2 flex items-center gap-2 cursor-pointer hover:bg-surface-2 transition-colors">
             <div className="text-[10px] font-semibold text-muted-foreground w-5">{i + 1}</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1">
@@ -1457,7 +1457,25 @@ function ExternalTokenContent({ data, onClose }: { data: any; onClose: () => voi
         <AllDexesPairsView mint={data.address} />
       )}
 
-      <div className="px-4 mt-4 pb-6">
+      <div className="px-4 mt-4 pb-6 space-y-2">
+        {/* Share button */}
+        <button
+          onClick={() => {
+            const text = `${data.symbol} (${data.name})\nPrice: ${fmtPrice(live)}\n24h: ${change24h >= 0 ? "+" : ""}${change24h.toFixed(2)}%\nMC: ${fmtUsd(data.market_cap || 0, { compact: true })}\n\nDiscovered on Moby 🐋`;
+            if (typeof navigator !== "undefined" && navigator.share) {
+              navigator.share({ title: `${data.symbol} on Moby`, text }).catch(() => {});
+            } else {
+              useMoby.getState().openShare({
+                title: `${data.name} ($${data.symbol})`,
+                description: `Price: ${fmtPrice(live)} · 24h: ${change24h >= 0 ? "+" : ""}${change24h.toFixed(2)}% · MC: ${fmtUsd(data.market_cap || 0, { compact: true })}`,
+              });
+            }
+          }}
+          className="w-full h-9 rounded-lg bg-bull/15 text-bull border border-bull/30 text-xs font-bold inline-flex items-center justify-center gap-1.5 hover:bg-bull/20"
+        >
+          <Share2 className="h-3 w-3" /> Share {data.symbol}
+        </button>
+        {/* Ask Moby */}
         <button
           onClick={() => setCopilotOpen(true)}
           className="w-full h-9 rounded-lg bg-gradient-to-r from-[#9945FF]/15 to-[#14F195]/15 border border-[#9945FF]/30 text-xs font-bold inline-flex items-center justify-center gap-1.5"
