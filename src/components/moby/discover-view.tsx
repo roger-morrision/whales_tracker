@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { ArrowUpRight, ArrowDownRight, Flame, TrendingUp, Star, StarOff, Calendar, Rocket, RefreshCw } from "lucide-react";
-import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, fmtAge, type Token } from "@/lib/moby-data";
+import { ArrowUpRight, ArrowDownRight, Flame, TrendingUp, Star, StarOff, Calendar, Rocket, RefreshCw, X } from "lucide-react";
+import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, fmtAge, fmtAgo, type Token } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { useGmgn } from "@/hooks/use-gmgn";
 import { usePullToRefresh } from "./mobile-helpers";
@@ -11,6 +11,7 @@ import { TokenIcon, Sparkline, Chip, SectionHeader } from "./primitives";
 import { MarketOverview } from "./market-overview";
 import { NewsFeed } from "./news-feed";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 export function DiscoverView() {
   const [section, setSection] = useState<"trending" | "gainers" | "new">("trending");
@@ -41,13 +42,13 @@ export function DiscoverView() {
         </div>
       )}
       <HeroBanner />
-      <MarketOverview />
+
+      {/* Main focus: Solana trending tokens */}
       <TopBoostsRow />
       <GmgnTrendingRow />
       <GmgnHotSearchesRow />
-      <NarrativesRow />
-      <LaunchCalendar />
 
+      {/* Discover tokens — trending/gainers/new */}
       <section>
         <SectionHeader
           title="Discover tokens"
@@ -80,10 +81,144 @@ export function DiscoverView() {
         </div>
       </section>
 
-      <SmartMoneyMovers />
-      <InsightsGrid />
-      <NewsFeed />
+      {/* Whale buy/sell flows — live on-chain */}
+      <WhaleFlowsRow />
+
+      {/* "More" button — opens modal with MarketOverview, Narratives, Launches, Tools, News */}
+      <button
+        onClick={() => useMoby.getState().setDiscoverMoreOpen(true)}
+        className="w-full py-3 rounded-xl border border-border bg-surface-2/50 hover:bg-surface-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
+      >
+        <span className="text-base">📋</span>
+        Market, Narratives, News & Tools
+        <ArrowUpRight className="h-3.5 w-3.5" />
+      </button>
+
+      {/* "More" modal with all secondary panels */}
+      <DiscoverMoreModal />
     </div>
+  );
+}
+
+// ===== Discover "More" Modal — secondary panels =====
+function DiscoverMoreModal() {
+  const open = useMoby((s) => s.discoverMoreOpen);
+  const setOpen = useMoby((s) => s.setDiscoverMoreOpen);
+  const [tab, setTab] = useState<"market" | "narratives" | "launches" | "tools" | "news">("market");
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          onClick={() => setOpen(false)}
+        >
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+          <motion.div
+            initial={{ y: "100%", opacity: 0.5 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "100%", opacity: 0.5 }}
+            transition={{ type: "spring", damping: 30, stiffness: 320 }}
+            role="dialog" aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full sm:max-w-md h-[88vh] flex flex-col bg-background border-t sm:border border-bull/20 rounded-t-3xl sm:rounded-3xl overflow-hidden"
+          >
+            <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+              <h2 className="font-semibold text-sm flex-1">More panels</h2>
+              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Tab selector */}
+            <div className="flex gap-0.5 p-2 border-b border-border bg-surface-3/30 overflow-x-auto no-scrollbar">
+              {[
+                { k: "market", label: "📊 Market" },
+                { k: "narratives", label: "🔥 Narratives" },
+                { k: "launches", label: "🚀 Launches" },
+                { k: "tools", label: "🧰 Tools" },
+                { k: "news", label: "📰 News" },
+              ].map((t) => (
+                <button
+                  key={t.k}
+                  onClick={() => setTab(t.k as typeof tab)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap",
+                    tab === t.k ? "bg-bull/15 text-bull" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
+              {tab === "market" && <MarketOverview />}
+              {tab === "narratives" && <NarrativesRow />}
+              {tab === "launches" && <LaunchCalendar />}
+              {tab === "tools" && <InsightsGrid />}
+              {tab === "news" && <NewsFeed />}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ===== Whale Buy/Sell Flows Row (live on-chain) =====
+function WhaleFlowsRow() {
+  const flows = useMoby((s) => s.flows);
+  const openToken = useMoby((s) => s.openToken);
+
+  return (
+    <section>
+      <SectionHeader
+        title="Whale buy/sell"
+        emoji="🐋"
+        action="All"
+        onAction={() => useMoby.getState().setActiveTab("whales")}
+      />
+      <div className="space-y-1">
+        {flows.slice(0, 6).map((flow) => {
+          const isBuy = flow.type === "ACCUMULATE" || flow.type === "NEW_POSITION";
+          const tk = TOKENS.find((t) => t.symbol === flow.tokenSymbol);
+          return (
+            <div
+              key={flow.id}
+              onClick={() => tk && openToken(tk.id)}
+              className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-surface-2 cursor-pointer transition-colors"
+            >
+              <div className={cn(
+                "h-8 w-8 rounded-lg grid place-items-center shrink-0",
+                isBuy ? "bg-bull/15" : "bg-bear/15"
+              )}>
+                {isBuy ? <ArrowUpRight className="h-3.5 w-3.5 text-bull" /> : <ArrowDownRight className="h-3.5 w-3.5 text-bear" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-semibold">{flow.tokenSymbol}</span>
+                  <Chip variant={isBuy ? "bull" : "bear"} className="text-[9px]">{isBuy ? "BUY" : "SELL"}</Chip>
+                  <span className="text-[10px] text-muted-foreground truncate">{flow.walletLabel}</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {fmtUsd(flow.usdValue, { compact: true })} · {fmtAgo(flow.agoSeconds)}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={cn("text-xs font-bold tabular", isBuy ? "text-bull" : "text-bear")}>
+                  {isBuy ? "+" : "-"}{fmtUsd(flow.usdValue, { compact: true })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

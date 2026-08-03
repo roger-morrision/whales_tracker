@@ -623,6 +623,10 @@ interface MobyState {
   pumpFunOpen: boolean;
   setPumpFunOpen: (open: boolean) => void;
 
+  // ===== Enhancement: Discover "More" panels modal =====
+  discoverMoreOpen: boolean;
+  setDiscoverMoreOpen: (open: boolean) => void;
+
   // ===== Enhancement: Portfolio holdings (persisted, mutated by trades) =====
   portfolioHoldings: PortfolioHolding[];
   applyTrade: (input: {
@@ -1729,6 +1733,10 @@ export const useMoby = create<MobyState>()(
   // ===== BATCH 9: Pump.fun explorer =====
   pumpFunOpen: false,
   setPumpFunOpen: (open) => set({ pumpFunOpen: open }),
+
+  // ===== Enhancement: Discover "More" panels modal =====
+  discoverMoreOpen: false,
+  setDiscoverMoreOpen: (open) => set({ discoverMoreOpen: open }),
 
   // ===== Enhancement: Portfolio holdings (persisted, mutated by trades) =====
   portfolioHoldings: initialPortfolioHoldings(),
