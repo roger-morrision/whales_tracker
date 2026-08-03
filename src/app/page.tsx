@@ -212,10 +212,15 @@ export default function Home() {
       // After each tick, update peaks and check for triggers.
       const state = useMoby.getState();
       const prices = state.prices;
+      const nowMs = Date.now();
       for (const stop of state.trailingStops) {
         if (stop.triggered) continue;
         const live = prices[stop.tokenId]?.price;
         if (!live || live <= 0) continue;
+        // Enforce minimum hold time — don't trigger within 30s of creation
+        // (prevents instant fires on the same candle the user created it)
+        const minHoldMs = stop.minHoldMs ?? 30_000;
+        if (nowMs - stop.createdAt < minHoldMs) continue;
         // Update peak if higher
         if (live > stop.peakPrice) {
           state.updateTrailingPeak(stop.tokenId, live);
@@ -234,10 +239,9 @@ export default function Home() {
   // ===== Enhancement #13: Snipe-bot background poller =====
   // Every 60s, fetches new pairs from GMGN and checks each enabled snipe rule.
   // When a rule matches, fires an actionable toast with quick-buy button.
-  const snipeRules = useMoby((s) => s.snipeRules);
-  const enabledRuleCount = snipeRules.filter((r) => r.enabled).length;
+  // Note: deps are empty because the poll reads fresh state via useMoby.getState()
+  // on each iteration — we don't need to restart the interval when configs change.
   useEffect(() => {
-    if (enabledRuleCount === 0) return;
     let cancelled = false;
     const poll = async () => {
       if (typeof document !== "undefined" && document.hidden) return;
@@ -262,17 +266,52 @@ export default function Home() {
             if (ageMin > rule.conditions.maxAgeMinutes) continue;
             if (pair.smart_money_holders !== undefined && pair.smart_money_holders < rule.conditions.minSmartMoneyHolders) continue;
             // Match! Fire toast + record trigger
-            state.recordSnipeTrigger(rule.id, false, 0);
             const localToken = TOKENS.find((t) => t.mint === pair.address);
+            const buyUsd = rule.actions.buyUsd;
+            const livePrice = localToken
+              ? (state.prices[localToken.id]?.price ?? localToken.price)
+              : (pair.price || 0);
+
+            // Auto-execute the buy if enabled AND we have a local token mapping
+            let executed = false;
+            if (rule.actions.autoExecute && localToken && livePrice > 0) {
+              try {
+                state.applyTrade({
+                  tokenId: localToken.id,
+                  side: "BUY",
+                  usdAmount: buyUsd,
+                  tokenAmount: buyUsd / livePrice,
+                  price: livePrice,
+                });
+                state.recordTrade({
+                  tokenId: localToken.id,
+                  tokenSymbol: localToken.symbol,
+                  side: "BUY",
+                  usdAmount: buyUsd,
+                  tokenAmount: buyUsd / livePrice,
+                  price: livePrice,
+                  txHash: `snipe_${rule.id}_${Date.now()}`,
+                });
+                executed = true;
+                state.recordSnipeTrigger(rule.id, true, 0);
+              } catch {
+                // execution failed — fall through to toast-only
+              }
+            } else {
+              state.recordSnipeTrigger(rule.id, false, 0);
+            }
+
             state.pushToast({
               title: `🎯 Snipe rule "${rule.name}" matched!`,
-              description: `${pair.symbol} (${pair.name || "unknown"}) — MC $${(pair.market_cap || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })} · ${ageMin.toFixed(0)}m old · liq $${(pair.liquidity || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`,
-              type: "alert",
+              description: executed
+                ? `✓ Auto-bought ${localToken?.symbol || pair.symbol} for $${buyUsd} at $${livePrice.toFixed(6)}`
+                : `${pair.symbol} (${pair.name || "unknown"}) — MC $${(pair.market_cap || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })} · ${ageMin.toFixed(0)}m old · liq $${(pair.liquidity || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`,
+              type: executed ? "success" : "alert",
               actionLabel: localToken ? `View ${localToken.symbol}` : "View on GMGN",
               actionId: localToken?.id,
-              quickBuyLabel: `Buy $${rule.actions.buyUsd}`,
+              quickBuyLabel: !executed && localToken ? `Buy $${buyUsd}` : undefined,
               quickBuyTokenId: localToken?.id,
-              quickBuyAmountUsd: rule.actions.buyUsd,
+              quickBuyAmountUsd: buyUsd,
             });
             break; // one trigger per pair
           }
@@ -288,16 +327,14 @@ export default function Home() {
       clearTimeout(initialTimer);
       clearInterval(interval);
     };
-  }, [enabledRuleCount]);
+  }, []);
 
   // ===== Enhancement #24: Copy-trade execution poller =====
   // Every 45s, fetches /api/gmgn/smart-money-feed and checks if any enabled
   // copy-trade config should mirror the latest smart-money trade.
   // Only mirrors BUY trades by default (config.onlyBuy controls SELL mirroring).
-  const copyTrades = useMoby((s) => s.copyTrades);
-  const enabledCopyTradeCount = copyTrades.filter((c) => c.enabled).length;
+  // Note: deps are empty — poll reads fresh state via useMoby.getState().
   useEffect(() => {
-    if (enabledCopyTradeCount === 0) return;
     let cancelled = false;
     const poll = async () => {
       if (typeof document !== "undefined" && document.hidden) return;
@@ -310,11 +347,11 @@ export default function Home() {
         const data = await res.json();
         const trades = data.trades || [];
         if (trades.length === 0) return;
-        // Use the most recent trade as the "signal" — in production this would
-        // track per-wallet last-seen to avoid double-execution, but for demo
-        // we mirror the latest trade once per poll cycle.
+        // Use the most recent trade as the "signal"
         const latest = trades[0];
         if (!latest || !latest.token_address) return;
+        // Build a dedup hash for this trade (token + ts + type)
+        const tradeHash = `${latest.token_address}_${latest.ts}_${latest.type}`;
         // Find the token in our local registry (only mirror tokens we know)
         const localToken = TOKENS.find((t) => t.mint === latest.token_address);
         if (!localToken) return;
@@ -323,10 +360,10 @@ export default function Home() {
         // For each enabled config, mirror the trade (capped at maxPerTradeUsd)
         for (const cfg of enabledConfigs) {
           if (!isBuy && cfg.onlyBuy) continue;
-          // Throttle: skip if we've copied this token in the last 60s
-          // (simplified — real impl would track per-token last-copied timestamp)
           if (cancelled) return;
-          state.executeCopyTrade({
+          // Dedup: skip if we already mirrored this exact trade
+          if (cfg.lastMirroredTxHash === tradeHash) continue;
+          const executed = state.executeCopyTrade({
             copyTradeId: cfg.id,
             tokenId: localToken.id,
             tokenSymbol: localToken.symbol,
@@ -334,6 +371,13 @@ export default function Home() {
             usdAmount: Math.min(latest.amount_usd, cfg.maxPerTradeUsd),
             price: livePrice,
           });
+          // Record dedup hash so we don't mirror the same trade again
+          if (executed) {
+            state.updateCopyTrade(cfg.id, {
+              lastMirroredTxHash: tradeHash,
+              lastMirroredAt: Date.now(),
+            });
+          }
         }
       } catch {
         // silent fail
@@ -346,7 +390,7 @@ export default function Home() {
       clearTimeout(initialTimer);
       clearInterval(interval);
     };
-  }, [enabledCopyTradeCount]);
+  }, []);
 
   // Scroll to top on tab change
   useEffect(() => {
@@ -369,6 +413,8 @@ export default function Home() {
         const s = useMoby.getState();
         if (!s.onboarded) { s.setOnboarded(true); return; }
         if (s.shareOpen) { s.setShareOpen(false); return; }
+        // Trade modal closes before token-detail-sheet (it's visually on top)
+        if (s.tradeOpen) { s.closeTrade(); return; }
         if (s.selectedTraderId) { s.openTrader(null); return; }
         if (s.selectedTokenId) { s.openToken(null); return; }
         if (s.copilotOpen) { s.setCopilotOpen(false); return; }
@@ -376,7 +422,6 @@ export default function Home() {
         if (s.notifOpen) { s.setNotifOpen(false); return; }
         if (s.walletOpen) { s.setWalletOpen(false); return; }
         if (s.screenerOpen) { s.setScreenerOpen(false); return; }
-        if (s.tradeOpen) { s.closeTrade(); return; }
         if (s.taxOpen) { s.setTaxOpen(false); return; }
         if (s.alertCreatorOpen) { s.closeAlertCreator(); return; }
         if (s.settingsOpen) { s.setSettingsOpen(false); return; }
@@ -563,18 +608,40 @@ function BackToTopButton() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const handler = () => setVisible(window.scrollY > 400);
-    window.addEventListener("scroll", handler, { passive: true });
-    // Initial check
-    handler();
+    // The scroll container is <main>, not window — find it and listen to its scroll.
+    // Use a small delay to ensure the element is mounted.
+    const findMain = () => {
+      const main = document.querySelector("main");
+      if (!main) return null;
+      const handler = () => setVisible(main.scrollTop > 400);
+      handler();
+      main.addEventListener("scroll", handler, { passive: true });
+      return { main, handler };
+    };
+    let cleanup: { main: Element; handler: () => void } | null = null;
+    const initTimer = setTimeout(() => {
+      cleanup = findMain();
+    }, 500);
     return () => {
-      window.removeEventListener("scroll", handler);
+      clearTimeout(initTimer);
+      if (cleanup) {
+        cleanup.main.removeEventListener("scroll", cleanup.handler);
+      }
     };
   }, []);
 
+  const scrollToTop = () => {
+    const main = document.querySelector("main");
+    if (main) {
+      main.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   return (
     <button
-      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      onClick={scrollToTop}
       className={cn(
         "fixed bottom-24 right-4 z-40 h-10 w-10 rounded-full bg-surface-2 border border-border shadow-lg grid place-items-center hover:bg-surface-3 transition-all duration-300",
         visible ? "opacity-100 scale-100" : "opacity-0 scale-0 pointer-events-none"

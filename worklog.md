@@ -507,3 +507,88 @@ Stage Summary:
 - 4 new UI components (LightweightChart, HolderConcentrationDonut, BatchTradeSheet, chain dropdown)
 - 1 new persisted store slice (selectedChain)
 - All TypeScript / ESLint / build checks pass
+
+---
+Task ID: 7
+Agent: main (orchestrator)
+Task: Continue all enhancements and bug fixes (round 7 — execution gaps + UX polish)
+
+Bug Fixes Shipped (10 items from round-7 audit):
+
+#4 Snipe-bot execution gap — FIXED
+- Added `autoExecute: boolean` field to SnipeRule.actions type
+- Updated snipe-bot poller in page.tsx to actually execute the buy when autoExecute is true:
+  - Calls `applyTrade` (mutates portfolio) + `recordTrade` (adds to history)
+  - Records trigger as filled (true) instead of false
+  - Toast changes from "alert" to "success" type with "✓ Auto-bought" description
+  - Quick-buy button hidden when auto-executed (no double-buy)
+- Added autoExecute checkbox toggle in SnipeRuleBuilder with red warning banner when enabled
+- When autoExecute is false (default), behavior unchanged (toast with quick-buy button only)
+
+#5 Trailing-stop min-hold time — FIXED
+- Added `minHoldMs?: number` field to TrailingStopConfig type (default 30_000 = 30s)
+- Updated `addTrailingStop` to:
+  - Seed peakPrice with 0.1% buffer (livePrice * 1.001) to avoid tick-noise triggers
+  - Set minHoldMs to 30_000 on creation
+- Updated trailing-stop price tracking loop in page.tsx to skip stops where `Date.now() - stop.createdAt < minHoldMs`
+- Prevents instant fires on the same candle the user created the stop
+
+#6 Copy-trade dedup — FIXED
+- Added `lastMirroredTxHash?: string` and `lastMirroredAt?: number` fields to CopyTradeConfig
+- Added `updateCopyTrade(id, patch)` action to store interface + implementation
+- Updated copy-trade poller to:
+  - Build a dedup hash: `${token_address}_${ts}_${type}`
+  - Skip configs where `cfg.lastMirroredTxHash === tradeHash`
+  - After successful execution, call `updateCopyTrade(cfg.id, { lastMirroredTxHash, lastMirroredAt })`
+- Same trade staying at top of feed for multiple cycles no longer gets mirrored repeatedly
+
+#7 Modal Escape order — FIXED
+- Moved `if (s.tradeOpen) { s.closeTrade(); return; }` ABOVE `if (s.selectedTokenId)` in the Escape handler
+- Trade modal (visually on top) now closes first, leaving token-detail-sheet visible
+- Previously Escape closed the token-detail-sheet first, leaving trade-modal orphaned
+
+#8 BackToTopButton never appears — FIXED
+- Was listening to `window.scrollY` which stays at 0 (the actual scroll container is `<main>`)
+- Now queries `document.querySelector("main")` and listens to its `scroll` event
+- Checks `main.scrollTop > 400` instead of `window.scrollY`
+- Click handler calls `main.scrollTo({ top: 0, behavior: "smooth" })`
+- 500ms delay before attaching listener (ensures main is mounted)
+- Proper cleanup on unmount
+
+#10 Quick-buy pre-fills trade-modal amount — FIXED
+- Added `tradePrefillUsd: number | null` to store trade slice
+- Updated `openTrade(tokenId, side, prefillUsd?)` to accept optional prefill
+- `closeTrade` clears the prefill
+- Updated toast-system quick-buy button to pass `toast.quickBuyAmountUsd` to `openTrade`
+- Updated TradeModal to consume prefill via useEffect:
+  - When modal opens + prefillUsd is set, initializes `amount` state
+  - Clears the prefill from store so it doesn't re-apply on next open
+- Removed the old "Quick-buy armed" info toast hack (no longer needed)
+
+#11 aria-label="Close" on icon-only buttons — FIXED
+- Python codemod added `aria-label="Close"` to 9 close buttons across batch6/7/8 modals
+- Pattern: `<button ... className="h-7 w-7 ... text-muted-foreground"><X` → adds `aria-label="Close"` before `><X`
+- Verified no remaining close buttons without aria-label
+
+#3 allowedDevOrigins — FIXED
+- Added `allowedDevOrigins: ["*.space-z.ai", "preview-*.space-z.ai"]` to next.config.ts
+- Suppresses the Next.js 16 cross-origin dev warning
+
+#9 Wire up useHaptics (was dead code) — FIXED
+- mobile-helpers.tsx `useHaptics` hook is now imported in trade-modal.tsx
+- Replaced inline `navigator.vibrate([10, 30, 10])` with `haptics.vibrate("success")`
+- The hook provides typed patterns: success/error/warning/selection/light
+
+#13 Poller deps — FIXED
+- Snipe-bot poller: changed deps from `[enabledRuleCount]` to `[]`
+- Copy-trade poller: changed deps from `[enabledCopyTradeCount]` to `[]`
+- Both polls read fresh state via `useMoby.getState()` on each iteration
+- Rapid config toggling no longer restarts the interval (which was starving polling)
+
+Verification:
+- TypeScript: 0 errors in src/
+- ESLint: clean
+- Production build: ✓ Compiled successfully
+- All endpoints return 200
+- Home page renders
+- Dev log shows no errors

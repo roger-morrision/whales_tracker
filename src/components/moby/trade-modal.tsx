@@ -15,6 +15,7 @@ import {
 import { TOKENS_BY_ID, fmtPrice, fmtUsd, fmtNum, fmtPct } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { TokenIcon, Chip } from "./primitives";
+import { useHaptics } from "./mobile-helpers";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export function TradeModal() {
   const open = useMoby((s) => s.tradeOpen);
   const tokenId = useMoby((s) => s.tradeTokenId);
   const side = useMoby((s) => s.tradeSide);
+  const tradePrefillUsd = useMoby((s) => s.tradePrefillUsd);
   const close = useMoby((s) => s.closeTrade);
   const settings = useMoby((s) => s.settings);
   const wallet = useMoby((s) => s.wallet);
@@ -29,6 +31,16 @@ export function TradeModal() {
 
   const token = tokenId ? TOKENS_BY_ID[tokenId] : null;
   const [amount, setAmount] = useState("");
+  const haptics = useHaptics();
+
+  // Consume prefill amount when modal opens (from quick-buy toast button)
+  useEffect(() => {
+    if (open && tradePrefillUsd && tradePrefillUsd > 0) {
+      setAmount(String(tradePrefillUsd));
+      // Clear the prefill so it doesn't re-apply on next open
+      useMoby.setState({ tradePrefillUsd: null });
+    }
+  }, [open, tradePrefillUsd]);
   const [slippage, setSlippage] = useState(settings.defaultSlippage);
   const [showSettings, setShowSettings] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -158,10 +170,8 @@ export function TradeModal() {
     submitTimerRef.current = setTimeout(() => {
       setSubmitting(false);
       setSuccess(true);
-      // Haptic feedback on trade confirmation
-      if (typeof navigator !== "undefined" && navigator.vibrate) {
-        navigator.vibrate([10, 30, 10]);
-      }
+      // Haptic feedback on trade confirmation (uses mobile-helpers hook)
+      haptics.vibrate("success");
       // Apply trade to portfolio + record in history
       const usdAmount = parseFloat(amount) || 0;
       const executedPrice = livePriceRef.current || token.price;

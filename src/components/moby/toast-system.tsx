@@ -81,19 +81,11 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
             <button
               onClick={() => {
                 // Open trade modal pre-filled with amount
-                useMoby.getState().openTrade(toast.quickBuyTokenId!, "BUY");
-                // The trade modal reads amount from its own state — set it via a brief timeout
-                if (toast.quickBuyAmountUsd) {
-                  setTimeout(() => {
-                    // The trade modal's amount state isn't directly accessible; instead,
-                    // push an info toast telling the user the suggested amount was applied
-                    useMoby.getState().pushToast({
-                      title: "Quick-buy armed",
-                      description: `Suggested: $${toast.quickBuyAmountUsd} USDC — confirm in trade modal.`,
-                      type: "info",
-                    });
-                  }, 250);
-                }
+                useMoby.getState().openTrade(
+                  toast.quickBuyTokenId!,
+                  "BUY",
+                  toast.quickBuyAmountUsd
+                );
                 onDismiss();
               }}
               className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-bull text-background hover:opacity-90"

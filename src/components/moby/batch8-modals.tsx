@@ -650,7 +650,7 @@ function ModalShell({ open, onClose, title, icon, children }: { open: boolean; o
             <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               {icon}
               <h2 className="font-semibold text-sm flex-1">{title}</h2>
-              <button onClick={onClose} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={onClose} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-thin p-4">{children}</div>
           </motion.div>

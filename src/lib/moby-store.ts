@@ -193,6 +193,7 @@ export interface SnipeRule {
     slippagePct: number;
     autoTakeProfitPct: number;    // auto-sell if price rises X%
     autoStopLossPct: number;      // auto-sell if price drops X%
+    autoExecute: boolean;         // if true, auto-fire the buy on match; if false, only push toast
   };
   stats: {
     triggered: number;
@@ -213,6 +214,7 @@ export interface TrailingStopConfig {
   triggered: boolean;
   triggeredAt?: number;
   triggeredPrice?: number;
+  minHoldMs?: number;           // minimum hold time before stop can trigger (default 30s)
 }
 
 // Default portfolio holdings seeded from the static PORTFOLIO cryptoHoldings.
@@ -346,7 +348,8 @@ interface MobyState {
   tradeOpen: boolean;
   tradeTokenId: string | null;
   tradeSide: "BUY" | "SELL";
-  openTrade: (tokenId: string, side: "BUY" | "SELL") => void;
+  tradePrefillUsd: number | null; // pre-fill amount (consumed by TradeModal on open)
+  openTrade: (tokenId: string, side: "BUY" | "SELL", prefillUsd?: number) => void;
   closeTrade: () => void;
 
   // ===== NEW: Tax calculator =====
@@ -386,6 +389,7 @@ interface MobyState {
   addCopyTrade: (c: Omit<CopyTradeConfig, "id" | "createdAt">) => void;
   removeCopyTrade: (id: string) => void;
   toggleCopyTrade: (id: string) => void;
+  updateCopyTrade: (id: string, patch: Partial<CopyTradeConfig>) => void;
   executeCopyTrade: (input: {
     copyTradeId: string;
     tokenId: string;
@@ -681,6 +685,9 @@ export interface CopyTradeConfig {
   onlyBuy: boolean;
   minTraderScore: number;
   createdAt: number;
+  // Dedup: track the last mirrored trade so we don't double-execute
+  lastMirroredTxHash?: string;
+  lastMirroredAt?: number;
 }
 
 export interface LimitOrder {
@@ -1147,9 +1154,10 @@ export const useMoby = create<MobyState>()(
   tradeOpen: false,
   tradeTokenId: null,
   tradeSide: "BUY",
-  openTrade: (tokenId, side) =>
-    set({ tradeOpen: true, tradeTokenId: tokenId, tradeSide: side }),
-  closeTrade: () => set({ tradeOpen: false }),
+  tradePrefillUsd: null,
+  openTrade: (tokenId, side, prefillUsd) =>
+    set({ tradeOpen: true, tradeTokenId: tokenId, tradeSide: side, tradePrefillUsd: prefillUsd ?? null }),
+  closeTrade: () => set({ tradeOpen: false, tradePrefillUsd: null }),
 
   // ===== NEW: Tax calculator =====
   taxOpen: false,
@@ -1262,6 +1270,10 @@ export const useMoby = create<MobyState>()(
       copyTrades: s.copyTrades.map((x) =>
         x.id === id ? { ...x, enabled: !x.enabled } : x
       ),
+    })),
+  updateCopyTrade: (id, patch) =>
+    set((s) => ({
+      copyTrades: s.copyTrades.map((x) => (x.id === id ? { ...x, ...patch } : x)),
     })),
   // ===== Enhancement #24: Copy-trade real execution =====
   // Mirrors a smart-money trade: applies the trade to portfolio + records history.
@@ -1865,19 +1877,22 @@ export const useMoby = create<MobyState>()(
   trailingStops: [],
   addTrailingStop: (cfg) => {
     const id = `ts_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    // Seed peakPrice from the current live price (if available)
+    // Seed peakPrice from the current live price with a 0.1% buffer to avoid
+    // tick-noise triggers on the very next price update.
     const livePrice = get().prices[cfg.tokenId]?.price ?? 0;
+    const seededPeak = livePrice > 0 ? livePrice * 1.001 : 0;
     const newStop: TrailingStopConfig = {
       ...cfg,
       id,
       createdAt: Date.now(),
-      peakPrice: livePrice,
+      peakPrice: seededPeak,
       triggered: false,
+      minHoldMs: 30_000, // 30s minimum hold before stop can trigger
     };
     set((s) => ({ trailingStops: [...s.trailingStops, newStop].slice(0, 20) }));
     get().pushAlert({
       title: "Trailing stop set",
-      description: `Trailing ${cfg.trailPct}% on ${cfg.tokenSymbol} from peak $${livePrice.toFixed(4)}`,
+      description: `Trailing ${cfg.trailPct}% on ${cfg.tokenSymbol} from peak $${livePrice.toFixed(4)} (30s min hold)`,
       type: "success",
     });
   },

@@ -220,7 +220,7 @@ export function YieldFarmingModal() {
             <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               <span className="text-base">🌾</span>
               <h2 className="font-semibold text-sm flex-1">Yield farming</h2>
-              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3">
               <div className="grid grid-cols-3 gap-2">
@@ -295,7 +295,7 @@ export function UnlocksModal() {
             <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               <span className="text-base">🔓</span>
               <h2 className="font-semibold text-sm flex-1">Token unlock schedule</h2>
-              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3">
               <div className="rounded-2xl p-4 bg-gradient-to-br from-bear/10 to-transparent border border-bear/20">
@@ -343,7 +343,7 @@ export function GovernanceModal() {
             <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               <span className="text-base">🗳️</span>
               <h2 className="font-semibold text-sm flex-1">Governance</h2>
-              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex gap-1 p-1 bg-surface-2 m-3 rounded-lg">
               {[{ k: "all", l: "All" }, { k: "active", l: "Active" }, { k: "passed", l: "Passed" }, { k: "failed", l: "Failed" }].map((s) => (
@@ -409,7 +409,7 @@ export function DeFiPositionsModal() {
             <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               <span className="text-base">🔗</span>
               <h2 className="font-semibold text-sm flex-1">DeFi positions</h2>
-              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3">
               <div className="grid grid-cols-3 gap-2">
@@ -454,7 +454,7 @@ export function CalendarModal() {
             <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               <span className="text-base">📅</span>
               <h2 className="font-semibold text-sm flex-1">Market calendar</h2>
-              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-2">
               {sorted.map((e) => {
@@ -512,7 +512,7 @@ export function MultiWalletModal() {
             <div className="sticky top-0 bg-background/95 backdrop-blur-xl px-4 py-3 border-b border-border flex items-center gap-2 z-10">
               <span className="text-base">👛</span>
               <h2 className="font-semibold text-sm flex-1">My wallets</h2>
-              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
             <div className="p-4 space-y-3">
               <div className="rounded-2xl p-4 bg-gradient-to-br from-bull/10 to-transparent border border-border">
@@ -750,7 +750,7 @@ export function WatchlistPerfModal() {
             <div className="sticky top-0 bg-background/95 backdrop-blur-xl px-4 py-3 border-b border-border flex items-center gap-2 z-10">
               <span className="text-base">⭐</span>
               <h2 className="font-semibold text-sm flex-1">Watchlist performance</h2>
-              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-2">

@@ -397,6 +397,7 @@ function SnipeRuleBuilder({
       slippagePct: number;
       autoTakeProfitPct: number;
       autoStopLossPct: number;
+      autoExecute: boolean;
     };
   }) => void;
   onCancel: () => void;
@@ -412,12 +413,13 @@ function SnipeRuleBuilder({
   const [slippagePct, setSlippagePct] = useState(5);
   const [autoTakeProfitPct, setAutoTakeProfitPct] = useState(100);
   const [autoStopLossPct, setAutoStopLossPct] = useState(30);
+  const [autoExecute, setAutoExecute] = useState(false);
 
   const handleCreate = () => {
     onCreate({
       name: name.trim() || `Snipe ${maxAgeMinutes}m · ≥${minSmartMoneyHolders} smart`,
       conditions: { maxDevHoldPct, minLiquidityUsd, maxAgeMinutes, minSmartMoneyHolders, renouncedOnly, maxRugRatio: maxRugRatio / 100 },
-      actions: { buyUsd, slippagePct, autoTakeProfitPct, autoStopLossPct },
+      actions: { buyUsd, slippagePct, autoTakeProfitPct, autoStopLossPct, autoExecute },
     });
   };
 
@@ -455,6 +457,16 @@ function SnipeRuleBuilder({
       <SnipeSlider label="Slippage tolerance" value={slippagePct} min={1} max={30} step={1} format={(v) => `${v}%`} onChange={setSlippagePct} />
       <SnipeSlider label="Auto take-profit" value={autoTakeProfitPct} min={10} max={500} step={10} format={(v) => `+${v}%`} onChange={setAutoTakeProfitPct} />
       <SnipeSlider label="Auto stop-loss" value={autoStopLossPct} min={5} max={80} step={5} format={(v) => `-${v}%`} onChange={setAutoStopLossPct} />
+
+      <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+        <input type="checkbox" checked={autoExecute} onChange={(e) => setAutoExecute(e.target.checked)} className="accent-bull" />
+        <span className="text-muted-foreground">Auto-execute buy on match (otherwise just notify)</span>
+      </label>
+      {autoExecute && (
+        <div className="rounded-md border border-bear/30 bg-bear/5 p-1.5 text-[10px] text-bear">
+          ⚠️ Auto-execute will fire real buy orders (simulated) when a rule matches. Use with caution.
+        </div>
+      )}
 
       <div className="flex gap-2 pt-2">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground">Cancel</button>
@@ -800,7 +812,7 @@ function ModalShell({ open, onClose, title, icon, children }: { open: boolean; o
         <div className="px-4 py-3 border-b border-border flex items-center gap-2">
           {icon}
           <h2 className="font-semibold text-sm flex-1">{title}</h2>
-          <button onClick={onClose} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close"><X className="h-4 w-4" /></button>
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-thin p-4">{children}</div>
       </motion.div>
