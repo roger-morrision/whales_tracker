@@ -349,7 +349,7 @@ export const TOKENS: Token[] = [
     name: "Bonk",
     chain: "SOL",
     category: "Meme",
-    price: 2.84e-05,
+    price: 0.0000284,
     change24h: 22.14,
     change1h: 5.42,
     marketCap: 1_940_000_000,

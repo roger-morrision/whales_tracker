@@ -64,6 +64,9 @@ export function DiscoverView() {
       {/* Main focus: Whale activities (moby.win style — "The Tape") */}
       <WhaleBuySellSummary />
 
+      {/* Multipliers showcase — tokens caught early (moby.win style) */}
+      <MultipliersShowcase />
+
       {/* Live whale buy/sell feed — what whales are buying/selling RIGHT NOW */}
       <WhaleFlowsRow />
 
@@ -1340,5 +1343,45 @@ function SmartMoneyMoversLive() {
         <div className="text-center py-4 text-xs text-muted-foreground">No smart money signals right now.</div>
       )}
     </section>
+  );
+}
+
+// ===== Multipliers Showcase — tokens Moby caught early (moby.win style) =====
+function MultipliersShowcase() {
+  // Fetch trending tokens and show their 24h gains as "multipliers"
+  const { data } = useGmgn<{ tokens: any[] }>("/api/solana/gainers?limit=10&timeframe=24h", { refreshMs: 120_000 });
+  const tokens = (data?.tokens || []).filter((t: any) => t.change_24h > 50).slice(0, 8);
+
+  if (tokens.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-gold/20 bg-gradient-to-br from-gold/5 to-transparent p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-sm font-bold">🚀 Caught Early</span>
+        <span className="text-[10px] text-muted-foreground">Top gainers surfaced by Moby · 24h</span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+        {tokens.map((t: any, i: number) => {
+          const multiplier = 1 + (t.change_24h || 0) / 100;
+          return (
+            <div
+              key={t.address || i}
+              onClick={() => {
+                const tk = TOKENS.find((tt) => tt.mint === t.address);
+                if (tk) useMoby.getState().openToken(tk.id);
+                else useMoby.getState().viewExternalToken(t);
+              }}
+              className="shrink-0 w-24 rounded-xl border border-gold/20 bg-surface-2/50 p-2.5 text-center hover:bg-surface-2 cursor-pointer transition-colors"
+            >
+              <div className="text-[10px] font-bold text-gold tabular">{multiplier.toFixed(1)}x</div>
+              <div className="text-[11px] font-semibold truncate">{t.symbol}</div>
+              <div className={cn("text-[9px] tabular", t.change_24h >= 0 ? "text-bull" : "text-bear")}>
+                +{Math.abs(t.change_24h).toFixed(0)}%
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

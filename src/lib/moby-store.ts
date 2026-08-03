@@ -1155,7 +1155,7 @@ export const useMoby = create<MobyState>()(
       address ||
       `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
     set({
-      wallet: { connected: true, address: addr, label, balanceUsd: 8420.5 },
+      wallet: { connected: true, address: addr, label, balanceUsd: 0 },
       walletOpen: false,
     });
     get().pushAlert({

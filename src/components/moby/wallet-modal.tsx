@@ -227,7 +227,7 @@ export function WalletButton() {
     >
       <span className="h-1.5 w-1.5 rounded-full bg-bull" />
       <span className="font-mono">{wallet.address}</span>
-      <span className="text-bull tabular">${(wallet.balanceUsd / 1000).toFixed(1)}K</span>
+      <span className="text-bull tabular">{wallet.balanceUsd > 0 ? `$${(wallet.balanceUsd / 1000).toFixed(1)}K` : "Connect"}</span>
     </button>
   );
 }
