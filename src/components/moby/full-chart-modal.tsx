@@ -72,6 +72,7 @@ export function FullChartModal() {
   const [showRsi, setShowRsi] = useState(true);
   const [showMacd, setShowMacd] = useState(false);
   const [showVolume, setShowVolume] = useState(true);
+  const [showTvl, setShowTvl] = useState(false);
 
   // Try fetching GMGN candles when token has a mint
   const gmgnConfig = token?.mint && token.mint !== "0x0000000000000000000000000000000000000000"
@@ -244,8 +245,20 @@ export function FullChartModal() {
                   >
                     VOL
                   </button>
+                  <button
+                    onClick={() => setShowTvl(!showTvl)}
+                    className={cn("px-2 py-1 rounded text-[10px] font-semibold", showTvl ? "bg-gold/15 text-gold" : "bg-surface-2 text-muted-foreground")}
+                    title="Overlay pool liquidity (TVL) — divergence from price signals liquidity pull"
+                  >
+                    TVL
+                  </button>
                 </div>
               </div>
+
+              {/* TVL overlay badge */}
+              {showTvl && token?.mint && (
+                <TvlOverlay mint={token.mint} />
+              )}
 
               {/* Main chart */}
               <div className="rounded-xl border border-border p-2">
@@ -493,6 +506,57 @@ function IndicatorCard({ label, value, signal, color }: { label: string; value: 
       <div className="text-[9px] text-muted-foreground uppercase">{label}</div>
       <div className={cn("text-sm font-bold tabular", colorCls)}>{value}</div>
       <div className={cn("text-[10px] font-semibold", colorCls)}>{signal}</div>
+    </div>
+  );
+}
+
+// ===== TVL Overlay — shows pool liquidity alongside price =====
+function TvlOverlay({ mint }: { mint: string }) {
+  const { data, loading, source } = useGmgn<{ pairs: any[] }>(
+    `/api/dexscreener/pairs?address=${mint}&chain=solana`,
+    { refreshMs: 60_000 }
+  );
+
+  const pairs = data?.pairs || [];
+  const totalLiquidity = pairs.reduce((s, p) => s + (p.liquidity?.usd ?? 0), 0);
+  const totalVolume24h = pairs.reduce((s, p) => s + (p.volume?.h24 ?? 0), 0);
+  const topPair = pairs[0];
+
+  return (
+    <div className="rounded-xl border border-gold/30 bg-gold/5 p-2.5 mb-2">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-[10px] font-semibold text-gold">📊 Pool Liquidity (TVL)</span>
+        {source && (
+          <Chip variant={source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
+            {source === "dexscreener" ? "live" : "demo"}
+          </Chip>
+        )}
+        {loading && <span className="text-[9px] text-muted-foreground">loading…</span>}
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-[10px]">
+        <div>
+          <div className="text-[9px] text-muted-foreground uppercase">Total TVL</div>
+          <div className="font-bold tabular text-gold">{fmtUsd(totalLiquidity, { compact: true })}</div>
+        </div>
+        <div>
+          <div className="text-[9px] text-muted-foreground uppercase">24h Volume</div>
+          <div className="font-bold tabular">{fmtUsd(totalVolume24h, { compact: true })}</div>
+        </div>
+        <div>
+          <div className="text-[9px] text-muted-foreground uppercase">Vol/TVL ratio</div>
+          <div className={cn("font-bold tabular", totalVolume24h / Math.max(1, totalLiquidity) > 1 ? "text-bull" : "text-muted-foreground")}>
+            {(totalVolume24h / Math.max(1, totalLiquidity)).toFixed(2)}x
+          </div>
+        </div>
+      </div>
+      {topPair && (
+        <div className="text-[9px] text-muted-foreground mt-1.5 pt-1.5 border-t border-border">
+          Top pool: {topPair.dexId} · Liq {fmtUsd(topPair.liquidity?.usd ?? 0, { compact: true })} · Vol {fmtUsd(topPair.volume?.h24 ?? 0, { compact: true })}
+        </div>
+      )}
+      <div className="text-[9px] text-muted-foreground mt-1">
+        💡 High Vol/TVL ratio (&gt;1x) = high turnover = active trading. Low ratio with rising price = liquidity pull = potential dump.
+      </div>
     </div>
   );
 }

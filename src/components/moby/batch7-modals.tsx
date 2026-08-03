@@ -819,3 +819,20 @@ function ModalShell({ open, onClose, title, icon, children }: { open: boolean; o
     </motion.div>
   );
 }
+
+// Default export: renders all batch7 modals (used by React.lazy in page.tsx)
+export default function Batch7Modals() {
+  return (
+    <>
+      <SecurityAuditModal />
+      <TokenizedStocksModal />
+      <WalletPnlModal />
+      <SnipeBotModal />
+      <PricePredictionModal />
+      <LiquidityDepthModal />
+      <TradingJournalModal />
+      <DefiHealthModal />
+      <HarvestModal />
+    </>
+  );
+}

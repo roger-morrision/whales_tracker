@@ -659,3 +659,17 @@ function ModalShell({ open, onClose, title, icon, children }: { open: boolean; o
     </AnimatePresence>
   );
 }
+
+// Default export: renders all batch8 modals (used by React.lazy in page.tsx)
+export default function Batch8Modals() {
+  return (
+    <>
+      <TrailingStopsModal />
+      <HotWalletsModal />
+      <MigrationsModal />
+      <MevProtectionModal />
+      <WalletImportModal />
+      <WatchlistAlertsModal />
+    </>
+  );
+}

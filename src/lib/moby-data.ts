@@ -4853,3 +4853,25 @@ export const MEV_PROTECTION: MevProtectionInfo = {
     { label: "Orca whirlpool", protected: false, description: "Direct whirlpool swap — no MEV protection" },
   ],
 };
+
+// ===== Enhancement #25: Gas-fee auto-tuner =====
+// Computes recommended priority fee (in micro-lamports) based on network congestion.
+// Used by snipe-bot to front-run the slot on launch snipes.
+export function computeAutoPriorityFee(congestionPct: number): {
+  microLamports: number;
+  feeUsd: number;
+  label: string;
+  confidence: number;
+} {
+  // Base: 1000 micro-lamports, scales with congestion
+  // At 100% congestion: ~10000 micro-lamports (aggressive)
+  const microLamports = Math.round(1000 + (congestionPct / 100) * 9000);
+  const feeUsd = microLamports * 0.000000001 * 184; // SOL at ~$184
+  const label = congestionPct > 70 ? "Turbo" : congestionPct > 40 ? "Fast" : "Standard";
+  const confidence = Math.min(99, 70 + (100 - congestionPct) * 0.3);
+  return { microLamports, feeUsd, label, confidence };
+}
+
+export function getCurrentCongestion(): number {
+  return CONGESTION_HISTORY[CONGESTION_HISTORY.length - 1]?.v ?? 50;
+}

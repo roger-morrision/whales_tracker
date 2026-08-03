@@ -805,3 +805,19 @@ export function WatchlistPerfModal() {
     </AnimatePresence>
   );
 }
+
+// Default export: renders all batch6 modals (used by React.lazy in page.tsx)
+export default function Batch6Modals() {
+  return (
+    <>
+      <PortfolioAnalyticsModal />
+      <YieldFarmingModal />
+      <UnlocksModal />
+      <GovernanceModal />
+      <DeFiPositionsModal />
+      <CalendarModal />
+      <MultiWalletModal />
+      <WatchlistPerfModal />
+    </>
+  );
+}

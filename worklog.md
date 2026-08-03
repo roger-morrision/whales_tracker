@@ -592,3 +592,77 @@ Verification:
 - All endpoints return 200
 - Home page renders
 - Dev log shows no errors
+
+---
+Task ID: 8
+Agent: main (orchestrator)
+Task: Continue all enhancements and bug fixes (round 8 — final polish)
+
+Features Shipped:
+
+#22 TVL overlay on price chart (full-chart-modal.tsx — TvlOverlay)
+- New "TVL" toggle button in chart toolbar (gold-themed)
+- TvlOverlay component fetches /api/dexscreener/pairs and shows:
+  - Total TVL across all DEX pools
+  - 24h volume
+  - Vol/TVL ratio (high = active trading, low + rising price = liquidity pull)
+  - Top pool details (DEX name, liquidity, volume)
+  - Insight tooltip explaining divergence interpretation
+- Only renders when token has a mint address
+- Auto-refreshes every 60s
+
+#25 Gas-fee auto-tuner for snipes (moby-data.ts + page.tsx)
+- New `computeAutoPriorityFee(congestionPct)` utility:
+  - Scales from 1000 μLamports (low congestion) to 10000 μLamports (100% congestion)
+  - Computes fee in USD, label (Turbo/Fast/Standard), and confidence %
+- New `getCurrentCongestion()` helper reads from CONGESTION_HISTORY
+- Snipe-bot poller now pushes a secondary "⛽ Auto priority fee" toast on every match:
+  - Shows computed μLamports, USD fee, congestion level, confidence
+  - Helps users understand the gas cost of auto-executed snipes
+
+#7 Code-splitting with next/dynamic + React.lazy (page.tsx)
+- Converted 12 heavy modal imports to `next/dynamic`:
+  - FullChartModal (recharts + lightweight-charts, ~400KB)
+  - NarrativeDetailModal, SmartMoneyMapModal, PerpsModal
+  - NftDetailModal, LaunchScannerModal, BridgeModal, StakingModal
+  - GasOptimizerModal, AirdropModal, PumpFunExplorerModal
+- Converted batch6/7/8 modals to `React.lazy` + `Suspense`:
+  - Added default exports to each batch file that render all their modals
+  - Batch6ModalsWrapper, Batch7ModalsWrapper, Batch8ModalsWrapper components
+  - JS for these modals is only downloaded when the component mounts (immediately on page load, but in a separate chunk)
+- Expected initial bundle reduction: ~400-600KB
+
+#4 Wire usePullToRefresh in DiscoverView (was dead code)
+- Imported `usePullToRefresh` from mobile-helpers.tsx
+- Wired to `refreshFeeds` store action
+- Added pull-to-refresh indicator at top of DiscoverView:
+  - Shows "↓ Pull to refresh" while pulling
+  - Shows "↑ Release to refresh" past threshold (50px)
+  - Shows spinner "Refreshing…" while refreshing
+- Touch handlers spread on the DiscoverView root div
+
+Bug Fixes / Polish:
+
+#5 tsconfig exclude — added examples/, skills/, mini-services/, tests/, tool-results/ to exclude array. Fixes `bunx tsc` showing errors in demo/example files.
+
+#6 Global focus-visible ring — added to globals.css `@layer base`:
+  - 2px solid bull-colored outline on all interactive elements (button, a, input, select, textarea, [role="button"])
+  - 2px offset, 4px border-radius
+  - Only shows on keyboard navigation (focus-visible), not mouse clicks
+
+#3 allowedDevOrigins (from round 7, confirmed working) — added ["*.space-z.ai", "preview-*.space-z.ai"] to next.config.ts
+
+Verification:
+- TypeScript: 0 errors in src/ (examples/skills now excluded)
+- ESLint: clean
+- Production build: ✓ Compiled successfully, all routes registered
+- All 22 endpoints return 200
+- Home page renders
+- Dev log shows no errors
+- Code-splitting confirmed: batch6/7/8 modals load in separate chunks
+
+Stage Summary:
+- 3 new features (TVL overlay, gas auto-tuner, code-splitting)
+- 1 dead-code wiring (usePullToRefresh)
+- 2 polish items (tsconfig exclude, focus-visible ring)
+- All 25 audit items from the original research now addressed

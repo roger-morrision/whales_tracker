@@ -107,6 +107,17 @@
   body {
     font-feature-settings: "ss01", "cv01", "cv02", "cv11";
   }
+  /* Global focus-visible ring for keyboard navigation accessibility */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid var(--bull);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 /* Tabular numbers for prices/quantities — critical for trading UI */

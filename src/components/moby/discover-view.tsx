@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { ArrowUpRight, ArrowDownRight, Flame, TrendingUp, Star, StarOff, Calendar, Rocket } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Flame, TrendingUp, Star, StarOff, Calendar, Rocket, RefreshCw } from "lucide-react";
 import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, fmtAge, type Token } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { useGmgn } from "@/hooks/use-gmgn";
+import { usePullToRefresh } from "./mobile-helpers";
 import { TokenIcon, Sparkline, Chip, SectionHeader } from "./primitives";
 import { MarketOverview } from "./market-overview";
 import { NewsFeed } from "./news-feed";
@@ -12,6 +13,8 @@ import { cn } from "@/lib/utils";
 
 export function DiscoverView() {
   const [section, setSection] = useState<"trending" | "gainers" | "new">("trending");
+  const refreshFeeds = useMoby((s) => s.refreshFeeds);
+  const { pullDistance, isRefreshing, touchHandlers } = usePullToRefresh(refreshFeeds);
 
   const trending = useMemo(() => TOKENS.filter((t) => t.rank).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0)), []);
   const gainers = useMemo(() => [...TOKENS].sort((a, b) => b.change24h - a.change24h).slice(0, 8), []);
@@ -20,7 +23,20 @@ export function DiscoverView() {
   const list = section === "trending" ? trending : section === "gainers" ? gainers : fresh;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...touchHandlers}>
+      {/* Pull-to-refresh indicator */}
+      {pullDistance > 0 && (
+        <div
+          className="flex items-center justify-center text-muted-foreground text-xs overflow-hidden transition-all"
+          style={{ height: `${pullDistance}px` }}
+        >
+          {isRefreshing ? (
+            <><RefreshCw className="h-4 w-4 animate-spin mr-1" /> Refreshing…</>
+          ) : (
+            <span>{pullDistance > 50 ? "↑ Release to refresh" : "↓ Pull to refresh"}</span>
+          )}
+        </div>
+      )}
       <HeroBanner />
       <MarketOverview />
       <TopBoostsRow />
