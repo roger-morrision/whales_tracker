@@ -947,3 +947,45 @@ Verification:
   - Pump.fun: real pump.fun API tokens
   - Quote: real Jupiter Ultra routing
   - Wallet: real Solana RPC balance
+
+---
+Task ID: 15
+Agent: main (orchestrator)
+Task: Fix token tables to show real trending/gainers/new from Solana + add filter popup
+
+Changes:
+- Created 3 new API endpoints that fetch real Solana DEX data from DexScreener:
+  - /api/solana/trending — top boosted tokens sorted by volume/change/mkt_cap/tx_count
+  - /api/solana/gainers — sorted by 24h/6h/1h price change
+  - /api/solana/new — sorted by creation time (newest first)
+- Each returns: symbol, name, price, change_1h/6h/24h, volume_24h, market_cap, liquidity, txns_24h_buys/sells, dex, pair_url, image_uri, created_at
+- Rewrote DiscoverView to fetch from these APIs instead of static TOKENS array
+- Created RealTokenRow component that displays real on-chain data:
+  - Token logo image from DexScreener
+  - DEX badge (pumpswap, raydium, orca, etc.)
+  - Age indicator (2h, 9h, 42h, etc.)
+  - Market cap, liquidity, buy/sell tx counts
+  - Sparkline based on 24h change
+  - Real price + 24h change % (green/red)
+  - Watchlist star toggle
+  - Click opens DexScreener pair page if token not in local registry
+- Added filter popup with:
+  - Sort by selector (Volume / Change / Mkt Cap / Tx Count) for trending tab
+  - Timeframe selector (1h / 6h / 24h) for gainers tab
+  - Min liquidity slider ($0-$500K)
+  - Min 24h volume slider ($0-$1M)
+  - Min change % slider (-100% to +100%)
+  - Reset button
+  - Active filter count badge
+- Loading skeletons (animated pulse placeholders) while fetching
+- Empty state when no tokens match filters
+- "live" / "demo" source badge next to "Discover tokens" header
+
+Verification:
+- TypeScript: 0 errors
+- ESLint: clean
+- Build: ✓ Compiled successfully
+- Trending: HBULL +14.3%, BRICK +44.5%, AURACAT +212% (real DexScreener data)
+- Gainers: DECK +381%, wiwiwi +241%, AURACAT +212% (real 24h changes)
+- New: One coin (2h old, +548%), DECK (9h old, +381%) (real creation times)
+- Zero runtime errors

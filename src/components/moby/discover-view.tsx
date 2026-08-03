@@ -17,14 +17,33 @@ export function DiscoverView() {
   const [section, setSection] = useState<"trending" | "gainers" | "new">("trending");
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
   const { pullDistance, isRefreshing, touchHandlers } = usePullToRefresh(refreshFeeds);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    minLiquidity: 0,
+    minVolume: 0,
+    minChange: -100,
+    sortBy: "volume" as "volume" | "change" | "market_cap" | "tx_count",
+    timeframe: "24h" as "1h" | "6h" | "24h",
+  });
 
-  const liveTokens = useLiveTokens();
+  // Fetch real tokens from DexScreener
+  const trendingUrl = `/api/solana/trending?limit=30&sort=${filters.sortBy}`;
+  const gainersUrl = `/api/solana/gainers?limit=30&timeframe=${filters.timeframe}`;
+  const newUrl = `/api/solana/new?limit=30`;
+  const currentUrl = section === "trending" ? trendingUrl : section === "gainers" ? gainersUrl : newUrl;
+  const { data: tokenData, loading, source } = useGmgn<{ tokens: any[] }>(currentUrl, { refreshMs: 60_000 });
 
-  const trending = useMemo(() => liveTokens.filter((t) => t.rank).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0)), [liveTokens]);
-  const gainers = useMemo(() => [...liveTokens].sort((a, b) => b.change24h - a.change24h).slice(0, 8), [liveTokens]);
-  const fresh = useMemo(() => [...liveTokens].sort((a, b) => a.ageHours - b.ageHours).slice(0, 8), [liveTokens]);
-
-  const list = section === "trending" ? trending : section === "gainers" ? gainers : fresh;
+  // Apply client-side filters
+  const list = useMemo(() => {
+    const tokens = tokenData?.tokens || [];
+    return tokens.filter((t: any) => {
+      if (t.liquidity < filters.minLiquidity) return false;
+      if (t.volume_24h < filters.minVolume) return false;
+      const change = filters.timeframe === "1h" ? t.change_1h : filters.timeframe === "6h" ? t.change_6h : t.change_24h;
+      if (change < filters.minChange) return false;
+      return true;
+    });
+  }, [tokenData, filters]);
 
   return (
     <div className="space-y-6" {...touchHandlers}>
@@ -48,14 +67,145 @@ export function DiscoverView() {
       <GmgnTrendingRow />
       <GmgnHotSearchesRow />
 
-      {/* Discover tokens — trending/gainers/new */}
+      {/* Discover tokens — trending/gainers/new with real DexScreener data */}
       <section>
-        <SectionHeader
-          title="Discover tokens"
-          emoji="🧭"
-          action="Screener"
-          onAction={() => useMoby.getState().setScreenerOpen(true)}
-        />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-semibold">🧭 Discover tokens</span>
+            {source && (
+              <Chip variant={source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
+                {source === "dexscreener" ? "live" : "demo"}
+              </Chip>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(
+                "h-7 px-2 grid place-items-center rounded-lg text-[11px] font-semibold border transition-colors relative",
+                showFilters || filters.minLiquidity > 0 || filters.minVolume > 0 || filters.minChange > -100
+                  ? "bg-bull/15 text-bull border-bull/30"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Flame className="h-3 w-3 inline mr-0.5" />Filter
+              {(filters.minLiquidity > 0 || filters.minVolume > 0 || filters.minChange > -100) && (
+                <span className="absolute -top-1 -right-1 h-3.5 min-w-3.5 px-0.5 grid place-items-center rounded-full bg-bull text-[8px] font-bold text-background">
+                  {[filters.minLiquidity > 0, filters.minVolume > 0, filters.minChange > -100].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => useMoby.getState().setScreenerOpen(true)}
+              className="h-7 px-2 grid place-items-center rounded-lg text-[11px] font-semibold border border-border text-muted-foreground hover:text-foreground"
+            >
+              Screener →
+            </button>
+          </div>
+        </div>
+
+        {/* Filter popup */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden mb-3"
+            >
+              <div className="rounded-xl border border-border bg-surface-2/50 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Filters</span>
+                  <button
+                    onClick={() => {
+                      setFilters({ minLiquidity: 0, minVolume: 0, minChange: -100, sortBy: "volume", timeframe: "24h" });
+                    }}
+                    className="text-[10px] text-muted-foreground hover:text-bull"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                {/* Timeframe (only for gainers) */}
+                {section === "gainers" && (
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-1">Timeframe</div>
+                    <div className="flex gap-1">
+                      {(["1h", "6h", "24h"] as const).map((tf) => (
+                        <button
+                          key={tf}
+                          onClick={() => setFilters((f) => ({ ...f, timeframe: tf }))}
+                          className={cn(
+                            "flex-1 py-1 rounded-md text-[10px] font-semibold border",
+                            filters.timeframe === tf ? "bg-bull/15 text-bull border-bull/30" : "bg-surface-3 text-muted-foreground border-border"
+                          )}
+                        >
+                          {tf}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sort by (only for trending) */}
+                {section === "trending" && (
+                  <div>
+                    <div className="text-[10px] text-muted-foreground mb-1">Sort by</div>
+                    <div className="flex gap-1">
+                      {([
+                        { k: "volume", label: "Volume" },
+                        { k: "change", label: "Change" },
+                        { k: "market_cap", label: "Mkt Cap" },
+                        { k: "tx_count", label: "Tx Count" },
+                      ] as const).map((s) => (
+                        <button
+                          key={s.k}
+                          onClick={() => setFilters((f) => ({ ...f, sortBy: s.k }))}
+                          className={cn(
+                            "flex-1 py-1 rounded-md text-[10px] font-semibold border",
+                            filters.sortBy === s.k ? "bg-bull/15 text-bull border-bull/30" : "bg-surface-3 text-muted-foreground border-border"
+                          )}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Min liquidity */}
+                <div>
+                  <div className="flex items-center justify-between text-[10px] mb-1">
+                    <span className="text-muted-foreground">Min liquidity</span>
+                    <span className="font-semibold tabular">{filters.minLiquidity === 0 ? "Any" : `$${(filters.minLiquidity / 1000).toFixed(0)}K`}</span>
+                  </div>
+                  <input type="range" min={0} max={500_000} step={10_000} value={filters.minLiquidity} onChange={(e) => setFilters((f) => ({ ...f, minLiquidity: parseInt(e.target.value) }))} className="w-full h-1.5 rounded-full bg-surface-3 accent-bull cursor-pointer" />
+                </div>
+
+                {/* Min volume */}
+                <div>
+                  <div className="flex items-center justify-between text-[10px] mb-1">
+                    <span className="text-muted-foreground">Min 24h volume</span>
+                    <span className="font-semibold tabular">{filters.minVolume === 0 ? "Any" : `$${(filters.minVolume / 1000).toFixed(0)}K`}</span>
+                  </div>
+                  <input type="range" min={0} max={1_000_000} step={50_000} value={filters.minVolume} onChange={(e) => setFilters((f) => ({ ...f, minVolume: parseInt(e.target.value) }))} className="w-full h-1.5 rounded-full bg-surface-3 accent-bull cursor-pointer" />
+                </div>
+
+                {/* Min change */}
+                <div>
+                  <div className="flex items-center justify-between text-[10px] mb-1">
+                    <span className="text-muted-foreground">Min change %</span>
+                    <span className="font-semibold tabular">{filters.minChange === -100 ? "Any" : `≥${filters.minChange}%`}</span>
+                  </div>
+                  <input type="range" min={-100} max={100} step={5} value={filters.minChange} onChange={(e) => setFilters((f) => ({ ...f, minChange: parseInt(e.target.value) }))} className="w-full h-1.5 rounded-full bg-surface-3 accent-bull cursor-pointer" />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Tab selector */}
         <div className="flex gap-1 p-1 bg-surface-2 rounded-lg mb-3">
           {[
             { k: "trending", label: "🔥 Trending" },
@@ -74,11 +224,38 @@ export function DiscoverView() {
             </button>
           ))}
         </div>
+
+        {/* Loading state */}
+        {loading && list.length === 0 && (
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="rounded-xl border border-border p-3 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-surface-3" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-3 w-20 bg-surface-3 rounded" />
+                    <div className="h-2 w-32 bg-surface-3 rounded" />
+                  </div>
+                  <div className="h-4 w-12 bg-surface-3 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Real token list */}
         <div className="space-y-1">
-          {list.map((t, idx) => (
-            <TokenRow key={t.id} token={t} rank={section === "trending" ? idx + 1 : undefined} />
+          {list.map((t: any, idx: number) => (
+            <RealTokenRow key={t.address || idx} token={t} rank={section === "trending" ? idx + 1 : undefined} />
           ))}
         </div>
+
+        {/* Empty state */}
+        {!loading && list.length === 0 && (
+          <div className="text-center py-8 text-sm text-muted-foreground">
+            No tokens match your filters. Try relaxing the criteria.
+          </div>
+        )}
       </section>
 
       {/* Whale buy/sell flows — live on-chain */}
@@ -808,5 +985,112 @@ function TopBoostsRow() {
         </div>
       )}
     </section>
+  );
+}
+
+// ===== Real Token Row (DexScreener data) =====
+function RealTokenRow({ token, rank }: { token: any; rank?: number }) {
+  const openToken = useMoby((s) => s.openToken);
+  const watchlist = useMoby((s) => s.watchlist);
+  const toggleWatch = useMoby((s) => s.toggleWatch);
+  const watched = watchlist.includes(token.address);
+
+  const change24h = token.change_24h ?? 0;
+  const change1h = token.change_1h ?? 0;
+  const isBull = change24h >= 0;
+  const ageMin = token.created_at ? Math.round((Date.now() - token.created_at) / 60000) : 0;
+  const ageLabel = ageMin > 0 ? (ageMin < 60 ? `${ageMin}m` : ageMin < 1440 ? `${Math.floor(ageMin / 60)}h` : `${Math.floor(ageMin / 1440)}d`) : "";
+
+  // Generate sparkline from 24h change approximation
+  const sparkData = useMemo(() => {
+    const points: number[] = [];
+    let v = token.price * (1 - change24h / 100);
+    for (let i = 0; i < 20; i++) {
+      v = v * (1 + (Math.random() - 0.5) * 0.02 + (change24h / 100 / 20));
+      points.push(v);
+    }
+    points.push(token.price);
+    return points;
+  }, [token.price, token.change_24h]);
+
+  return (
+    <div
+      onClick={() => {
+        // Try to find in local TOKENS first, otherwise push toast
+        const tk = TOKENS.find((t) => t.mint === token.address);
+        if (tk) {
+          openToken(tk.id);
+        } else {
+          useMoby.getState().pushToast({
+            title: `${token.symbol} — ${token.name}`,
+            description: `Price: ${fmtPrice(token.price)} · MC ${fmtUsd(token.market_cap, { compact: true })} · Liq ${fmtUsd(token.liquidity, { compact: true })} · ${token.dex}`,
+            type: "info",
+          });
+          window.open(token.pair_url || `https://dexscreener.com/solana/${token.address}`, "_blank");
+        }
+      }}
+      className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-2 cursor-pointer transition-colors"
+    >
+      <div className="w-5 text-center text-xs font-mono text-muted-foreground">
+        {rank ?? ""}
+      </div>
+      {/* Token icon */}
+      {token.image_uri ? (
+        <img
+          src={token.image_uri}
+          alt={token.symbol}
+          className="h-9 w-9 rounded-full object-cover shrink-0"
+          onError={(e) => { (e.currentTarget.style.display = "none"); }}
+        />
+      ) : (
+        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-surface-3 to-surface-2 grid place-items-center text-xs font-bold shrink-0">
+          {token.symbol?.[0] ?? "?"}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-sm truncate">{token.symbol}</span>
+          <Chip variant="outline" className="text-[9px]">{token.dex}</Chip>
+          {ageLabel && <span className="text-[9px] text-muted-foreground">{ageLabel}</span>}
+        </div>
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span className="truncate max-w-[100px]">{token.name}</span>
+          <span>·</span>
+          <span>MC {fmtUsd(token.market_cap, { compact: true })}</span>
+          <span>·</span>
+          <span>Liq {fmtUsd(token.liquidity, { compact: true })}</span>
+          {token.txns_24h_buys > 0 && (
+            <>
+              <span>·</span>
+              <span className="text-bull">{token.txns_24h_buys}b</span>
+              <span className="text-bear">{token.txns_24h_sells}s</span>
+            </>
+          )}
+        </div>
+      </div>
+      {/* Sparkline */}
+      <div className="w-16 h-8 hidden xs:block">
+        <Sparkline data={sparkData} width={64} height={32} bullish={isBull} />
+      </div>
+      {/* Price + change */}
+      <div className="text-right shrink-0">
+        <div className="text-sm font-semibold tabular">{fmtPrice(token.price)}</div>
+        <div className={cn("text-[10px] tabular flex items-center justify-end gap-0.5", isBull ? "text-bull" : "text-bear")}>
+          {isBull ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+          {Math.abs(change24h).toFixed(1)}%
+        </div>
+      </div>
+      {/* Watchlist toggle */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleWatch(token.address);
+        }}
+        className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground shrink-0"
+        aria-label="Watchlist"
+      >
+        {watched ? <Star className="h-3.5 w-3.5 fill-gold text-gold" /> : <StarOff className="h-3.5 w-3.5" />}
+      </button>
+    </div>
   );
 }
