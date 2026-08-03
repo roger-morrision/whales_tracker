@@ -6,6 +6,7 @@ import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, fmtAge,
 import { useMoby } from "@/lib/moby-store";
 import { useGmgn } from "@/hooks/use-gmgn";
 import { usePullToRefresh } from "./mobile-helpers";
+import { useLiveTokens } from "@/hooks/use-live-tokens";
 import { TokenIcon, Sparkline, Chip, SectionHeader } from "./primitives";
 import { MarketOverview } from "./market-overview";
 import { NewsFeed } from "./news-feed";
@@ -16,9 +17,11 @@ export function DiscoverView() {
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
   const { pullDistance, isRefreshing, touchHandlers } = usePullToRefresh(refreshFeeds);
 
-  const trending = useMemo(() => TOKENS.filter((t) => t.rank).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0)), []);
-  const gainers = useMemo(() => [...TOKENS].sort((a, b) => b.change24h - a.change24h).slice(0, 8), []);
-  const fresh = useMemo(() => [...TOKENS].sort((a, b) => a.ageHours - b.ageHours).slice(0, 8), []);
+  const liveTokens = useLiveTokens();
+
+  const trending = useMemo(() => liveTokens.filter((t) => t.rank).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0)), [liveTokens]);
+  const gainers = useMemo(() => [...liveTokens].sort((a, b) => b.change24h - a.change24h).slice(0, 8), [liveTokens]);
+  const fresh = useMemo(() => [...liveTokens].sort((a, b) => a.ageHours - b.ageHours).slice(0, 8), [liveTokens]);
 
   const list = section === "trending" ? trending : section === "gainers" ? gainers : fresh;
 
