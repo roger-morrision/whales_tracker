@@ -60,9 +60,17 @@ export function DiscoverView() {
           )}
         </div>
       )}
-      <HeroBanner />
 
-      {/* Main focus: Solana trending tokens */}
+      {/* Main focus: Whale activities (moby.win style — "The Tape") */}
+      <WhaleBuySellSummary />
+
+      {/* Live whale buy/sell feed — what whales are buying/selling RIGHT NOW */}
+      <WhaleFlowsRow />
+
+      {/* Smart money movers — tokens with most smart money inflow */}
+      <SmartMoneyMoversLive />
+
+      {/* Top Boosted + Trending + Hot Searches */}
       <TopBoostsRow />
       <GmgnTrendingRow />
       <GmgnHotSearchesRow />
@@ -1152,5 +1160,185 @@ function RealTokenRow({ token, rank }: { token: any; rank?: number }) {
         {watched ? <Star className="h-3.5 w-3.5 fill-gold text-gold" /> : <StarOff className="h-3.5 w-3.5" />}
       </button>
     </div>
+  );
+}
+
+// ===== Whale Buy/Sell Summary — aggregated stats (moby.win "The Tape" style) =====
+function WhaleBuySellSummary() {
+  const { data, loading, source } = useGmgn<{ trades: any[] }>(
+    "/api/gmgn/smart-money-feed?chain=sol&limit=30",
+    { refreshMs: 30_000 }
+  );
+
+  const trades = data?.trades || [];
+  const buys = trades.filter((t: any) => t.type === "buy");
+  const sells = trades.filter((t: any) => t.type === "sell");
+  const totalBuyUsd = buys.reduce((s: number, t: any) => s + (t.amount_usd || 0), 0);
+  const totalSellUsd = sells.reduce((s: number, t: any) => s + (t.amount_usd || 0), 0);
+  const netFlow = totalBuyUsd - totalSellUsd;
+  const buyPressure = totalBuyUsd + totalSellUsd > 0 ? (totalBuyUsd / (totalBuyUsd + totalSellUsd)) * 100 : 50;
+
+  // Top bought tokens
+  const tokenMap: Record<string, { buys: number; sells: number; buyUsd: number; sellUsd: number }> = {};
+  for (const t of trades) {
+    const sym = t.token_symbol || "UNKNOWN";
+    if (!tokenMap[sym]) tokenMap[sym] = { buys: 0, sells: 0, buyUsd: 0, sellUsd: 0 };
+    if (t.type === "buy") { tokenMap[sym].buys++; tokenMap[sym].buyUsd += t.amount_usd || 0; }
+    else { tokenMap[sym].sells++; tokenMap[sym].sellUsd += t.amount_usd || 0; }
+  }
+  const topBought = Object.entries(tokenMap)
+    .map(([sym, d]) => ({ sym, ...d, net: d.buyUsd - d.sellUsd }))
+    .sort((a, b) => b.net - a.net)
+    .slice(0, 5);
+
+  return (
+    <div className="rounded-2xl border border-bull/20 bg-gradient-to-br from-bull/5 to-transparent p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-sm font-bold">🐋 Smart Money Activity</span>
+        {source && (
+          <Chip variant={source === "gmgn" || source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
+            {source === "gmgn" || source === "dexscreener" ? "live" : "demo"}
+          </Chip>
+        )}
+        <span className="ml-auto text-[10px] text-muted-foreground">{trades.length} trades · 30s refresh</span>
+      </div>
+
+      {loading && trades.length === 0 ? (
+        <div className="h-20 rounded-lg bg-surface-3 animate-pulse" />
+      ) : (
+        <>
+          {/* Buy/sell pressure bar */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-[10px] mb-1">
+              <span className="text-bull font-semibold">BUY {totalBuyUsd >= 1000 ? `$${(totalBuyUsd / 1000).toFixed(1)}K` : `$${totalBuyUsd.toFixed(0)}`}</span>
+              <span className="text-bear font-semibold">SELL {totalSellUsd >= 1000 ? `$${(totalSellUsd / 1000).toFixed(1)}K` : `$${totalSellUsd.toFixed(0)}`}</span>
+            </div>
+            <div className="h-2.5 rounded-full overflow-hidden flex">
+              <div className="bg-bull transition-all" style={{ width: `${buyPressure}%` }} />
+              <div className="bg-bear transition-all" style={{ width: `${100 - buyPressure}%` }} />
+            </div>
+            <div className="flex items-center justify-between text-[10px] mt-0.5">
+              <span className="text-muted-foreground">{buys.length} buy orders</span>
+              <span className={cn("font-semibold", netFlow >= 0 ? "text-bull" : "text-bear")}>
+                Net: {netFlow >= 0 ? "+" : "-"}{Math.abs(netFlow) >= 1000 ? `$${(Math.abs(netFlow) / 1000).toFixed(1)}K` : `$${Math.abs(netFlow).toFixed(0)}`}
+              </span>
+              <span className="text-muted-foreground">{sells.length} sell orders</span>
+            </div>
+          </div>
+
+          {/* Top tokens by net flow */}
+          <div className="space-y-1">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Top tokens by smart money net flow</div>
+            {topBought.map((t, i) => (
+              <div
+                key={t.sym}
+                onClick={() => {
+                  const trade = trades.find((tr: any) => tr.token_symbol === t.sym);
+                  if (trade) {
+                    const tk = TOKENS.find((tt) => tt.mint === trade.token_address);
+                    if (tk) { useMoby.getState().openToken(tk.id); return; }
+                    useMoby.getState().viewExternalToken({
+                      address: trade.token_address, symbol: t.sym, name: t.sym,
+                      price: trade.price ?? 0, change_24h: 0, volume_24h: t.buyUsd + t.sellUsd,
+                      market_cap: 0, liquidity: 0, dex: "SOL",
+                    });
+                  }
+                }}
+                className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-surface-2 cursor-pointer transition-colors"
+              >
+                <span className="text-[10px] font-mono text-muted-foreground w-4">{i + 1}</span>
+                <span className="text-xs font-semibold flex-1">{t.sym}</span>
+                <span className="text-[10px] text-bull tabular">{t.buys}b</span>
+                <span className="text-[10px] text-bear tabular">{t.sells}s</span>
+                <span className={cn("text-[11px] font-bold tabular w-16 text-right", t.net >= 0 ? "text-bull" : "text-bear")}>
+                  {t.net >= 0 ? "+" : "-"}{Math.abs(t.net) >= 1000 ? `$${(Math.abs(t.net) / 1000).toFixed(1)}K` : `$${Math.abs(t.net).toFixed(0)}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ===== Smart Money Movers Live — tokens with smart money inflow (from GMGN feed) =====
+function SmartMoneyMoversLive() {
+  const { data, loading, source } = useGmgn<{ signals: any[] }>(
+    "/api/gmgn/signals?chain=sol&limit=10",
+    { refreshMs: 60_000 }
+  );
+
+  const signals = data?.signals || [];
+  const buySignals = signals.filter((s: any) => s.signal_type === "smart_money_buy" || s.signal_type === "large_buy");
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold">📡 Smart Money Signals</span>
+          {source && (
+            <Chip variant={source === "gmgn" || source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
+              {source === "gmgn" || source === "dexscreener" ? "live" : "demo"}
+            </Chip>
+          )}
+        </div>
+        <button
+          onClick={() => useMoby.getState().openTokenList({ title: "Smart Money Signals", endpoint: "/api/gmgn/signals?chain=sol&limit=30" })}
+          className="text-[11px] text-muted-foreground hover:text-bull"
+        >
+          View all →
+        </button>
+      </div>
+
+      {loading && buySignals.length === 0 ? (
+        <div className="space-y-1">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-lg border border-border p-2 animate-pulse h-12" />
+          ))}
+        </div>
+      ) : buySignals.length > 0 ? (
+        <div className="space-y-1">
+          {buySignals.slice(0, 5).map((s: any, i: number) => (
+            <div
+              key={i}
+              onClick={() => useMoby.getState().viewExternalToken({
+                address: s.token_address, symbol: s.symbol, name: s.name,
+                price: s.price, change_24h: s.change_24h ?? 0, volume_24h: s.amount_usd,
+                market_cap: s.market_cap ?? 0, liquidity: 0, dex: "SOL",
+              })}
+              className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-surface-2 cursor-pointer transition-colors"
+            >
+              <div className="h-7 w-7 rounded-lg bg-bull/15 grid place-items-center shrink-0">
+                <ArrowUpRight className="h-3 w-3 text-bull" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-semibold">{s.symbol}</span>
+                  <Chip variant="bull" className="text-[9px]">
+                    {s.signal_type === "smart_money_buy" ? "🐋 SMART BUY" : "🐳 LARGE BUY"}
+                  </Chip>
+                  {s.wallet_count && <span className="text-[10px] text-muted-foreground">{s.wallet_count} wallets</span>}
+                </div>
+                <div className="text-[10px] text-muted-foreground truncate">
+                  {s.name} · {fmtUsd(s.amount_usd, { compact: true })}
+                  {s.change_24h !== undefined && (
+                    <span className={cn("ml-1", s.change_24h >= 0 ? "text-bull" : "text-bear")}>
+                      {s.change_24h >= 0 ? "+" : ""}{s.change_24h.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-bold tabular text-bull">+{fmtUsd(s.amount_usd, { compact: true })}</div>
+                <div className="text-[9px] text-muted-foreground">{s.ts ? new Date(s.ts * 1000).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-4 text-xs text-muted-foreground">No smart money signals right now.</div>
+      )}
+    </section>
   );
 }
