@@ -61,7 +61,7 @@ export function SearchModal() {
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -20, opacity: 0 }}
-            onClick={(e) => e.stopPropagation()}
+            role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
             className="relative w-full sm:max-w-md bg-background border border-border rounded-2xl overflow-hidden shadow-2xl"
           >
             {/* Search input */}
@@ -267,7 +267,7 @@ export function NotificationsPanel() {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 320 }}
-            onClick={(e) => e.stopPropagation()}
+            role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
             className="relative w-full sm:max-w-sm h-full sm:h-screen bg-background border-l border-border overflow-y-auto scrollbar-thin"
           >
             <div className="sticky top-0 bg-background/95 backdrop-blur-xl px-4 py-3 border-b border-border flex items-center justify-between">

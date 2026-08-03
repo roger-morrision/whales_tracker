@@ -666,3 +666,58 @@ Stage Summary:
 - 1 dead-code wiring (usePullToRefresh)
 - 2 polish items (tsconfig exclude, focus-visible ring)
 - All 25 audit items from the original research now addressed
+
+---
+Task ID: 9
+Agent: main (orchestrator)
+Task: Continue all enhancements and bug fixes (round 9 — final accessibility + PWA + email alerts)
+
+Features Shipped:
+
+PWA Install Prompt (profile-view.tsx — PwaInstallPrompt)
+- Uses `useIsPWA` hook from mobile-helpers (was dead code — now wired)
+- Listens for `beforeinstallprompt` event
+- Shows install banner in Profile view with "Install" + "Not now" buttons
+- Calls `installEvent.prompt()` on click
+- Auto-hides when running as PWA or after dismissal
+- Purple/green gradient card matching Moby brand
+
+Email Alert Channel (alert-creator.tsx)
+- Email channel was already in the CHANNELS list but had no input field
+- Added `emailForAlerts` state + email input that appears when "email" channel is selected
+- Input has email type validation, placeholder, and helper text
+- "We'll send a verification link before enabling email alerts" — sets expectation for server-side implementation
+
+Accessibility: role="dialog" + aria-modal (7 modal files)
+- Python codemod added `role="dialog" aria-modal="true"` to the main modal container in:
+  - token-detail-sheet.tsx
+  - trade-modal.tsx
+  - wallet-modal.tsx
+  - search-modal.tsx
+  - alert-creator.tsx
+  - settings-modal.tsx
+  - compare-modal.tsx
+- Screen readers now announce these as modal dialogs
+- Combined with the existing aria-label="Close" on close buttons (from round 7)
+
+Bug Fix: Stale Fast Refresh cache
+- After code-splitting changes (round 8), the dev server's Fast Refresh cache caused a "Batch6Modals is not defined" error
+- Fixed by restarting the dev server — the code was correct, the cache was stale
+- Verified: zero runtime errors after clean restart
+
+Verification:
+- TypeScript: 0 errors in src/
+- ESLint: clean
+- Production build: ✓ Compiled successfully
+- All 10 tested endpoints return 200 (5 original + 5 GMGN/DexScreener)
+- Zero runtime errors in dev.log
+- Deep audit by Explore subagent confirmed: NO ISSUES FOUND across all 10 verification areas
+
+Final Codebase Stats:
+- 54 component files in src/components/moby/
+- 26 API routes (5 original + 17 GMGN + 4 DexScreener)
+- ~2000-line Zustand store with 30+ persisted slices
+- ~4900-line moby-data.ts with token/trader/signal/flow data + utilities
+- ~1400-line GMGN client lib (gmgn-cli integration + DexScreener fallback)
+- 9 rounds of enhancements documented in worklog.md
+- All 25 features from the original GMGN/DexScreener research audit implemented

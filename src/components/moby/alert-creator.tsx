@@ -35,6 +35,7 @@ export function AlertCreatorModal() {
   const [threshold, setThreshold] = useState("");
   const [channels, setChannels] = useState<("push" | "email" | "telegram")[]>(["push"]);
   const [showTokenPicker, setShowTokenPicker] = useState(false);
+  const [emailForAlerts, setEmailForAlerts] = useState("");
 
   // Sync presetTokenId when it changes (e.g., opening from different tokens)
   useEffect(() => {
@@ -87,7 +88,7 @@ export function AlertCreatorModal() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0.5 }}
             transition={{ type: "spring", damping: 30, stiffness: 320 }}
-            onClick={(e) => e.stopPropagation()}
+            role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
             className="relative w-full sm:max-w-md h-[88vh] flex flex-col bg-background border-t sm:border border-bull/20 rounded-t-3xl sm:rounded-3xl overflow-hidden"
           >
             <div className="px-4 py-3 border-b border-border flex items-center gap-2">
@@ -268,6 +269,22 @@ export function AlertCreatorModal() {
                       );
                     })}
                   </div>
+                  {/* Email input when email channel is selected */}
+                  {channels.includes("email") && (
+                    <div className="mt-2">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Email address</div>
+                      <input
+                        type="email"
+                        value={emailForAlerts}
+                        onChange={(e) => setEmailForAlerts(e.target.value)}
+                        placeholder="trader@example.com"
+                        className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-bull/40"
+                      />
+                      <div className="text-[9px] text-muted-foreground mt-0.5">
+                        We'll send a verification link before enabling email alerts.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

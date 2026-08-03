@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useMoby } from "@/lib/moby-store";
 import { TOKENS, fmtUsd, fmtNum, fmtPrice, fmtAge } from "@/lib/moby-data";
+import { useIsPWA } from "./mobile-helpers";
 import { TokenIcon, Chip, SectionHeader } from "./primitives";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,7 @@ export function ProfileView() {
     <div className="space-y-5">
       <ProfileHeader />
       <GmgnSetupBanner />
+      <PwaInstallPrompt />
 
       {/* Quick stats */}
       <div className="grid grid-cols-3 gap-2">
@@ -503,6 +505,58 @@ function GmgnSetupBanner() {
         >
           <X className="h-3.5 w-3.5" />
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ===== PWA Install Prompt =====
+function PwaInstallPrompt() {
+  const isPWA = useIsPWA();
+  const [dismissed, setDismissed] = useState(false);
+  const [installEvent, setInstallEvent] = useState<any>(null);
+
+  useEffect(() => {
+    if (isPWA) return;
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallEvent(e);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, [isPWA]);
+
+  if (isPWA || dismissed || !installEvent) return null;
+
+  return (
+    <div className="rounded-2xl p-3 bg-gradient-to-br from-[#9945FF]/10 to-[#14F195]/5 border border-[#9945FF]/20">
+      <div className="flex items-start gap-2.5">
+        <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-[#9945FF] to-[#14F195] grid place-items-center text-sm shrink-0">
+          📱
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold">Install Moby app</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">
+            Add to home screen for full-screen trading with push notifications.
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              onClick={() => {
+                installEvent.prompt();
+                installEvent.userChoice?.then(() => setInstallEvent(null));
+              }}
+              className="px-3 py-1 rounded-lg bg-bull text-background text-[11px] font-bold hover:opacity-90"
+            >
+              Install
+            </button>
+            <button
+              onClick={() => setDismissed(true)}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -224,7 +224,7 @@ export function TradeModal() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0.5 }}
             transition={{ type: "spring", damping: 30, stiffness: 320 }}
-            onClick={(e) => e.stopPropagation()}
+            role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
             className="relative w-full sm:max-w-md bg-background border-t sm:border border-bull/20 rounded-t-3xl sm:rounded-3xl overflow-hidden"
           >
             {/* Header */}
