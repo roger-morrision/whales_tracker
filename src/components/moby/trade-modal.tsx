@@ -34,13 +34,16 @@ export function TradeModal() {
   const haptics = useHaptics();
 
   // Consume prefill amount when modal opens (from quick-buy toast button)
-  useEffect(() => {
-    if (open && tradePrefillUsd && tradePrefillUsd > 0) {
-      setAmount(String(tradePrefillUsd));
-      // Clear the prefill so it doesn't re-apply on next open
-      useMoby.setState({ tradePrefillUsd: null });
-    }
-  }, [open, tradePrefillUsd]);
+    useEffect(() => {
+      if (open && tradePrefillUsd && tradePrefillUsd > 0) {
+        // Defer to avoid synchronous setState in effect
+        setTimeout(() => {
+          setAmount(String(tradePrefillUsd));
+          // Clear the prefill so it doesn't re-apply on next open
+          useMoby.setState({ tradePrefillUsd: null });
+        }, 0);
+      }
+    }, [open, tradePrefillUsd]);
   const [slippage, setSlippage] = useState(settings.defaultSlippage);
   const [showSettings, setShowSettings] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -58,66 +61,80 @@ export function TradeModal() {
   const [quoteLoading, setQuoteLoading] = useState(false);
 
   const prices = useMoby((s) => s.prices);
-  const livePrice = token ? prices[token.id]?.price ?? token.price : 0;
-  // Keep a ref to livePrice so the quote effect doesn't re-run every 2.5s
-  const livePriceRef = useRef(livePrice);
-  livePriceRef.current = livePrice;
-  const applyTrade = useMoby((s) => s.applyTrade);
-  const recordTrade = useMoby((s) => s.recordTrade);
+    const livePrice = token ? prices[token.id]?.price ?? token.price : 0;
+    // Keep a ref to livePrice so the quote effect doesn't re-run every 2.5s
+    const livePriceRef = useRef(livePrice);
+
+    // Update ref in effect to avoid "Cannot update ref during render"
+    useEffect(() => {
+      livePriceRef.current = livePrice;
+    }, [livePrice]);
+
+    const applyTrade = useMoby((s) => s.applyTrade);
+    const recordTrade = useMoby((s) => s.recordTrade);
 
   // Fetch real quote from API when amount changes
-  // NOTE: livePrice is intentionally NOT in deps — it changes every 2.5s via
-  // tickPrices and would cause constant refetches. It's read via livePriceRef.
-  useEffect(() => {
-    if (!token || !amount || parseFloat(amount) <= 0) {
-      setQuote(null);
-      return;
-    }
-    setQuoteLoading(true);
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      try {
-        const inputMint = side === "BUY" ? "USDC" : token.symbol;
-        const outputMint = side === "BUY" ? token.symbol : "USDC";
-        const res = await fetch(
-          `/api/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippage=${slippage}`,
-          { signal: controller.signal }
-        );
-        const data = await res.json();
-        setQuote({
-          outAmount: data.outAmount,
-          priceImpactPct: data.priceImpactPct,
-          minReceived: data.minReceived,
-          platformFeeUsd: data.platformFeeUsd,
-          route: data.route,
-          quoteId: data.quoteId,
-        });
-      } catch {
-        // Fallback to local calculation
-        const usdIn = parseFloat(amount) || 0;
-        const refPrice = livePriceRef.current || token.price;
-        const baseOut = usdIn / refPrice;
-        const impact = Math.min(15, (usdIn / Math.max(1, token.liquidity)) * 100);
-        const afterImpact = baseOut * (1 - impact / 100);
-        const minRec = afterImpact * (1 - slippage / 100);
-        setQuote({
-          outAmount: afterImpact,
-          priceImpactPct: impact,
-          minReceived: minRec,
-          platformFeeUsd: usdIn * 0.0085,
-          route: ["USDC", token.symbol],
-          quoteId: `local_${Date.now()}`,
-        });
-      } finally {
-        setQuoteLoading(false);
+    // NOTE: livePrice is intentionally NOT in deps — it changes every 2.5s via
+    // tickPrices and would cause constant refetches. It's read via livePriceRef.
+    useEffect(() => {
+      if (!token || !amount || parseFloat(amount) <= 0) {
+        // Defer to avoid synchronous setState in effect
+        setTimeout(() => {
+          setQuote(null);
+        }, 0);
+        return;
       }
-    }, 400); // Debounce 400ms
+      // Defer to avoid synchronous setState in effect
+      setTimeout(() => {
+        setQuoteLoading(true);
+      }, 0);
+      const controller = new AbortController();
+      const timer = setTimeout(async () => {
+        try {
+          const inputMint = side === "BUY" ? "USDC" : token.symbol;
+          const outputMint = side === "BUY" ? token.symbol : "USDC";
+          const res = await fetch(
+            `/api/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippage=${slippage}`,
+            { signal: controller.signal }
+          );
+          const data = await res.json();
+          setQuote({
+            outAmount: data.outAmount,
+            priceImpactPct: data.priceImpactPct,
+            minReceived: data.minReceived,
+            platformFeeUsd: data.platformFeeUsd,
+            route: data.route,
+            quoteId: data.quoteId,
+          });
+        } catch {
+          // Fallback to local calculation
+          const usdIn = parseFloat(amount) || 0;
+          const refPrice = livePriceRef.current || token.price;
+          const baseOut = usdIn / refPrice;
+          const impact = Math.min(15, (usdIn / Math.max(1, token.liquidity)) * 100);
+          const afterImpact = baseOut * (1 - impact / 100);
+          const minRec = afterImpact * (1 - slippage / 100);
+          setQuote({
+            outAmount: afterImpact,
+            priceImpactPct: impact,
+            minReceived: minRec,
+            platformFeeUsd: usdIn * 0.0085,
+            route: ["USDC", token.symbol],
+            quoteId: `local_${Date.now()}`,
+          });
+        } finally {
+          // Defer to avoid synchronous setState in effect
+          setTimeout(() => {
+            setQuoteLoading(false);
+          }, 0);
+        }
+      }, 400); // Debounce 400ms
 
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [token, amount, slippage, side]);
+      return () => {
+        clearTimeout(timer);
+        controller.abort();
+      };
+    }, [token, amount, slippage, side]);
 
   const amountOut = quote?.outAmount ?? 0;
   const priceImpact = quote?.priceImpactPct ?? 0;

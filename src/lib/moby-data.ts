@@ -59,9 +59,15 @@ export interface Token {
   price: number;
   change24h: number; // percent
   change1h: number;
+  change5m?: number;     // Phase 1: 5-minute change
+  change30m?: number;    // Phase 1: 30-minute change
+  change1m?: number;     // Phase 1: 1-minute change
   marketCap: number;
   liquidity: number;
   volume24h: number;
+  volume1h?: number;     // Phase 1: 1-hour volume
+  volume30m?: number;    // Phase 1: 30-minute volume
+  volume1m?: number;     // Phase 1: 1-minute volume
   holders: number;
   ageHours: number; // time since mint
   smartMoneyHolders: number; // count of tracked smart wallets holding
@@ -73,6 +79,16 @@ export interface Token {
   description: string;
   rank?: number; // trending rank if applicable
   mint?: string; // Solana mint address (for GMGN / on-chain lookups)
+  // Phase 4: GMGN-style enrichment
+  holderCount?: number | null;
+  totalFeesSol?: number | null;
+  buyTax?: number | null;
+  sellTax?: number | null;
+  ctoPct?: number | null;
+  isDs?: boolean;
+  insiderPct?: number | null;
+  bundlerPct?: number | null;
+  sniperHoldPct?: number | null;
 }
 
 export interface Trader {

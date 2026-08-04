@@ -171,8 +171,13 @@ export function PumpFunExplorerModal() {
   }, [tab, launchpad]);
 
   useEffect(() => {
-    if (open) fetchTokens();
-  }, [open, fetchTokens]);
+      if (open) {
+        // Defer to avoid synchronous setState in effect
+        setTimeout(() => {
+          fetchTokens();
+        }, 0);
+      }
+    }, [open, fetchTokens]);
 
   // Auto-refresh every 30s (skipped when tab is hidden to save CLI subprocess spawns)
   useEffect(() => {

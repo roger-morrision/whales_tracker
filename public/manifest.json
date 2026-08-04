@@ -1,17 +1,106 @@
 {
-  "name": "Moby — Trade Smarter",
+  "name": "Moby - Whales Tracker",
   "short_name": "Moby",
-  "description": "Onchain intelligence for traders. Follow whales, KOLs, and top-performing traders in real time.",
+  "description": "Mobile-first crypto trading intelligence platform for tracking smart money, whales, and token analytics on Solana",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0d14",
-  "theme_color": "#0a0d14",
-  "orientation": "portrait",
+  "background_color": "#0f0f0f",
+  "theme_color": "#14F195",
+  "orientation": "portrait-primary",
+  "scope": "/",
   "icons": [
     {
-      "src": "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "business", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Discover Tokens",
+      "short_name": "Discover",
+      "description": "Browse trending and new tokens",
+      "url": "/?tab=discover",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Portfolio",
+      "short_name": "Portfolio",
+      "description": "View your portfolio and PnL",
+      "url": "/?tab=portfolio",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Whales",
+      "short_name": "Whales",
+      "description": "Track smart money and whale activity",
+      "url": "/?tab=whales",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Trade",
+      "short_name": "Trade",
+      "description": "Open trade modal",
+      "url": "/?action=trade",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+moby",
+      "url": "/?action=%s"
     }
   ]
 }

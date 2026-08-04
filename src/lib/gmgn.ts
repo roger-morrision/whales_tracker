@@ -46,6 +46,211 @@ function resolveGmgnCliBin(): string {
 const GMGN_CLI_BIN = resolveGmgnCliBin();
 const DEFAULT_TIMEOUT_MS = 12_000; // CLI startup is slower than HTTP
 
+// ===== Circuit Breaker =====
+interface CircuitBreakerState {
+  failures: number;
+  lastFailure: number;
+  state: 'closed' | 'open' | 'half-open';
+  successCount: number;
+}
+
+const circuitBreakers = new Map<string, CircuitBreakerState>();
+
+const CIRCUIT_BREAKER_CONFIG = {
+  failureThreshold: 3,           // Open after 3 consecutive failures
+  successThreshold: 2,           // Close after 2 successes in half-open
+  timeout: 60_000,               // 1 minute before trying half-open
+};
+
+function getCircuitBreaker(key: string): CircuitBreakerState {
+  if (!circuitBreakers.has(key)) {
+    circuitBreakers.set(key, {
+      failures: 0,
+      lastFailure: 0,
+      state: 'closed',
+      successCount: 0,
+    });
+  }
+  return circuitBreakers.get(key)!;
+}
+
+function recordSuccess(key: string) {
+  const cb = getCircuitBreaker(key);
+  cb.failures = 0;
+  if (cb.state === 'half-open') {
+    cb.successCount++;
+    if (cb.successCount >= CIRCUIT_BREAKER_CONFIG.successThreshold) {
+      cb.state = 'closed';
+      cb.successCount = 0;
+    }
+  }
+}
+
+function recordFailure(key: string) {
+  const cb = getCircuitBreaker(key);
+  cb.failures++;
+  cb.lastFailure = Date.now();
+  if (cb.state === 'half-open') {
+    cb.state = 'open';
+    cb.successCount = 0;
+  } else if (cb.failures >= CIRCUIT_BREAKER_CONFIG.failureThreshold) {
+    cb.state = 'open';
+  }
+}
+
+function isCircuitOpen(key: string): boolean {
+  const cb = getCircuitBreaker(key);
+  if (cb.state === 'open') {
+    // Check if timeout has passed to transition to half-open
+    if (Date.now() - cb.lastFailure > CIRCUIT_BREAKER_CONFIG.timeout) {
+      cb.state = 'half-open';
+      cb.successCount = 0;
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+function getCircuitBreakerStatus(key: string) {
+  const cb = getCircuitBreaker(key);
+  return {
+    state: cb.state,
+    failures: cb.failures,
+    lastFailure: cb.lastFailure,
+    successCount: cb.successCount,
+  };
+}
+
+// ===== Request Deduplication =====
+interface PendingRequest<T> {
+  promise: Promise<T | null>;
+  timestamp: number;
+}
+
+const pendingRequests = new Map<string, PendingRequest<any>>();
+
+function deduplicateRequest<T>(key: string, factory: () => Promise<T | null>): Promise<T | null> {
+  const existing = pendingRequests.get(key);
+  if (existing && Date.now() - existing.timestamp < 5000) {
+    // Return existing promise if less than 5 seconds old
+    return existing.promise;
+  }
+  const promise = factory();
+  pendingRequests.set(key, { promise, timestamp: Date.now() });
+  // Clean up after completion
+  promise.finally(() => {
+    // Small delay to allow other callers to get the cached result
+    setTimeout(() => pendingRequests.delete(key), 1000);
+  });
+  return promise;
+}
+
+// ===== Health Metrics =====
+interface HealthMetrics {
+  gmgn: {
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    avgLatencyMs: number;
+    lastError?: string;
+    circuitBreakers: Record<string, { state: string; failures: number }>;
+  };
+  dexScreener: {
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    avgLatencyMs: number;
+    lastError?: string;
+  };
+  cache: {
+    size: number;
+    hitRate: number;
+  };
+}
+
+let healthMetrics: HealthMetrics = {
+  gmgn: {
+    totalRequests: 0,
+    successfulRequests: 0,
+    failedRequests: 0,
+    avgLatencyMs: 0,
+    circuitBreakers: {},
+  },
+  dexScreener: {
+    totalRequests: 0,
+    successfulRequests: 0,
+    failedRequests: 0,
+    avgLatencyMs: 0,
+  },
+  cache: {
+    size: 0,
+    hitRate: 0,
+  },
+};
+
+let totalCacheHits = 0;
+let totalCacheMisses = 0;
+
+function recordHealthMetric(source: 'gmgn' | 'dexScreener', success: boolean, latencyMs: number, error?: string) {
+  const m = healthMetrics[source];
+  m.totalRequests++;
+  if (success) {
+    m.successfulRequests++;
+    m.avgLatencyMs = (m.avgLatencyMs * (m.successfulRequests - 1) + latencyMs) / m.successfulRequests;
+    m.lastError = undefined;
+  } else {
+    m.failedRequests++;
+    m.lastError = error;
+  }
+}
+
+function recordCacheHit() {
+  totalCacheHits++;
+  healthMetrics.cache.hitRate = totalCacheHits / (totalCacheHits + totalCacheMisses) * 100;
+}
+
+function recordCacheMiss() {
+  totalCacheMisses++;
+  healthMetrics.cache.hitRate = totalCacheHits / (totalCacheHits + totalCacheMisses) * 100;
+}
+
+export function getHealthMetrics(): HealthMetrics {
+  healthMetrics.cache.size = cache.size;
+  healthMetrics.gmgn.circuitBreakers = {};
+  for (const [key, cb] of circuitBreakers.entries()) {
+    healthMetrics.gmgn.circuitBreakers[key] = {
+      state: cb.state,
+      failures: cb.failures,
+    };
+  }
+  return { ...healthMetrics };
+}
+
+export function resetHealthMetrics() {
+  healthMetrics = {
+    gmgn: {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      avgLatencyMs: 0,
+      circuitBreakers: {},
+    },
+    dexScreener: {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      avgLatencyMs: 0,
+    },
+    cache: {
+      size: cache.size,
+      hitRate: 0,
+    },
+  };
+  totalCacheHits = 0;
+  totalCacheMisses = 0;
+}
+
 // ===== Cache =====
 interface CacheEntry {
   ts: number;
@@ -55,11 +260,16 @@ const cache = new Map<string, CacheEntry>();
 
 function getCached<T>(key: string, ttlMs: number): T | null {
   const e = cache.get(key);
-  if (!e) return null;
-  if (Date.now() - e.ts > ttlMs) {
-    cache.delete(key);
+  if (!e) {
+    recordCacheMiss();
     return null;
   }
+  if (Date.now() - e.ts > ttlMs) {
+    cache.delete(key);
+    recordCacheMiss();
+    return null;
+  }
+  recordCacheHit();
   return e.data as T;
 }
 
@@ -85,7 +295,6 @@ async function isGmgnCliAvailable(): Promise<boolean> {
     });
     // exit code 0 = configured; CLI prints nothing on success
     cliAvailableCache = stdout.includes("configured") || stdout.includes("OK") || stdout.trim() === "" || true;
-    // Re-check via actual exit code by running a tiny call
     cliAvailableCheckedAt = Date.now();
     return cliAvailableCache;
   } catch {
@@ -100,10 +309,23 @@ async function isGmgnCliAvailable(): Promise<boolean> {
  * Returns null on any error (CLI not installed, missing API key, network error, etc.)
  */
 async function runGmgnCli(args: string[]): Promise<any | null> {
+  const startTime = Date.now();
+  const circuitKey = `gmgn:${args.slice(0, 2).join(':')}`;
+
+  // Check circuit breaker
+  if (isCircuitOpen(circuitKey)) {
+    recordHealthMetric('gmgn', false, Date.now() - startTime, 'Circuit breaker open');
+    return null;
+  }
+
   try {
     // Check API key configured first
     const isAvailable = await isGmgnCliAvailable();
-    if (!isAvailable) return null;
+    if (!isAvailable) {
+      recordFailure(circuitKey);
+      recordHealthMetric('gmgn', false, Date.now() - startTime, 'CLI not available');
+      return null;
+    }
 
     // If the resolved bin is a .js file, invoke via node
     const isJsFile = GMGN_CLI_BIN.endsWith(".js") || GMGN_CLI_BIN.endsWith(".mjs");
@@ -118,27 +340,44 @@ async function runGmgnCli(args: string[]): Promise<any | null> {
 
     // CLI may print notice lines on stderr; we only care about stdout
     const trimmed = stdout.trim();
-    if (!trimmed) return null;
+    if (!trimmed) {
+      recordFailure(circuitKey);
+      recordHealthMetric('gmgn', false, Date.now() - startTime, 'Empty stdout');
+      return null;
+    }
     // Find the first JSON object in the output
     const jsonStart = trimmed.indexOf("{");
     const jsonStartArr = trimmed.indexOf("[");
     let start = -1;
     if (jsonStart >= 0 && (jsonStartArr < 0 || jsonStart < jsonStartArr)) start = jsonStart;
     else if (jsonStartArr >= 0) start = jsonStartArr;
-    if (start < 0) return null;
-    const jsonStr = trimmed.slice(start);
-    try {
-      return JSON.parse(jsonStr);
-    } catch {
+    if (start < 0) {
+      recordFailure(circuitKey);
+      recordHealthMetric('gmgn', false, Date.now() - startTime, 'No JSON in output');
       return null;
     }
-  } catch {
+    const jsonStr = trimmed.slice(start);
+    try {
+      const result = JSON.parse(jsonStr);
+      recordSuccess(circuitKey);
+      recordHealthMetric('gmgn', true, Date.now() - startTime);
+      return result;
+    } catch {
+      recordFailure(circuitKey);
+      recordHealthMetric('gmgn', false, Date.now() - startTime, 'JSON parse error');
+      return null;
+    }
+  } catch (err: any) {
+    recordFailure(circuitKey);
+    recordHealthMetric('gmgn', false, Date.now() - startTime, err?.message);
     return null;
   }
 }
 
-// ===== DexScreener fallback =====
+// ===== DexScreener fallback with deduplication =====
 export async function fetchJson(url: string, timeoutMs = 8000): Promise<any | null> {
+  const startTime = Date.now();
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -152,63 +391,23 @@ export async function fetchJson(url: string, timeoutMs = 8000): Promise<any | nu
       cache: "no-store",
     });
     clearTimeout(timer);
-    if (!res.ok) return null;
-    const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
+    if (!res.ok) {
+      recordHealthMetric('dexScreener', false, Date.now() - startTime, `HTTP ${res.status}`);
       return null;
     }
-  } catch {
+    const text = await res.text();
+    try {
+      const result = JSON.parse(text);
+      recordHealthMetric('dexScreener', true, Date.now() - startTime);
+      return result;
+    } catch {
+      recordHealthMetric('dexScreener', false, Date.now() - startTime, 'JSON parse error');
+      return null;
+    }
+  } catch (err: any) {
+    recordHealthMetric('dexScreener', false, Date.now() - startTime, err?.message);
     return null;
   }
-}
-
-// ===== Public typed interfaces =====
-
-export interface GmgnTokenInfo {
-  address: string;
-  symbol: string;
-  name: string;
-  decimals: number;
-  price: number;
-  price_change_1h: number;
-  price_change_24h: number;
-  price_change_6h?: number;
-  volume_24h: number;
-  market_cap: number;
-  fdv?: number;
-  liquidity: number;
-  holders: number;
-  total_supply: number;
-  top_10_holder_rate?: number;
-  dev_holder_rate?: number;
-  create_timestamp?: number;
-  last_trade_timestamp?: number;
-  tx_24h_buy?: number;
-  tx_24h_sell?: number;
-  is_alive?: boolean;
-  twitter?: string;
-  website?: string;
-  telegram?: string;
-  image_uri?: string;
-  // Extended visual / social fields (DexScreener)
-  header_image_uri?: string;
-  websites?: { url: string; label?: string }[];
-  socials?: { type: string; url: string }[];
-  boosts_active?: number;
-  // Extended fields from gmgn-cli
-  smart_degen_count?: number;
-  renowned_count?: number;
-  sniper_count?: number;
-  bundler_rate?: number;
-  rat_trader_amount_rate?: number;
-  rug_ratio?: number;
-  is_honeypot?: boolean;
-  renounced_mint?: boolean;
-  renounced_freeze_account?: boolean;
-  is_on_curve?: boolean;
-  cto_flag?: number;
 }
 
 export interface GmgnSecurity {
