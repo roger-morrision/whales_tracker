@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchTokenInfo, fetchSecurity, type GmgnTokenInfo, type GmgnSecurity } from "@/lib/gmgn";
+import { rateLimit, errors } from "@/lib/api-rate-limiter";
 
 /**
  * GET /api/gmgn/token?address=<mint>
@@ -10,6 +11,12 @@ import { fetchTokenInfo, fetchSecurity, type GmgnTokenInfo, type GmgnSecurity } 
  * Response shape:
  *   { token: GmgnTokenInfo, security?: GmgnSecurity, source: "gmgn" | "simulated", address }
  */
+
+const RATE_LIMIT_CONFIG = {
+  windowMs: 60_000,
+  maxRequests: 120,
+  keyPrefix: 'gmgn:token',
+};
 
 // Fallback: synthesize a reasonable token info from address hash + known token list
 function fallbackToken(address: string): { token: GmgnTokenInfo; source: "simulated" } {
@@ -53,6 +60,12 @@ function fallbackToken(address: string): { token: GmgnTokenInfo; source: "simula
 }
 
 export async function GET(req: NextRequest) {
+  // Rate limiting
+  const rateLimitResult = await rateLimit(req, RATE_LIMIT_CONFIG);
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response!;
+  }
+
   const address = req.nextUrl.searchParams.get("address");
   if (!address) {
     return NextResponse.json({ error: "Missing 'address' parameter" }, { status: 400 });
@@ -68,21 +81,29 @@ export async function GET(req: NextRequest) {
     ]);
 
     if (token) {
-      return NextResponse.json({
+      const response = NextResponse.json({
         token,
         security: security ?? undefined,
         source: "gmgn",
         address,
         timestamp: Date.now(),
       });
+      
+      // Add rate limit headers
+      response.headers.set('X-RateLimit-Limit', rateLimitResult.info.limit.toString());
+      response.headers.set('X-RateLimit-Remaining', rateLimitResult.info.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', Math.ceil(rateLimitResult.info.resetTime / 1000).toString());
+      
+      return response;
     }
-  } catch {
+  } catch (error) {
+    console.error('[token] GMGN fetch failed:', error);
     // fall through to fallback
   }
 
   // Fallback
   const { token: fallback, source } = fallbackToken(address);
-  return NextResponse.json({
+  const response = NextResponse.json({
     token: fallback,
     security: undefined,
     source,
@@ -90,4 +111,11 @@ export async function GET(req: NextRequest) {
     timestamp: Date.now(),
     note: "GMGN API unavailable — showing simulated data.",
   });
+  
+  // Add rate limit headers
+  response.headers.set('X-RateLimit-Limit', rateLimitResult.info.limit.toString());
+  response.headers.set('X-RateLimit-Remaining', rateLimitResult.info.remaining.toString());
+  response.headers.set('X-RateLimit-Reset', Math.ceil(rateLimitResult.info.resetTime / 1000).toString());
+  
+  return response;
 }

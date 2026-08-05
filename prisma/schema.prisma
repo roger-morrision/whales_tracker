@@ -1,32 +1,795 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// This is your Prisma schema file for Whales Tracker (Moby)
+// Uses PostgreSQL/TimescaleDB for production data warehouse
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// User & Authentication
+// ============================================
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatarUrl     String?
+  walletAddress String?   @unique
+  role          UserRole  @default(USER)
+  settings      Json?     // User preferences, notifications, etc.
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  portfolios    Portfolio[]
+  alerts        Alert[]
+  watchlists    Watchlist[]
+  trades        Trade[]
+  copyTrades    CopyTradeConfig[]
+  socialPosts   SocialPost[]
+  comments      Comment[]
+  follows       Follow[]        @relation("follower")
+  followers     Follow[]        @relation("following")
+  watchlistCollabs WatchlistCollaborator[]
+
+  @@index([walletAddress])
+  @@map("users")
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum UserRole {
+  USER
+  PREMIUM
+  ADMIN
+  INSTITUTIONAL
+}
+
+// ============================================
+// Portfolio & Trading
+// ============================================
+model Portfolio {
+  id              String        @id @default(cuid())
+  userId          String
+  name            String        @default("Main")
+  description     String?
+  isDefault       Boolean       @default(false)
+  totalValueUsd   Float         @default(0)
+  totalCostBasis  Float         @default(0)
+  unrealizedPnl   Float         @default(0)
+  realizedPnl     Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings        PortfolioHolding[]
+  trades          Trade[]
+
+  @@index([userId])
+  @@map("portfolios")
+}
+
+model PortfolioHolding {
+  id                String    @id @default(cuid())
+  portfolioId       String
+  tokenMint         String
+  tokenSymbol       String
+  tokenName         String
+  amount            Decimal   @db.Decimal(38, 18)
+  decimals          Int       @default(9)
+  avgCostPerToken   Float
+  totalCostBasis    Float
+  currentPriceUsd   Float
+  currentValueUsd   Float
+  unrealizedPnlUsd  Float
+  unrealizedPnlPct  Float
+  realizedPnlUsd    Float     @default(0)
+  firstAcquiredAt   DateTime  @default(now())
+  lastUpdatedAt     DateTime  @updatedAt
+
+  portfolio         Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, tokenMint])
+  @@index([portfolioId])
+  @@map("portfolio_holdings")
+}
+
+model Trade {
+  id              String        @id @default(cuid())
+  portfolioId     String
+  userId          String
+  tokenMint       String
+  tokenSymbol     String
+  side            TradeSide
+  amount          Decimal       @db.Decimal(38, 18)
+  priceUsd        Float
+  usdValue        Float
+  feeUsd          Float         @default(0)
+  slippageBps     Int?
+  priceImpactPct  Float?
+  orderType       OrderType     @default(MARKET)
+  orderId         String?       // Link to advanced order
+  signature       String?       @unique
+  txHash          String?
+  status          TradeStatus   @default(CONFIRMED)
+  errorMessage    String?
+  executedAt      DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+
+  portfolio       Portfolio     @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId])
+  @@index([userId])
+  @@index([tokenMint])
+  @@index([executedAt])
+  @@map("trades")
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum TradeStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  DCA
+  STOP_LOSS
+  TAKE_PROFIT
+  TRAILING_STOP
+}
+
+// ============================================
+// Advanced Orders
+// ============================================
+model LimitOrder {
+  id            String        @id @default(cuid())
+  userId        String
+  tokenMint     String
+  tokenSymbol   String
+  side          TradeSide
+  targetPrice   Float
+  amount        Decimal       @db.Decimal(38, 18)
+  slippageBps   Int           @default(100)
+  expiresAt     DateTime?
+  filledAmount  Decimal       @db.Decimal(38, 18) @default(0)
+  filledAt      DateTime?
+  status        AdvancedOrderStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([tokenMint])
+  @@map("limit_orders")
+}
+
+model DCAOrder {
+  id              String          @id @default(cuid())
+  userId          String
+  tokenMint       String
+  tokenSymbol     String
+  side            TradeSide
+  totalAmount     Float
+  amountPerOrder  Float
+  intervalMs      BigInt
+  maxOrders       Int
+  slippageBps     Int             @default(100)
+  executedOrders  Int             @default(0)
+  nextExecutionAt DateTime
+  status          AdvancedOrderStatus @default(PENDING)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  executions      DCAExecution[]
+
+  @@index([userId])
+  @@index([tokenMint])
+  @@map("dca_orders")
+}
+
+model DCAExecution {
+  id          String    @id @default(cuid())
+  dcaOrderId  String
+  timestamp   DateTime  @default(now())
+  amount      Float
+  tokenAmount Decimal   @db.Decimal(38, 18)
+  price       Float
+  signature   String?
+  status      ExecutionStatus @default(PENDING)
+
+  dcaOrder    DCAOrder  @relation(fields: [dcaOrderId], references: [id], onDelete: Cascade)
+
+  @@index([dcaOrderId])
+  @@map("dca_executions")
+}
+
+model StopOrder {
+  id            String              @id @default(cuid())
+  userId        String
+  tokenMint     String
+  tokenSymbol   String
+  type          StopOrderType
+  side          TradeSide
+  triggerPrice  Float
+  amount        Decimal             @db.Decimal(38, 18)
+  slippageBps   Int                 @default(100)
+  triggeredAt   DateTime?
+  executedAt    DateTime?
+  signature     String?
+  status        AdvancedOrderStatus @default(PENDING)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([tokenMint])
+  @@map("stop_orders")
+}
+
+model TrailingStopOrder {
+  id            String              @id @default(cuid())
+  userId        String
+  tokenMint     String
+  tokenSymbol   String
+  trailPercent  Float
+  amount        Decimal             @db.Decimal(38, 18)
+  slippageBps   Int                 @default(100)
+  peakPrice     Float
+  triggerPrice  Float
+  triggeredAt   DateTime?
+  executedAt    DateTime?
+  signature     String?
+  status        AdvancedOrderStatus @default(PENDING)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([tokenMint])
+  @@map("trailing_stop_orders")
+}
+
+enum AdvancedOrderStatus {
+  PENDING
+  ACTIVE
+  FILLED
+  CANCELLED
+  EXPIRED
+  FAILED
+}
+
+enum StopOrderType {
+  STOP_LOSS
+  TAKE_PROFIT
+}
+
+enum ExecutionStatus {
+  PENDING
+  FILLED
+  FAILED
+}
+
+// ============================================
+// Alerts & Notifications
+// ============================================
+model Alert {
+  id            String        @id @default(cuid())
+  userId        String
+  tokenMint     String?
+  tokenSymbol   String?
+  type          AlertType
+  condition     AlertCondition
+  threshold     Float
+  channels      AlertChannel[]
+  isActive      Boolean       @default(true)
+  triggered     Boolean       @default(false)
+  triggeredAt   DateTime?
+  lastCheckedAt DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenMint])
+  @@map("alerts")
+}
+
+enum AlertType {
+  PRICE_ABOVE
+  PRICE_BELOW
+  PRICE_CHANGE_PCT
+  SMART_MONEY_INFLOW
+  SMART_MONEY_OUTFLOW
+  NEW_WHALE_BUY
+  VOLUME_SPIKE
+  LIQUIDITY_CHANGE
+  NEW_TOKEN_LAUNCH
+  PORTFOLIO_MILESTONE
+}
+
+enum AlertCondition {
+  GT
+  LT
+  GTE
+  LTE
+  EQ
+  BETWEEN
+}
+
+enum AlertChannel {
+  PUSH
+  EMAIL
+  TELEGRAM
+  DISCORD
+  WEBHOOK
+}
+
+// ============================================
+// Watchlists & Social
+// ============================================
+model Watchlist {
+  id              String    @id @default(cuid())
+  ownerId         String
+  name            String
+  description     String?
+  isPublic        Boolean   @default(false)
+  isDefault       Boolean   @default(false)
+  followers       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  owner           User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tokens          WatchlistToken[]
+  collaborators   WatchlistCollaborator[]
+
+  @@index([ownerId])
+  @@map("watchlists")
+}
+
+model WatchlistToken {
+  id            String    @id @default(cuid())
+  watchlistId   String
+  tokenMint     String
+  tokenSymbol   String
+  tokenName     String?
+  addedAt       DateTime  @default(now())
+  note          String?
+  targetPrice   Float?
+  stopLossPrice Float?
+
+  watchlist     Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, tokenMint])
+  @@index([watchlistId])
+  @@map("watchlist_tokens")
+}
+
+model WatchlistCollaborator {
+  id          String    @id @default(cuid())
+  watchlistId String
+  userId      String
+  permission  CollabPermission @default(VIEW)
+  addedAt     DateTime  @default(now())
+
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, userId])
+  @@map("watchlist_collaborators")
+}
+
+enum CollabPermission {
+  VIEW
+  EDIT
+  ADMIN
+}
+
+// ============================================
+// Social Features
+// ============================================
+model SocialPost {
+  id              String        @id @default(cuid())
+  authorId        String
+  content         String
+  tokenMint       String?
+  tokenSymbol     String?
+  type            PostType
+  sentiment       Sentiment
+  likes           Int           @default(0)
+  commentsCount   Int           @default(0)
+  shares          Int           @default(0)
+  tags            String[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  author          User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments        Comment[]
+  likesRel        PostLike[]
+
+  @@index([authorId])
+  @@index([tokenMint])
+  @@index([createdAt])
+  @@map("social_posts")
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  postId      String
+  authorId    String
+  content     String
+  likes       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  post        SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([authorId])
+  @@map("comments")
+}
+
+model PostLike {
+  id        String      @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime    @default(now())
+
+  post      SocialPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_likes")
+}
+
+enum PostType {
+  TRADE
+  ANALYSIS
+  ALERT
+  GENERAL
+  NEWS
+}
+
+enum Sentiment {
+  BULLISH
+  BEARISH
+  NEUTRAL
+}
+
+// ============================================
+// Follow System
+// ============================================
+model Follow {
+  id              String    @id @default(cuid())
+  followerId      String
+  followingId     String
+  createdAt       DateTime  @default(now())
+
+  follower        User      @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following       User      @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+// ============================================
+// Copy Trading
+// ============================================
+model CopyTradeConfig {
+  id                  String    @id @default(cuid())
+  traderAddress       String
+  traderLabel         String
+  copierId            String
+  enabled             Boolean     @default(true)
+  settings            Json        // CopyTradeSettings
+  performance         Json        // CopyTradePerformance
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  copier              User        @relation(fields: [copierId], references: [id], onDelete: Cascade)
+
+  @@index([copierId])
+  @@index([traderAddress])
+  @@map("copy_trade_configs")
+}
+
+// ============================================
+// Verified Traders
+// ============================================
+model VerifiedTrader {
+  id                    String    @id @default(cuid())
+  address               String    @unique
+  label                 String
+  avatarUrl             String?
+  verifiedAt            DateTime  @default(now())
+  verificationMethod    VerificationMethod
+  stats                 Json        // TraderStats
+  socialLinks           Json?
+  isPublic              Boolean     @default(true)
+  followers             Int         @default(0)
+  following             Int         @default(0)
+  tags                  String[]
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([address])
+  @@map("verified_traders")
+}
+
+enum VerificationMethod {
+  SIGNED_MESSAGE
+  KYC
+  API_KEY
+}
+
+// ============================================
+// Watchlist Tokens & Notes
+// ============================================
+model WatchlistTokenNote {
+  id          String    @id @default(cuid())
+  watchlistId String
+  tokenMint   String
+  note        String
+  targetPrice Float?
+  stopLossPrice Float?
+  addedAt     DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([watchlistId, tokenMint])
+  @@map("watchlist_token_notes")
+}
+
+// ============================================
+// Trader Rankings
+// ============================================
+model TraderRanking {
+  id          String    @id @default(cuid())
+  traderAddress String
+  rank        Int
+  category    RankingCategory
+  period      RankingPeriod
+  pnlPct      Float
+  score       Float
+  createdAt   DateTime  @default(now())
+
+  @@unique([traderAddress, category, period, createdAt])
+  @@index([category, period, rank])
+  @@map("trader_rankings")
+}
+
+enum RankingCategory {
+  OVERALL
+  ROI
+  CONSISTENCY
+  VOLUME
+  RISK_ADJUSTED
+}
+
+enum RankingPeriod {
+  D7
+  D30
+  D90
+  ALL
+}
+
+// ============================================
+// Market Data (TimescaleDB hypertables)
+// ============================================
+model OHLCV {
+  id        BigInt   @id @default(autoincrement())
+  tokenMint String
+  time      DateTime @db.Timestamptz(6)
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float
+  interval  String   // 1m, 5m, 15m, 1h, 4h, 1d
+
+  @@unique([tokenMint, time, interval])
+  @@index([tokenMint, time])
+  @@index([time])
+  @@map("ohlcv")
+}
+
+model TradeRecord {
+  id          BigInt   @id @default(autoincrement())
+  tokenMint   String
+  time        DateTime @db.Timestamptz(6)
+  side        TradeSide
+  amount      Float
+  priceUsd    Float
+  volumeUsd   Float
+  buyer       String?
+  seller      String?
+  txHash      String?
+  isSmartMoney Boolean  @default(false)
+
+  @@index([tokenMint, time])
+  @@index([time])
+  @@map("trade_records")
+}
+
+model WalletActivityRecord {
+  id          BigInt   @id @default(autoincrement())
+  wallet      String
+  time        DateTime @db.Timestamptz(6)
+  tokenMint   String
+  tokenSymbol String
+  side        TradeSide
+  amount      Float
+  priceUsd    Float
+  valueUsd    Float
+  txHash      String?
+
+  @@index([wallet, time])
+  @@index([time])
+  @@map("wallet_activity_records")
+}
+
+// ============================================
+// Token Metadata Cache
+// ============================================
+model TokenMetadata {
+  id              String    @id @default(cuid())
+  address         String    @unique
+  symbol          String
+  name            String
+  decimals        Int       @default(9)
+  priceUsd        Float
+  priceChange1h   Float
+  priceChange24h  Float
+  volume24h       Float
+  marketCap       Float
+  fdv             Float?
+  liquidity       Float
+  holders         Int
+  totalSupply     Float
+  imageUri        String?
+  lastUpdatedAt   DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  @@index([address])
+  @@index([symbol])
+  @@map("token_metadata")
+}
+
+// ============================================
+// Security Scores
+// ============================================
+model SecurityScore {
+  id                      String    @id @default(cuid())
+  address                 String    @unique
+  isMintAuthorityRevoked  Boolean
+  isFreezeAuthorityRevoked Boolean
+  isTokenMintable         Boolean
+  isHoneypot              Boolean
+  isOpenSource            Boolean
+  isProxy                 Boolean
+  isCanonical             Boolean
+  top10HolderRate         Float
+  top10HolderValueUsd     Float?
+  devHolderRate           Float
+  lpHolderRate            Float?
+  liquidityLocked         Boolean
+  lpLockedRatio           Float?
+  devBuyTaxRate           Float
+  devSellTaxRate          Float
+  risks                   String[]
+  lastCheckedAt           DateTime  @default(now())
+  createdAt               DateTime  @default(now())
+
+  @@index([address])
+  @@map("security_scores")
+}
+
+// ============================================
+// Smart Money & KOL Data
+// ============================================
+model SmartMoneyWallet {
+  id              String    @id @default(cuid())
+  address         String    @unique
+  label           String?
+  tags            String[]
+  pnl30d          Float
+  winRate         Float
+  totalValueUsd   Float
+  lastActiveAt    DateTime
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([address])
+  @@map("smart_money_wallets")
+}
+
+model KOLWallet {
+  id              String    @id @default(cuid())
+  address         String    @unique
+  twitterHandle   String?
+  twitterName     String?
+  followers       Int
+  balance         Float
+  valueUsd        Float
+  avgBuyPrice     Float?
+  pnlUsd          Float?
+  lastBuyTs       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([address])
+  @@map("kol_wallets")
+}
+
+// ============================================
+// Settings & Preferences
+// ============================================
+model UserSettings {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  defaultSlippage Float     @default(1.0)
+  defaultGas      GasSpeed  @default(STANDARD)
+  priorityFee     Float     @default(0.001)
+  showHiddenTokens Boolean  @default(false)
+  hideSmallBalances Boolean @default(true)
+  smallBalanceThreshold Float @default(10)
+  notifications   Json      // NotificationPreferences
+  privacy         Json      // PrivacySettings
+  display         Json      // DisplaySettings
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+enum GasSpeed {
+  SLOW
+  STANDARD
+  FAST
+}
+
+// ============================================
+// Background Sync & Offline
+// ============================================
+model PendingSyncTask {
+  id          String    @id @default(cuid())
+  type        SyncTaskType
+  payload     Json
+  status      SyncStatus @default(PENDING)
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([type, status])
+  @@map("pending_sync_tasks")
+}
+
+enum SyncTaskType {
+  TRADE_EXECUTION
+  PORTFOLIO_SYNC
+  ALERT_CHECK
+  PRICE_UPDATE
+  PORTFOLIO_SYNC_FULL
+  WALLET_SYNC
+}
+
+enum SyncStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
 }

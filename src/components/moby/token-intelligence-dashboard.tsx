@@ -407,7 +407,7 @@ function MetricCard({ title, value, icon: Icon, iconColor, subtitle }: any) {
 function StatBox({ label, value, color }: any) {
   return (
     <div className="rounded-xl border bg-card p-4 text-center">
-      <div className="text-2xl font-bold tabular-nums text-{color}">{value}</div>
+      <div className={cn("text-2xl font-bold tabular-nums", color === 'bull' ? 'text-bull' : color === 'bear' ? 'text-bear' : 'text-foreground')}>{value}</div>
       <div className="text-xs text-muted-foreground mt-1">{label}</div>
     </div>
   );

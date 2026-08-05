@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchTrending, type GmgnTrendingToken } from "@/lib/gmgn";
+import { rateLimit, errors, createHealthResponse } from "@/lib/api-rate-limiter";
 
 /**
  * GET /api/gmgn/trending?timeframe=1h&orderBy=volume&limit=30
@@ -8,6 +9,13 @@ import { fetchTrending, type GmgnTrendingToken } from "@/lib/gmgn";
  * timeframes: 1m, 5m, 1h, 6h, 24h
  * orderBy: volume, tx_count, market_cap, smart_money
  */
+
+// Rate limit config: 60 requests per minute per IP
+const RATE_LIMIT_CONFIG = {
+  windowMs: 60_000,
+  maxRequests: 60,
+  keyPrefix: 'gmgn:trending',
+};
 
 function fallbackTrending(timeframe: string, orderBy: string, limit: number): GmgnTrendingToken[] {
   const SYMBOLS = [
@@ -79,6 +87,12 @@ function fallbackTrending(timeframe: string, orderBy: string, limit: number): Gm
 }
 
 export async function GET(req: NextRequest) {
+  // Rate limiting
+  const rateLimitResult = await rateLimit(req, RATE_LIMIT_CONFIG);
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response!;
+  }
+
   const timeframe = (req.nextUrl.searchParams.get("timeframe") || "1h") as "1m" | "5m" | "1h" | "6h" | "24h";
   const orderBy = (req.nextUrl.searchParams.get("orderBy") || "volume") as "volume" | "tx_count" | "market_cap" | "smart_money";
   const limit = Math.min(parseInt(req.nextUrl.searchParams.get("limit") || "30", 10), 100);
@@ -86,7 +100,7 @@ export async function GET(req: NextRequest) {
   try {
     const trending = await fetchTrending(timeframe, orderBy, limit);
     if (trending && trending.length > 0) {
-      return NextResponse.json({
+      const response = NextResponse.json({
         tokens: trending,
         count: trending.length,
         timeframe,
@@ -94,13 +108,21 @@ export async function GET(req: NextRequest) {
         source: "gmgn",
         timestamp: Date.now(),
       });
+      
+      // Add rate limit headers
+      response.headers.set('X-RateLimit-Limit', rateLimitResult.info.limit.toString());
+      response.headers.set('X-RateLimit-Remaining', rateLimitResult.info.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', Math.ceil(rateLimitResult.info.resetTime / 1000).toString());
+      
+      return response;
     }
-  } catch {
-    // fall through
+  } catch (error) {
+    console.error('[trending] GMGN fetch failed:', error);
+    // Fall through to simulated data
   }
 
   const fallback = fallbackTrending(timeframe, orderBy, limit);
-  return NextResponse.json({
+  const response = NextResponse.json({
     tokens: fallback,
     count: fallback.length,
     timeframe,
@@ -109,4 +131,11 @@ export async function GET(req: NextRequest) {
     timestamp: Date.now(),
     note: "GMGN API unavailable — showing simulated trending tokens.",
   });
+  
+  // Add rate limit headers
+  response.headers.set('X-RateLimit-Limit', rateLimitResult.info.limit.toString());
+  response.headers.set('X-RateLimit-Remaining', rateLimitResult.info.remaining.toString());
+  response.headers.set('X-RateLimit-Reset', Math.ceil(rateLimitResult.info.resetTime / 1000).toString());
+  
+  return response;
 }
