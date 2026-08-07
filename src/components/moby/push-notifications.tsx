@@ -14,12 +14,17 @@ export function PushNotificationManager() {
   const requestPermission = useMoby((s) => s.requestPushPermission);
   const toasts = useMoby((s) => s.toasts);
   const [dismissed, setDismissed] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Track which toast IDs we've already notified about (LRU capped to 50 entries
   // to avoid unbounded growth in long-running tabs).
   const notifiedRef = useRef<Set<string>>(new Set());
 
   // Fire real browser notifications for alert-type toasts when permission granted
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (permission !== "granted") return;
     const latest = toasts[0];
@@ -42,7 +47,7 @@ export function PushNotificationManager() {
     }
   }, [toasts, permission]);
 
-  if (permission !== "default" || dismissed) return null;
+  if (!mounted || permission !== "default" || dismissed) return null;
 
   return (
     <div className="fixed bottom-24 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:max-w-sm z-[55] pointer-events-auto">
