@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
   const prices = await fetchTokenPrices(tokenMints);
 
   // SOL price — fetch via DexScreener too
-  const solPrice = prices["So11111111111111111111111111111111111111112"] ?? 72.97;
+  const solPrice = prices["So11111111111111111111111111111111111111112"] ?? 0;
 
   // Compute USD values
   let totalUsd = solBalance * solPrice;
@@ -164,7 +164,7 @@ export async function GET(req: NextRequest) {
     solBalance,
     solPrice,
     tokenCount: holdings.length,
-    source: "solana_rpc",
+    source: "solana-rpc",
     timestamp: Date.now(),
   });
 }

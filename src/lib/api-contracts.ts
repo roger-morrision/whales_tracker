@@ -11,7 +11,7 @@ export const PriceSchema = z.object({
   volume24h: z.number().optional(),
   marketCap: z.number().optional(),
   liquidity: z.number().optional(),
-  source: z.enum(['dexscreener', 'fallback', 'gmgn']).optional(),
+  source: z.enum(['dexscreener', 'gmgn', 'error']).optional(),
 });
 
 export const TokenSchema = z.object({
@@ -63,7 +63,7 @@ export const WalletBalanceSchema = z.object({
     valueUsd: z.number().optional(),
   })).optional(),
   totalUsd: z.number(),
-  source: z.enum(['solana-rpc', 'gmgn', 'fallback']).optional(),
+  source: z.enum(['solana-rpc', 'gmgn', 'error']).optional(),
 });
 
 export const GmgnTokenInfoSchema = z.object({
@@ -107,7 +107,7 @@ export const GmgnTokenInfoSchema = z.object({
   renounced_freeze_account: z.boolean().optional(),
   is_on_curve: z.boolean().optional(),
   cto_flag: z.number().optional(),
-  source: z.enum(['gmgn', 'dexscreener', 'simulated']).optional(),
+  source: z.enum(['gmgn', 'dexscreener', 'error']).optional(),
 });
 
 export const GmgnSecuritySchema = z.object({
@@ -129,7 +129,7 @@ export const GmgnSecuritySchema = z.object({
   liquidity_locked: z.boolean().optional(),
   lp_locked_ratio: z.number().optional(),
   risks: z.array(z.string()),
-  source: z.enum(['gmgn', 'simulated']).optional(),
+  source: z.enum(['gmgn', 'error']).optional(),
 });
 
 export const GmgnHolderSchema = z.object({
@@ -148,7 +148,7 @@ export const GmgnHolderSchema = z.object({
   is_rat_trader: z.boolean().optional(),
   is_fresh_wallet: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
-  source: z.enum(['gmgn', 'simulated']).optional(),
+  source: z.enum(['gmgn', 'error']).optional(),
 });
 
 export const GmgnTraderSchema = z.object({
@@ -165,7 +165,7 @@ export const GmgnTraderSchema = z.object({
   first_buy_time: z.number().optional(),
   last_active_time: z.number().optional(),
   tags: z.array(z.string()).optional(),
-  source: z.enum(['gmgn', 'simulated']).optional(),
+  source: z.enum(['gmgn', 'error']).optional(),
 });
 
 export const GmgnTrendingTokenSchema = GmgnTokenInfoSchema.extend({
@@ -239,7 +239,7 @@ export const GmgnTrendingResponseSchema = ApiResponseSchema.extend({
   data: z.object({
     tokens: z.array(GmgnTrendingTokenSchema),
     timeframe: z.string().optional(),
-    source: z.enum(['gmgn', 'dexscreener', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'dexscreener', 'error']).optional(),
   }).optional(),
 });
 
@@ -248,7 +248,7 @@ export const GmgnNewPairsResponseSchema = ApiResponseSchema.extend({
   data: z.object({
     tokens: z.array(GmgnTrendingTokenSchema),
     type: z.string().optional(),
-    source: z.enum(['gmgn', 'dexscreener', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'dexscreener', 'error']).optional(),
   }).optional(),
 });
 
@@ -257,7 +257,7 @@ export const GmgnSearchResponseSchema = ApiResponseSchema.extend({
   data: z.object({
     tokens: z.array(GmgnTrendingTokenSchema),
     query: z.string().optional(),
-    source: z.enum(['gmgn', 'dexscreener', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'dexscreener', 'error']).optional(),
   }).optional(),
 });
 
@@ -273,7 +273,7 @@ export const GmgnChartResponseSchema = ApiResponseSchema.extend({
       v: z.number(),
     })),
     resolution: z.string().optional(),
-    source: z.enum(['gmgn', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'error']).optional(),
   }).optional(),
 });
 
@@ -296,7 +296,7 @@ export const GmgnPortfolioResponseSchema = ApiResponseSchema.extend({
     unrealizedPnl: z.number().optional(),
     winRate: z.number().optional(),
     trades30d: z.number().optional(),
-    source: z.enum(['gmgn', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'error']).optional(),
   }).optional(),
 });
 
@@ -315,7 +315,7 @@ export const GmgnWalletActivityResponseSchema = ApiResponseSchema.extend({
       from_address: z.string().optional(),
       to_address: z.string().optional(),
     })),
-    source: z.enum(['gmgn', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'error']).optional(),
   }).optional(),
 });
 
@@ -332,7 +332,7 @@ export const GmgnSignalsResponseSchema = ApiResponseSchema.extend({
       timestamp: z.number(),
       chain: z.string(),
     })),
-    source: z.enum(['gmgn', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'error']).optional(),
   }).optional(),
 });
 
@@ -344,7 +344,7 @@ export const GmgnHotSearchesResponseSchema = ApiResponseSchema.extend({
       search_count_change: z.number().optional(),
     })),
     interval: z.string().optional(),
-    source: z.enum(['gmgn', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'error']).optional(),
   }).optional(),
 });
 
@@ -364,7 +364,7 @@ export const GmgnSmartMoneyFeedResponseSchema = ApiResponseSchema.extend({
       ts: z.number(),
       pnl_30d_usd: z.number().optional(),
     })),
-    source: z.enum(['gmgn', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'error']).optional(),
   }).optional(),
 });
 
@@ -385,7 +385,7 @@ export const GmgnKolFeedResponseSchema = ApiResponseSchema.extend({
       ts: z.number(),
       pnl_usd: z.number().optional(),
     })),
-    source: z.enum(['gmgn', 'simulated']).optional(),
+    source: z.enum(['gmgn', 'error']).optional(),
   }).optional(),
 });
 

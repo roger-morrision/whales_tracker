@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 /**
  * Moby wordmark + whale glyph.
@@ -227,6 +228,55 @@ export function Chip({
     >
       {children}
     </span>
+  );
+}
+
+function formatDataAge(fetchedAt: number | null, now: number) {
+  if (!fetchedAt) return "Awaiting fetch";
+  const ageMs = Math.max(0, now - fetchedAt);
+  const ageSec = Math.floor(ageMs / 1000);
+  if (ageSec < 10) return "Updated just now";
+  if (ageSec < 60) return `Updated ${ageSec}s ago`;
+  const ageMin = Math.floor(ageSec / 60);
+  if (ageMin < 60) return `Updated ${ageMin}m ago`;
+  const ageHr = Math.floor(ageMin / 60);
+  return `Updated ${ageHr}h ago`;
+}
+
+export function DataSourceBadge({
+  source,
+  fetchedAt,
+  stale = false,
+  className,
+}: {
+  source: "gmgn" | "simulated" | "dexscreener" | "error" | null;
+  fetchedAt?: number | null;
+  stale?: boolean;
+  className?: string;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const chipVariant =
+    source === "error" ? "bear" : stale ? "gold" : source === "gmgn" || source === "dexscreener" ? "bull" : "outline";
+  const chipLabel =
+    source === "error" ? "offline" : stale ? "cached" : source === "gmgn" || source === "dexscreener" ? "live" : "syncing";
+  const providerLabel =
+    source === "gmgn" ? "GMGN" : source === "dexscreener" ? "DexScreener" : source === "error" ? "Feed offline" : "Waiting for live feed";
+
+  return (
+    <div className={cn("flex items-center gap-1.5", className)}>
+      <Chip variant={chipVariant} className="text-[9px]">
+        {chipLabel}
+      </Chip>
+      <span className="text-[10px] text-muted-foreground">
+        {providerLabel} · {formatDataAge(fetchedAt ?? null, now)}
+      </span>
+    </div>
   );
 }
 

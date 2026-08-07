@@ -1,11 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Check, Shield, ChevronRight, ExternalLink, Loader2, Key } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import {
+  X,
+  Check,
+  Shield,
+  ChevronRight,
+  ExternalLink,
+  Loader2,
+  Key,
+  Copy,
+  LogOut,
+  UserRound,
+  Wallet,
+  ArrowDownToLine,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Boxes,
+  Split,
+  ArrowRightLeft,
+  RefreshCw,
+  Briefcase,
+  BadgeCheck,
+  Gift,
+} from "lucide-react";
 import { WALLETS } from "@/lib/moby-data";
 import { useMoby } from "@/lib/moby-store";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { fmtUsd } from "@/lib/moby-data";
 
 // Detect real injected wallet providers
 function getInjectedWallets(): Record<string, boolean> {
@@ -207,6 +230,29 @@ export function WalletButton() {
   const wallet = useMoby((s) => s.wallet);
   const setWalletOpen = useMoby((s) => s.setWalletOpen);
   const disconnect = useMoby((s) => s.disconnectWallet);
+  const setActiveTab = useMoby((s) => s.setActiveTab);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [profileOpen]);
 
   if (!wallet) {
     return (
@@ -219,15 +265,258 @@ export function WalletButton() {
     );
   }
 
+  const shortAddress =
+    wallet.address.length > 14
+      ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`
+      : wallet.address;
+  const balanceLabel =
+    wallet.balanceUsd > 0
+      ? fmtUsd(wallet.balanceUsd, { compact: wallet.balanceUsd >= 1000 })
+      : "$0.00";
+
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(wallet.address);
+      useMoby.getState().pushToast({
+        title: "Wallet address copied",
+        description: shortAddress,
+        type: "success",
+      });
+    } catch {
+      useMoby.getState().pushToast({
+        title: "Copy failed",
+        description: "Could not copy the wallet address.",
+        type: "warn",
+      });
+    }
+  };
+
+  const quickActions = [
+    { label: "Deposit", icon: ArrowDownToLine, onClick: copyAddress },
+    {
+      label: "Buy",
+      icon: ArrowUpCircle,
+      onClick: () => {
+        setActiveTab("discover");
+        setProfileOpen(false);
+      },
+    },
+    {
+      label: "Withdraw",
+      icon: ArrowDownCircle,
+      onClick: () => {
+        useMoby.getState().pushToast({
+          title: "Withdraw flow",
+          description: "Withdrawal flow coming soon.",
+          type: "info",
+        });
+        setProfileOpen(false);
+      },
+    },
+    {
+      label: "Consolidate",
+      icon: Boxes,
+      onClick: () => {
+        useMoby.getState().setMultiWalletOpen(true);
+        setProfileOpen(false);
+      },
+    },
+    {
+      label: "Distribute",
+      icon: Split,
+      onClick: () => {
+        useMoby.getState().pushToast({
+          title: "Distribute funds",
+          description: "Distribution tools are available in the wallet manager.",
+          type: "info",
+        });
+        setProfileOpen(false);
+      },
+    },
+    {
+      label: "Transfer",
+      icon: ArrowRightLeft,
+      onClick: () => {
+        useMoby.getState().pushToast({
+          title: "Transfer flow",
+          description: "Transfer flow coming soon.",
+          type: "info",
+        });
+        setProfileOpen(false);
+      },
+    },
+    {
+      label: "Convert",
+      icon: RefreshCw,
+      onClick: () => {
+        useMoby.getState().setTradeOpen(true);
+        setProfileOpen(false);
+      },
+    },
+  ];
+
+  const profileRows = [
+    {
+      label: "Portfolio",
+      icon: Briefcase,
+      onClick: () => {
+        setActiveTab("portfolio");
+        setProfileOpen(false);
+      },
+    },
+    {
+      label: "Security",
+      icon: BadgeCheck,
+      onClick: () => {
+        useMoby.getState().setSettingsOpen(true);
+        setProfileOpen(false);
+      },
+    },
+    {
+      label: "Referral",
+      icon: Gift,
+      onClick: () => {
+        useMoby.getState().setReferralOpen(true);
+        setProfileOpen(false);
+      },
+    },
+  ];
+
   return (
-    <button
-      onClick={disconnect}
-      className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg bg-surface-3 border border-bull/30 text-xs font-semibold hover:bg-surface-3/70"
-      title="Click to disconnect"
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-bull" />
-      <span className="font-mono">{wallet.address}</span>
-      <span className="text-bull tabular">{wallet.balanceUsd > 0 ? `$${(wallet.balanceUsd / 1000).toFixed(1)}K` : "Connect"}</span>
-    </button>
+    <div className="relative" ref={profileRef}>
+      <button
+        onClick={() => setProfileOpen((open) => !open)}
+        className="h-8 px-3 inline-flex items-center gap-2 rounded-lg bg-surface-3 border border-bull/30 text-xs font-semibold hover:bg-surface-3/70"
+        title="Open wallet profile"
+        aria-haspopup="dialog"
+        aria-expanded={profileOpen}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-bull" />
+        <span className="text-bull tabular">{balanceLabel}</span>
+      </button>
+
+      <AnimatePresence>
+        {profileOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.16 }}
+            className="absolute right-0 top-full z-50 mt-2 w-[20rem] overflow-hidden rounded-2xl border border-border bg-[#171717] shadow-[0_24px_80px_-24px_rgba(0,0,0,0.9)]"
+            role="dialog"
+            aria-label="Wallet profile"
+          >
+            <div className="border-b border-white/8 px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] text-zinc-400">SOL Balance</div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="grid h-7 w-7 place-items-center rounded-full bg-emerald-500/15 text-emerald-400">
+                      <Wallet className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[1.65rem] font-semibold tracking-tight text-white tabular">
+                        {(wallet.balanceUsd / 74.3 || 0).toFixed(2)}
+                      </span>
+                      <span className="text-sm font-medium text-zinc-300">{fmtUsd(wallet.balanceUsd)}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={copyAddress}
+                  className="inline-flex items-center gap-1 rounded-lg bg-white/4 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:bg-white/8 hover:text-white"
+                  title="Copy address"
+                >
+                  <span className="font-mono">{shortAddress}</span>
+                  <Copy className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="mt-3 flex items-center gap-2 text-[11px] text-zinc-500">
+                <span>UID: -----</span>
+                <button
+                  onClick={() => {
+                    useMoby.getState().pushToast({
+                      title: "UID hidden",
+                      description: "Moby keeps this demo profile private.",
+                      type: "info",
+                    });
+                  }}
+                  className="transition-colors hover:text-zinc-300"
+                >
+                  <UserRound className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-4 py-4">
+              <div className="grid grid-cols-4 gap-x-3 gap-y-5">
+                {quickActions.map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <button
+                      key={action.label}
+                      onClick={action.onClick}
+                      className="flex flex-col items-center gap-2 text-center"
+                    >
+                      <span className="grid h-11 w-11 place-items-center rounded-full bg-emerald-500/12 text-emerald-400 transition-colors hover:bg-emerald-500/18">
+                        <Icon className="h-4.5 w-4.5" />
+                      </span>
+                      <span className="text-[11px] font-medium text-zinc-200">{action.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="border-t border-white/8 px-3 py-2">
+              {profileRows.map((row) => {
+                const Icon = row.icon;
+                return (
+                  <button
+                    key={row.label}
+                    onClick={row.onClick}
+                    className="flex w-full items-center gap-3 rounded-xl px-2.5 py-3 text-left text-sm text-zinc-100 transition-colors hover:bg-white/4"
+                  >
+                    <Icon className="h-4 w-4 text-zinc-400" />
+                    <span className="flex-1">{row.label}</span>
+                    <ChevronRight className="h-4 w-4 text-zinc-600" />
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="px-4 py-3">
+              <button
+                onClick={() => {
+                  useMoby.getState().setReferralOpen(true);
+                  setProfileOpen(false);
+                }}
+                className="relative flex w-full items-center gap-3 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-400/40 via-cyan-400/35 to-violet-500/45 px-4 py-3 text-left"
+              >
+                <div className="absolute inset-y-0 right-3 w-16 rounded-full bg-white/10 blur-2xl" />
+                <Gift className="relative z-10 h-4 w-4 text-white" />
+                <div className="relative z-10">
+                  <div className="text-xs font-semibold text-white">MOBY Rewards</div>
+                  <div className="text-[11px] text-white/80">Earn cashback and referral perks</div>
+                </div>
+              </button>
+            </div>
+
+            <div className="border-t border-white/8 p-2">
+              <button
+                onClick={() => {
+                  disconnect();
+                  setProfileOpen(false);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-medium text-zinc-200 transition-colors hover:bg-white/4"
+              >
+                <LogOut className="h-4 w-4 text-zinc-400" />
+                <span>Disconnect</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

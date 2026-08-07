@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Moby — Trade Smarter",
+  title: "Moby - Trade Smarter",
   description:
     "Onchain intelligence for traders. Follow whales, KOLs, and top-performing traders in real time. Discover trending tokens before they hit the crowd.",
   keywords: [
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "Moby — Trade Smarter",
+    title: "Moby - Trade Smarter",
     description:
       "Onchain intelligence for traders. Follow whales, KOLs, and top-performing traders in real time.",
     siteName: "Moby",
@@ -54,24 +54,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Inline script prevents flash-of-dark-theme for users who selected light theme.
-  // Runs before React hydrates — reads from localStorage (moby-storage) and sets the class.
-  const themeScript = `(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('moby-storage') || '{}');
-      const theme = stored.state?.theme;
-      if (theme === 'light') {
-        document.documentElement.classList.remove('dark');
-        document.documentElement.classList.add('light');
-      }
-    } catch (e) {}
-  })();`;
-
   return (
     <html lang="en" suppressHydrationWarning className="dark">
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
+      <head />
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

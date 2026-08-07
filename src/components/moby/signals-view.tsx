@@ -218,6 +218,10 @@ function GmgnSignalsSection() {
     { refreshMs: 60_000 }
   );
 
+  if (!loading && source === "error" && (!data?.signals || data.signals.length === 0)) {
+    return null;
+  }
+
   return (
     <section className="rounded-2xl border border-border bg-surface-2/40 overflow-hidden">
       <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
@@ -226,8 +230,8 @@ function GmgnSignalsSection() {
         </div>
         <span className="text-xs font-semibold">GMGN Live Signals</span>
         {source && (
-          <Chip variant={(source === "gmgn" || source === "dexscreener") ? "bull" : "outline"} className="text-[9px]">
-            {(source === "gmgn" || source === "dexscreener") ? "live" : "demo"}
+          <Chip variant={(source === "gmgn" || source === "dexscreener") ? "bull" : source === "error" ? "bear" : "outline"} className="text-[9px]">
+            {(source === "gmgn" || source === "dexscreener") ? "live" : source === "error" ? "offline" : "syncing"}
           </Chip>
         )}
           <button

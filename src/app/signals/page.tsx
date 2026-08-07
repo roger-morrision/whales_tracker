@@ -1,12 +1,7 @@
 "use client";
 
-import dynamic from "next/dynamic";
-
-const Home = dynamic(() => import("@/app/page").then((m) => m.default), {
-  ssr: false,
-  loading: () => <div className="min-h-screen flex items-center justify-center">Loading...</div>,
-});
+import { MobyApp } from "../page";
 
 export default function SignalsPage() {
-  return <Home />;
+  return <MobyApp forcedTab="signals" />;
 }

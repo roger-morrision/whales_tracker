@@ -64,7 +64,7 @@ export function TokenListModal() {
               <span className="font-semibold text-sm flex-1">{config.title}</span>
               {source && (
                 <Chip variant={source === "dexscreener" || source === "gmgn" ? "bull" : "outline"} className="text-[9px]">
-                  {source === "dexscreener" || source === "gmgn" ? "live" : "demo"}
+                  {source === "dexscreener" || source === "gmgn" ? "live" : source === "error" ? "offline" : "unavailable"}
                 </Chip>
               )}
               <button onClick={() => setOpen(false)} className="h-7 w-7 grid place-items-center rounded-lg hover:bg-surface-3 text-muted-foreground" aria-label="Close">
@@ -206,7 +206,7 @@ export function TokenListModal() {
 
             {/* Footer count */}
             <div className="px-4 py-2 border-t border-border bg-surface-2/50 text-[10px] text-muted-foreground tabular">
-              {tokens.length} tokens · {source === "dexscreener" ? "DexScreener live" : source === "gmgn" ? "GMGN live" : "simulated"}
+              {tokens.length} tokens · {source === "dexscreener" ? "DexScreener live" : source === "gmgn" ? "GMGN live" : source === "error" ? "Live feed offline" : "Unavailable"}
             </div>
           </motion.div>
         </motion.div>

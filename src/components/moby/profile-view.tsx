@@ -57,6 +57,8 @@ export function ProfileView() {
         <StatBox icon={<Bell className="h-3.5 w-3.5" />} label="Alerts" value={`${signals.length}`} accent="bear" />
       </div>
 
+      <CashbackTiersCard />
+
       {/* Trading tools grid — new batch 3 features */}
       <section>
         <SectionHeader title="Trading tools" emoji="⚡" />
@@ -243,6 +245,59 @@ export function ProfileView() {
         </div>
       </div>
     </div>
+  );
+}
+
+function CashbackTiersCard() {
+  const wallet = useMoby((s) => s.wallet);
+  const volumeBase = wallet?.balanceUsd ?? 1675;
+  const mobyHeld = Math.max(241, Math.round(volumeBase / 6.9));
+  const tiers = [
+    { tier: 1, cashback: 12, target: 1_000 },
+    { tier: 2, cashback: 14, target: 10_000 },
+    { tier: 3, cashback: 16, target: 100_000 },
+    { tier: 4, cashback: 18, target: 1_000_000 },
+    { tier: 5, cashback: 20, target: 10_000_000 },
+  ];
+  const currentVolume = volumeBase;
+
+  return (
+    <section className="rounded-2xl border border-bull/20 bg-gradient-to-br from-[#14F195]/10 via-surface-2 to-transparent p-4">
+      <div className="mb-2 text-center text-sm font-semibold">Cash Back Tiers</div>
+      <div className="mb-3 text-center text-sm text-muted-foreground">
+        Grow your trading volume or hold $MOBY to increase your cash back tier.
+      </div>
+      <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-surface-2 px-4 py-2">
+        <span className="text-2xl font-bold">{fmtNum(mobyHeld)}</span>
+        <span className="text-sm font-semibold text-bull">MOBY</span>
+      </div>
+      <div className="space-y-3">
+        {tiers.map((item) => {
+          const unlocked = currentVolume >= item.target;
+          const remaining = Math.max(item.target - currentVolume, 0);
+          return (
+            <div key={item.tier} className="flex items-start gap-3">
+              <div className={cn(
+                "mt-1 h-9 w-9 shrink-0 rounded-full border grid place-items-center",
+                unlocked ? "border-bull/40 bg-bull/15 text-bull" : "border-border bg-surface-2 text-muted-foreground"
+              )}>
+                {unlocked ? "✓" : item.tier}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-lg font-semibold">
+                  Tier {item.tier} <span className={cn(unlocked ? "text-bull" : "text-muted-foreground")}>({item.cashback}% Cash Back)</span>
+                </div>
+                <div className="text-sm text-muted-foreground">Trading Volume</div>
+                <div className="text-2xl font-bold">{fmtUsd(item.target, { compact: true })}</div>
+                <div className="text-sm text-muted-foreground">
+                  {remaining === 0 ? "$0 left to unlock" : `${fmtUsd(remaining, { compact: true })} left to unlock`}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

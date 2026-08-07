@@ -1,18 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useMoby } from "@/lib/moby-store";
+import { tabFromPathname, tabHref } from "@/lib/moby-navigation";
 import { TOKENS } from "@/lib/moby-data";
 import { getCurrentCongestion, computeAutoPriorityFee } from "@/lib/moby-data";
 import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/moby/top-bar";
+import ActionBar from "@/components/moby/action-bar";
 import { BottomNav } from "@/components/moby/bottom-nav";
 import { DiscoverView } from "@/components/moby/discover-view";
+import { FeedsView } from "@/components/moby/feeds-view";
 import { WhalesView } from "@/components/moby/whales-view";
 import { SignalsView } from "@/components/moby/signals-view";
 import { PortfolioView } from "@/components/moby/portfolio-view";
 import { ProfileView } from "@/components/moby/profile-view";
+import { LeaderboardView } from "@/components/moby/leaderboard-view";
 import { TokenDetailSheet } from "@/components/moby/token-detail-sheet";
 import { TraderDetailSheet } from "@/components/moby/trader-detail-sheet";
 import { AICopilot } from "@/components/moby/ai-copilot";
@@ -42,6 +48,8 @@ import { ShareModal } from "@/components/moby/share-modal";
 import { TokenListModal } from "@/components/moby/token-list-modal";
 import { WalletDetailSheet } from "@/components/moby/wallet-detail-sheet";
 import { AnimatePresence, motion } from "framer-motion";
+import { ArrowRight, Compass, PieChart, User, Waves, Zap } from "lucide-react";
+import type { TabKey } from "@/lib/moby-store";
 
 // Code-split heavy modals (recharts, lightweight-charts, large data sets)
 // These load on-demand when first opened, reducing initial JS bundle by ~400-600KB.
@@ -57,22 +65,23 @@ const GasOptimizerModal = dynamic(() => import("@/components/moby/gas-optimizer-
 const AirdropModal = dynamic(() => import("@/components/moby/airdrop-modal").then(m => ({ default: m.AirdropModal })), { ssr: false, loading: () => null });
 const PumpFunExplorerModal = dynamic(() => import("@/components/moby/pumpfun-explorer").then(m => ({ default: m.PumpFunExplorerModal })), { ssr: false, loading: () => null });
 
-// Batch 6/7/8 modals — each file exports multiple modals, load on demand.
-// We use a lazy-mount pattern: the wrapper component imports the module on
-// first render and renders all its modals.
-import { lazy, Suspense } from "react";
+const Batch6Modals = dynamic(() => import("@/components/moby/batch6-modals"), { ssr: false, loading: () => null });
+const Batch7Modals = dynamic(() => import("@/components/moby/batch7-modals"), { ssr: false, loading: () => null });
+const Batch8Modals = dynamic(() => import("@/components/moby/batch8-modals"), { ssr: false, loading: () => null });
 
-const LazyBatch6 = lazy(() => import("@/components/moby/batch6-modals"));
-const LazyBatch7 = lazy(() => import("@/components/moby/batch7-modals"));
-const LazyBatch8 = lazy(() => import("@/components/moby/batch8-modals"));
-
-export default function Home() {
+export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
   const activeTab = useMoby((s) => s.activeTab);
+  const setActiveTab = useMoby((s) => s.setActiveTab);
   const tickPrices = useMoby((s) => s.tickPrices);
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
   const setCopilotOpen = useMoby((s) => s.setCopilotOpen);
   const wallet = useMoby((s) => s.wallet);
   const theme = useMoby((s) => s.theme);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    setActiveTab(forcedTab ?? tabFromPathname(pathname));
+  }, [forcedTab, pathname, setActiveTab]);
 
   // Apply theme to document element
   useEffect(() => {
@@ -84,9 +93,31 @@ export default function Home() {
 
   // Register PWA service worker
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    if (!("serviceWorker" in navigator)) {
+      return;
     }
+
+    const isLocalDev =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+    if (isLocalDev) {
+      if ("caches" in window) {
+        caches.keys().then((keys) => {
+          keys.forEach((key) => {
+            caches.delete(key).catch(() => {});
+          });
+        }).catch(() => {});
+      }
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => {
+          registration.unregister().catch(() => {});
+        });
+      }).catch(() => {});
+      return;
+    }
+
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);
 
   // Live price ticking — every 2.5s (moved below with visibility check)
@@ -527,100 +558,166 @@ export default function Home() {
 
   return (
     <ErrorBoundary>
-    <div className="phone-shell flex flex-col">
-      <TopBar />
+      <div className="app-shell">
+        <DesktopRail />
+        <div className="phone-shell">
+          <TopBar />
+          {activeTab !== "discover" && <ActionBar />}
 
-      <main className="flex-1 px-4 py-4 overflow-y-auto scrollbar-thin">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18 }}
-          >
-            {activeTab === "discover" && <DiscoverView />}
-            {activeTab === "whales" && <WhalesView />}
-            {activeTab === "signals" && <SignalsView />}
-            {activeTab === "portfolio" && <PortfolioView />}
-            {activeTab === "profile" && <ProfileView />}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+          <main className="flex-1 px-4 py-4 overflow-y-auto scrollbar-thin">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+              >
+                {activeTab === "discover" && <DiscoverView />}
+                {activeTab === "whales" && <FeedsView />}
+                {activeTab === "signals" && <SignalsView />}
+                {activeTab === "portfolio" && <LeaderboardView />}
+                {activeTab === "profile" && <ProfileView />}
+              </motion.div>
+            </AnimatePresence>
+          </main>
 
-      <BottomNav />
+          <BottomNav />
 
-      {/* Overlays — modals & sheets */}
-      <TokenDetailSheet />
-      <TraderDetailSheet />
-      <AICopilot />
-      <SearchModal />
-      <NotificationsPanel />
-      <WalletConnectModal />
-      <TokenScreenerModal />
-      <TradeModal />
-      <TaxCalculatorModal />
-      <AlertCreatorModal />
-      <SettingsModal />
-      <CompareModal />
-
-      {/* Batch 3 modals */}
-      <CopyTradeModal />
-      <LimitOrdersModal />
-      <DcaModal />
-      <WalletActivityModal />
-      <SolanaStatsModal />
-      <PnlLeaderboardModal />
-      <SocialSentimentModal />
-      <RebalanceModal />
-      <ReferralModal />
-      <AchievementsModal />
-
-      {/* Batch 4 modals */}
-      <PerpsModal />
-      <NftDetailModal />
-      <LaunchScannerModal />
-      <BridgeModal />
-      <StakingModal />
-      <GasOptimizerModal />
-      <AirdropModal />
-
-      {/* Toast notifications + whale alert pusher */}
-      <ToastContainer />
-      <WhaleAlertPusher />
-
-      {/* Batch 5: Full-screen chart + narrative detail + smart money map + push */}
-      <FullChartModal />
-      <NarrativeDetailModal />
-      <SmartMoneyMapModal />
-      <PushNotificationManager />
-
-      {/* Batch 6/7/8 modals — dynamically loaded on first render */}
-      <Batch6ModalsWrapper />
-      <Batch7ModalsWrapper />
-      <Batch8ModalsWrapper />
-
-      {/* Batch 9: Pump.fun explorer */}
-      <PumpFunExplorerModal />
-
-      {/* Token list modal (for "View all" buttons on trending/boosted/hot-search) */}
-      <TokenListModal />
-
-      {/* Wallet detail sheet (for clicking wallets/holders/traders) */}
-      <WalletDetailSheet />
-
-      {/* Share modal (global, store-driven) */}
-      <StoreShareModal />
-
-      {/* Onboarding — first-time experience */}
-      <OnboardingOverlay />
-
-      {/* Back to top floating button */}
-      <BackToTopButton />
-    </div>
+          <TokenDetailSheet />
+          <TraderDetailSheet />
+          <AICopilot />
+          <SearchModal />
+          <NotificationsPanel />
+          <WalletConnectModal />
+          <TokenScreenerModal />
+          <TradeModal />
+          <TaxCalculatorModal />
+          <AlertCreatorModal />
+          <SettingsModal />
+          <CompareModal />
+          <CopyTradeModal />
+          <LimitOrdersModal />
+          <DcaModal />
+          <WalletActivityModal />
+          <SolanaStatsModal />
+          <PnlLeaderboardModal />
+          <SocialSentimentModal />
+          <RebalanceModal />
+          <ReferralModal />
+          <AchievementsModal />
+          <PerpsModal />
+          <NftDetailModal />
+          <LaunchScannerModal />
+          <BridgeModal />
+          <StakingModal />
+          <GasOptimizerModal />
+          <AirdropModal />
+          <ToastContainer />
+          <WhaleAlertPusher />
+          <FullChartModal />
+          <NarrativeDetailModal />
+          <SmartMoneyMapModal />
+          <PushNotificationManager />
+          <Batch6Modals />
+          <Batch7Modals />
+          <Batch8Modals />
+          <PumpFunExplorerModal />
+          <TokenListModal />
+          <WalletDetailSheet />
+          <StoreShareModal />
+          <OnboardingOverlay />
+          <BackToTopButton />
+        </div>
+      </div>
     </ErrorBoundary>
   );
 }
+
+export default function Home() {
+  return <MobyApp forcedTab="discover" />;
+}
+
+function DesktopRail() {
+  const alertsCount = useMoby((s) => s.alerts.length);
+  const wallet = useMoby((s) => s.wallet);
+  const activeTab = useMoby((s) => s.activeTab);
+
+  const shortcuts: { tab: TabKey; label: string; note: string }[] = [
+    { tab: "discover", label: "Discover", note: "Live discovery and market focus" },
+    { tab: "whales", label: "Whales", note: "Wallet flows and trader rankings" },
+    { tab: "signals", label: "Signals", note: "Actionable entries and alerts" },
+    { tab: "portfolio", label: "Portfolio", note: "Holdings, PnL, and allocation" },
+    { tab: "profile", label: "Profile", note: "Settings, achievements, and account" },
+  ];
+
+  return (
+    <aside className="desktop-rail">
+      <div className="flex w-full flex-col rounded-[28px] border border-border bg-surface/75 p-6 shadow-[0_30px_120px_-40px_rgba(0,0,0,0.75)] backdrop-blur-xl">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Workspace</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Moby Command</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Desktop now shows the same trading app without the forced phone frame, while keeping mobile behavior intact.
+          </p>
+        </div>
+
+        <div className="mt-6 grid gap-3">
+          <div className="rounded-2xl border border-border bg-background/70 p-4">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Status</div>
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Wallet</span>
+              <span className="font-medium">{wallet?.connected ? wallet.label : "Not connected"}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Alerts</span>
+              <span className="font-medium">{alertsCount}</span>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-background/70 p-2">
+            {shortcuts.map(({ tab, label, note }) => {
+              const Icon = railIcons[tab];
+              const isActive = activeTab === tab;
+              return (
+                <Link
+                  key={tab}
+                  href={tabHref(tab)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors",
+                    isActive ? "bg-bull/12 text-foreground" : "hover:bg-surface-2"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "grid h-10 w-10 place-items-center rounded-2xl",
+                      isActive ? "bg-bull text-background" : "bg-surface-2 text-muted-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold">{label}</div>
+                    <div className="text-xs text-muted-foreground">{note}</div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+const railIcons = {
+  discover: Compass,
+  whales: Waves,
+  signals: Zap,
+  portfolio: PieChart,
+  profile: User,
+};
 
 function StoreShareModal() {
   const open = useMoby((s) => s.shareOpen);
@@ -686,29 +783,3 @@ function BackToTopButton() {
   );
 }
 
-// ===== Dynamic batch modal wrappers =====
-// These render the batch modal files lazily via React.lazy + Suspense.
-// The JS for batch6/7/8 modals is only downloaded when the component mounts.
-function Batch6ModalsWrapper() {
-  return (
-    <Suspense fallback={null}>
-      <LazyBatch6 />
-    </Suspense>
-  );
-}
-
-function Batch7ModalsWrapper() {
-  return (
-    <Suspense fallback={null}>
-      <LazyBatch7 />
-    </Suspense>
-  );
-}
-
-function Batch8ModalsWrapper() {
-  return (
-    <Suspense fallback={null}>
-      <LazyBatch8 />
-    </Suspense>
-  );
-}

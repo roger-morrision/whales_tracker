@@ -1160,7 +1160,7 @@ export const useMoby = create<MobyState>()(
     });
     get().pushAlert({
       title: "Wallet connected",
-      description: `${label} · ${addr}`,
+      description: `${label} connected successfully`,
       type: "success",
     });
   },

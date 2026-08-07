@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, BellOff, Check } from "lucide-react";
 import { useMoby } from "@/lib/moby-store";
 
@@ -13,6 +13,7 @@ export function PushNotificationManager() {
   const permission = useMoby((s) => s.pushPermission);
   const requestPermission = useMoby((s) => s.requestPushPermission);
   const toasts = useMoby((s) => s.toasts);
+  const [dismissed, setDismissed] = useState(false);
 
   // Track which toast IDs we've already notified about (LRU capped to 50 entries
   // to avoid unbounded growth in long-running tabs).
@@ -41,7 +42,7 @@ export function PushNotificationManager() {
     }
   }, [toasts, permission]);
 
-  if (permission !== "default") return null;
+  if (permission !== "default" || dismissed) return null;
 
   return (
     <div className="fixed bottom-24 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:max-w-sm z-[55] pointer-events-auto">
@@ -54,13 +55,19 @@ export function PushNotificationManager() {
           <div className="text-[10px] text-muted-foreground">Get alerted when whales move or smart money enters.</div>
         </div>
         <button
-          onClick={requestPermission}
+          onClick={() => {
+            setDismissed(true);
+            requestPermission();
+          }}
           className="px-2.5 py-1.5 rounded-lg bg-bull text-background text-[11px] font-bold shrink-0"
         >
           Allow
         </button>
         <button
-          onClick={() => useMoby.getState().setPushPermission("denied")}
+          onClick={() => {
+            setDismissed(true);
+            useMoby.getState().setPushPermission("denied");
+          }}
           className="h-7 w-7 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground shrink-0"
         >
           <BellOff className="h-3.5 w-3.5" />

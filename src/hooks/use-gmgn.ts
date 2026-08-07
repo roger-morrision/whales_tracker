@@ -14,6 +14,8 @@ export interface GmgnState<T> {
   loading: boolean;
   error: string | null;
   source: "gmgn" | "simulated" | "dexscreener" | "error" | null;
+  fetchedAt: number | null;
+  stale: boolean;
   refetch: () => void;
 }
 
@@ -22,6 +24,8 @@ export function useGmgn<T>(url: string | null, opts?: { refreshMs?: number }): G
   const [loading, setLoading] = useState(!!url);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<"gmgn" | "simulated" | "dexscreener" | "error" | null>(null);
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+  const [stale, setStale] = useState(false);
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
@@ -31,13 +35,15 @@ export function useGmgn<T>(url: string | null, opts?: { refreshMs?: number }): G
         setData(null);
         setLoading(false);
         setSource(null);
+        setFetchedAt(null);
+        setStale(false);
       });
       return;
     }
     let cancelled = false;
     const controller = new AbortController();
     // Defer setState calls to avoid the synchronous-setState-in-effect lint
-    Promise.resolve().then(() => {
+      Promise.resolve().then(() => {
       if (cancelled) return;
       setLoading(true);
       setError(null);
@@ -50,11 +56,17 @@ export function useGmgn<T>(url: string | null, opts?: { refreshMs?: number }): G
         if (cancelled) return;
         setData(json);
         setSource(json.source ?? null);
+        setFetchedAt(Date.now());
+        setStale(false);
         setLoading(false);
       })
       .catch((err) => {
         if (cancelled || err?.name === "AbortError") return;
         setError(err?.message ?? "fetch failed");
+        setStale(true);
+        if (!data) {
+          setSource("error");
+        }
         setLoading(false);
       });
 
@@ -74,5 +86,13 @@ export function useGmgn<T>(url: string | null, opts?: { refreshMs?: number }): G
     return () => clearInterval(id);
   }, [url, opts?.refreshMs]);
 
-  return { data, loading, error, source, refetch: () => setNonce((n) => n + 1) };
+  return {
+    data,
+    loading,
+    error,
+    source,
+    fetchedAt,
+    stale,
+    refetch: () => setNonce((n) => n + 1),
+  };
 }

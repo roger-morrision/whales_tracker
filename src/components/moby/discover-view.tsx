@@ -6,8 +6,7 @@ import { TOKENS, NARRATIVES, LAUNCHES, fmtUsd, fmtPct, fmtNum, fmtPrice, fmtAge,
 import { useMoby } from "@/lib/moby-store";
 import { useGmgn } from "@/hooks/use-gmgn";
 import { usePullToRefresh } from "./mobile-helpers";
-import { useLiveTokens } from "@/hooks/use-live-tokens";
-import { TokenIcon, Sparkline, Chip, SectionHeader } from "./primitives";
+import { TokenIcon, Sparkline, Chip, DataSourceBadge, SectionHeader } from "./primitives";
 import { MarketOverview } from "./market-overview";
 import { NewsFeed } from "./news-feed";
 import { cn } from "@/lib/utils";
@@ -16,6 +15,8 @@ import { motion, AnimatePresence } from "framer-motion";
 export function DiscoverView() {
   const [section, setSection] = useState<"trending" | "gainers" | "new">("trending");
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
+  const wallet = useMoby((s) => s.wallet);
+  const tradeHistory = useMoby((s) => s.tradeHistory);
   const { pullDistance, isRefreshing, touchHandlers } = usePullToRefresh(refreshFeeds);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -31,7 +32,7 @@ export function DiscoverView() {
   const gainersUrl = `/api/solana/gainers?limit=30&timeframe=${filters.timeframe}`;
   const newUrl = `/api/solana/new?limit=30`;
   const currentUrl = section === "trending" ? trendingUrl : section === "gainers" ? gainersUrl : newUrl;
-  const { data: tokenData, loading, source } = useGmgn<{ tokens: any[] }>(currentUrl, { refreshMs: 60_000 });
+  const { data: tokenData, loading, source, fetchedAt, stale } = useGmgn<{ tokens: any[] }>(currentUrl, { refreshMs: 60_000 });
 
   // Apply client-side filters
   const list = useMemo(() => {
@@ -44,6 +45,14 @@ export function DiscoverView() {
       return true;
     });
   }, [tokenData, filters]);
+
+  const activeTrades = Math.min(
+    3,
+    Math.max(
+      0,
+      tradeHistory.filter((trade) => trade.side === "BUY").length - tradeHistory.filter((trade) => trade.side === "SELL").length
+    )
+  );
 
   return (
     <div className="space-y-6" {...touchHandlers}>
@@ -64,30 +73,52 @@ export function DiscoverView() {
       {/* Main focus: Whale activities (moby.win style — "The Tape") */}
       <WhaleBuySellSummary />
 
-      {/* Multipliers showcase — tokens caught early (moby.win style) */}
-      <MultipliersShowcase />
-
       {/* Live whale buy/sell feed — what whales are buying/selling RIGHT NOW */}
       <WhaleFlowsRow />
 
       {/* Smart money movers — tokens with most smart money inflow */}
       <SmartMoneyMoversLive />
 
-      {/* Top Boosted + Trending + Hot Searches */}
-      <TopBoostsRow />
-      <GmgnTrendingRow />
-      <GmgnHotSearchesRow />
+      <section className="space-y-4 rounded-[28px] border border-white/6 bg-black px-4 pb-4 pt-2">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium text-muted-foreground">Wallet Balance</div>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="text-[2.4rem] font-semibold tracking-tight text-white">
+                {fmtUsd(wallet?.balanceUsd ?? 65.03, { decimals: 2 })}
+              </div>
+              <ArrowUpRight className="h-5 w-5 text-white/80" />
+            </div>
+            <div className="mt-1 text-xl text-bull">{activeTrades} Active Trades</div>
+          </div>
+          <button
+            onClick={() => useMoby.getState().setWalletOpen(true)}
+            className="mt-3 rounded-full bg-bull px-6 py-3 text-lg font-semibold text-background shadow-[0_0_30px_-10px_rgba(20,241,149,0.9)]"
+          >
+            Deposit
+          </button>
+        </div>
+
+        <button
+          onClick={() => useMoby.getState().setCopilotOpen(true)}
+          className="flex w-full items-center justify-between rounded-3xl border border-white/5 bg-gradient-to-r from-[#171d2b] to-[#12151f] px-4 py-4 text-left"
+        >
+          <div>
+            <div className="text-2xl font-semibold text-white">First time on Moby?</div>
+            <div className="mt-1 text-lg text-bull">Start trade with an edge</div>
+          </div>
+          <div className="grid h-14 w-14 place-items-center rounded-full bg-bull/10 text-3xl">🐳</div>
+        </button>
+      </section>
 
       {/* Discover tokens — trending/gainers/new with real DexScreener data */}
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1">
-            <span className="text-sm font-semibold">🧭 Discover tokens</span>
-            {source && (
-              <Chip variant={source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
-                {source === "dexscreener" ? "live" : "demo"}
-              </Chip>
-            )}
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-semibold">🧭 Discover tokens</span>
+            </div>
+            <DataSourceBadge source={source} fetchedAt={fetchedAt} stale={stale} className="mt-1" />
           </div>
           <div className="flex items-center gap-1.5">
             <button
@@ -217,23 +248,29 @@ export function DiscoverView() {
         </AnimatePresence>
 
         {/* Tab selector */}
-        <div className="flex gap-1 p-1 bg-surface-2 rounded-lg mb-3">
+        <div className="mb-3 flex gap-1 rounded-full bg-surface-2 p-1">
           {[
+            { k: "gainers", label: "Gainers" },
+            { k: "new", label: "New" },
             { k: "trending", label: "🔥 Trending" },
-            { k: "gainers", label: "📈 Gainers" },
-            { k: "new", label: "✨ New" },
           ].map((s) => (
             <button
               key={s.k}
               onClick={() => setSection(s.k as typeof section)}
               className={cn(
-                "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors",
-                section === s.k ? "bg-surface-3 text-foreground" : "text-muted-foreground hover:text-foreground"
+                "flex-1 rounded-full py-2 text-sm font-medium transition-colors",
+                section === s.k ? "bg-bull text-background" : "text-muted-foreground hover:text-foreground"
               )}
             >
               {s.label}
             </button>
           ))}
+          <button
+            onClick={() => useMoby.getState().setActiveTab("signals")}
+            className="flex-1 rounded-full py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            Pulse
+          </button>
         </div>
 
         {/* Loading state */}
@@ -268,9 +305,6 @@ export function DiscoverView() {
           </div>
         )}
       </section>
-
-      {/* Whale buy/sell flows — live on-chain */}
-      <WhaleFlowsRow />
 
       {/* "More" button — opens modal with MarketOverview, Narratives, Launches, Tools, News */}
       <button
@@ -345,7 +379,15 @@ function DiscoverMoreModal() {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
-              {tab === "market" && <MarketOverview />}
+              {tab === "market" && (
+                <div className="space-y-6">
+                  <MultipliersShowcase />
+                  <TopBoostsRow />
+                  <GmgnTrendingRow />
+                  <GmgnHotSearchesRow />
+                  <MarketOverview />
+                </div>
+              )}
               {tab === "narratives" && <NarrativesRow />}
               {tab === "launches" && <LaunchCalendar />}
               {tab === "tools" && <InsightsGrid />}
@@ -360,21 +402,21 @@ function DiscoverMoreModal() {
 
 // ===== Whale Buy/Sell Flows Row (real GMGN smart-money feed) =====
 function WhaleFlowsRow() {
-  const { data, loading, source } = useGmgn<{ trades: any[] }>(
+  const { data, loading, source, fetchedAt, stale } = useGmgn<{ trades: any[] }>(
     "/api/gmgn/smart-money-feed?chain=sol&limit=10",
     { refreshMs: 30_000 }
   );
 
+  if (!loading && source === "error" && (!data?.trades || data.trades.length === 0)) {
+    return null;
+  }
+
   return (
     <section>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
           <span className="text-sm font-semibold">🐋 Whale buy/sell</span>
-          {source && (
-            <Chip variant={source === "gmgn" || source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
-              {source === "gmgn" || source === "dexscreener" ? "live" : "demo"}
-            </Chip>
-          )}
+          <DataSourceBadge source={source} fetchedAt={fetchedAt} stale={stale} className="mt-1" />
         </div>
         <button
           onClick={() => useMoby.getState().setActiveTab("whales")}
@@ -891,11 +933,6 @@ function GmgnTrendingRow() {
           <div className="text-xs text-muted-foreground py-8">No trending tokens available.</div>
         )}
       </div>
-      {source && (
-        <div className="text-[10px] text-muted-foreground mt-1 px-1">
-          Source: <span className={source === "gmgn" ? "text-bull" : ""}>{(source === "gmgn" || source === "dexscreener") ? "GMGN/DexScreener live" : "simulated (GMGN unavailable)"}</span>
-        </div>
-      )}
     </section>
   );
 }
@@ -986,7 +1023,7 @@ function GmgnHotSearchesRow() {
       </div>
       {source && (
         <div className="text-[10px] text-muted-foreground mt-1 px-1">
-          Source: <span className={source === "gmgn" ? "text-bull" : ""}>{(source === "gmgn" || source === "dexscreener") ? "GMGN/DexScreener live" : "simulated (GMGN unavailable)"}</span>
+          Source: <span className={source === "gmgn" || source === "dexscreener" ? "text-bull" : source === "error" ? "text-bear" : ""}>{(source === "gmgn" || source === "dexscreener") ? "GMGN/DexScreener live" : source === "error" ? "Live feed offline" : "Unavailable"}</span>
         </div>
       )}
     </section>
@@ -995,7 +1032,7 @@ function GmgnHotSearchesRow() {
 
 // ===== DexScreener Top Boosts Row =====
 function TopBoostsRow() {
-  const { data, loading, source } = useGmgn<{ tokens: any[] }>(
+  const { data, loading, source, fetchedAt, stale } = useGmgn<{ tokens: any[] }>(
     "/api/dexscreener/top-boosts?chain=solana&limit=8",
     { refreshMs: 120_000 }
   );
@@ -1008,6 +1045,7 @@ function TopBoostsRow() {
         action="View all"
         onAction={() => useMoby.getState().openTokenList({ title: "🚀 Top Boosted Tokens", endpoint: "/api/dexscreener/top-boosts?chain=solana&limit=30" })}
       />
+      <DataSourceBadge source={source} fetchedAt={fetchedAt} stale={stale} className="mb-3 px-1" />
       <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {loading && !data ? (
           [1, 2, 3, 4].map((i) => (
@@ -1052,15 +1090,29 @@ function TopBoostsRow() {
           <div className="text-xs text-muted-foreground py-8">No boosted tokens available.</div>
         )}
       </div>
-      {source && (
-        <div className="text-[10px] text-muted-foreground mt-1 px-1">
-          Source: <span className={(source === "gmgn" || source === "dexscreener") ? "text-bull" : ""}>
-            {(source === "gmgn" || source === "dexscreener") ? "DexScreener live" : "simulated"}
-          </span>
-        </div>
-      )}
     </section>
   );
+}
+
+function makeDeterministicSparkline(price: number, change24h: number, seedKey: string) {
+  let seed = 0;
+  for (let i = 0; i < seedKey.length; i += 1) {
+    seed = (seed * 31 + seedKey.charCodeAt(i)) >>> 0;
+  }
+
+  const nextRand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0xffffffff;
+  };
+
+  const points: number[] = [];
+  let value = price * (1 - change24h / 100);
+  for (let i = 0; i < 20; i += 1) {
+    value = value * (1 + (nextRand() - 0.5) * 0.02 + change24h / 100 / 20);
+    points.push(value);
+  }
+  points.push(price);
+  return points;
 }
 
 // ===== Real Token Row (DexScreener data) =====
@@ -1076,17 +1128,9 @@ function RealTokenRow({ token, rank }: { token: any; rank?: number }) {
   const ageMin = token.created_at ? Math.round((Date.now() - token.created_at) / 60000) : 0;
   const ageLabel = ageMin > 0 ? (ageMin < 60 ? `${ageMin}m` : ageMin < 1440 ? `${Math.floor(ageMin / 60)}h` : `${Math.floor(ageMin / 1440)}d`) : "";
 
-  // Generate sparkline from 24h change approximation
   const sparkData = useMemo(() => {
-    const points: number[] = [];
-    let v = token.price * (1 - change24h / 100);
-    for (let i = 0; i < 20; i++) {
-      v = v * (1 + (Math.random() - 0.5) * 0.02 + (change24h / 100 / 20));
-      points.push(v);
-    }
-    points.push(token.price);
-    return points;
-  }, [token.price, token.change_24h]);
+    return makeDeterministicSparkline(token.price, change24h, token.address || token.symbol || "token");
+  }, [change24h, token.address, token.price, token.symbol]);
 
   return (
     <div
@@ -1182,6 +1226,9 @@ function WhaleBuySellSummary() {
   );
 
   const trades = data?.trades || [];
+  if (!loading && source === "error" && trades.length === 0) {
+    return null;
+  }
   const buys = trades.filter((t: any) => t.type === "buy");
   const sells = trades.filter((t: any) => t.type === "sell");
   const totalBuyUsd = buys.reduce((s: number, t: any) => s + (t.amount_usd || 0), 0);
@@ -1207,8 +1254,8 @@ function WhaleBuySellSummary() {
       <div className="flex items-center gap-2 mb-3">
         <span className="text-sm font-bold">🐋 Smart Money Activity</span>
         {source && (
-          <Chip variant={source === "gmgn" || source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
-            {source === "gmgn" || source === "dexscreener" ? "live" : "demo"}
+          <Chip variant={source === "gmgn" || source === "dexscreener" ? "bull" : source === "error" ? "bear" : "outline"} className="text-[9px]">
+            {source === "gmgn" || source === "dexscreener" ? "live" : source === "error" ? "offline" : "unavailable"}
           </Chip>
         )}
         <span className="ml-auto text-[10px] text-muted-foreground">{trades.length} trades · 30s refresh</span>
@@ -1275,7 +1322,7 @@ function WhaleBuySellSummary() {
 
 // ===== Smart Money Movers Live — tokens with smart money inflow (from GMGN feed) =====
 function SmartMoneyMoversLive() {
-  const { data, loading, source } = useGmgn<{ signals: any[] }>(
+  const { data, loading, source, fetchedAt, stale } = useGmgn<{ signals: any[] }>(
     "/api/gmgn/signals?chain=sol&limit=10",
     { refreshMs: 60_000 }
   );
@@ -1283,16 +1330,16 @@ function SmartMoneyMoversLive() {
   const signals = data?.signals || [];
   const buySignals = signals.filter((s: any) => s.signal_type === "smart_money_buy" || s.signal_type === "large_buy");
 
+  if (!loading && source === "error" && buySignals.length === 0) {
+    return null;
+  }
+
   return (
     <section>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
           <span className="text-sm font-semibold">📡 Smart Money Signals</span>
-          {source && (
-            <Chip variant={source === "gmgn" || source === "dexscreener" ? "bull" : "outline"} className="text-[9px]">
-              {source === "gmgn" || source === "dexscreener" ? "live" : "demo"}
-            </Chip>
-          )}
+          <DataSourceBadge source={source} fetchedAt={fetchedAt} stale={stale} className="mt-1" />
         </div>
         <button
           onClick={() => useMoby.getState().openTokenList({ title: "Smart Money Signals", endpoint: "/api/gmgn/signals?chain=sol&limit=30" })}
