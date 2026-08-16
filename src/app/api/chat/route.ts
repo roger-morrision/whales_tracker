@@ -1,23 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchTrending, fetchHotSearches } from "@/lib/gmgn";
+import { rateLimit } from "@/lib/api-rate-limiter";
 
 /**
  * POST /api/chat
  * Body: { messages: [{ role, content }] }
  *
  * AI copilot chat endpoint.
- * Uses z-ai-web-dev-sdk (server-side only) for real LLM responses.
+ * Uses the NVIDIA NIM OpenAI-compatible Chat Completions API (server-side only)
+ * for real LLM responses.
  * Falls back to heuristic responses if the LLM is unavailable.
  * Enhanced with live GMGN trending + hot-search data for real-time context.
  */
 
-// Note: LLM is dynamically imported inside POST handler to avoid bundling issues.
-
-async function buildLiveContext(): Promise<string> {
+async function buildLiveContext(origin: string): Promise<string> {
   // Fetch real prices from our own /api/prices endpoint
-  let priceLine = "Available tokens (real prices from DexScreener):";
+  let priceLine = "Live price context is currently unavailable. Do not infer or invent prices.";
   try {
-    const priceRes = await fetch("http://localhost:3000/api/prices?symbols=SOL,WIF,JUP,BONK,JTO,PYTH,DRIFT,IO,RNDR,POPCAT,HNT,MNGO,ETH,BTC,NEON,RAY");
+    const priceRes = await fetch(`${origin}/api/prices?symbols=SOL,WIF,JUP,BONK,JTO,PYTH,DRIFT,IO,RNDR,POPCAT,HNT,MNGO,ETH,BTC,NEON,RAY`, {
+      cache: "no-store",
+    });
     const priceData = await priceRes.json();
     if (priceData?.prices) {
       const parts: string[] = [];
@@ -28,9 +30,7 @@ async function buildLiveContext(): Promise<string> {
       }
       priceLine = `Available tokens (live DexScreener prices): ${parts.join(", ")}.`;
     }
-  } catch {
-    priceLine = "Available tokens: SOL ($73), WIF ($0.14), JUP ($0.84), BONK ($0.0000284), POPCAT ($0.044), RAY ($0.61), DRIFT ($1.84), IO ($2.94).";
-  }
+  } catch { /* Keep the unavailable state explicit. */ }
 
   let ctx = `You are Moby, an AI crypto trading copilot built on Solana. You help users:
 - Analyze tokens (price, smart money flow, security, predictions)
@@ -40,14 +40,11 @@ async function buildLiveContext(): Promise<string> {
 
 ${priceLine}
 
-Current narratives: AI Agents (+12%), Meme Season (+28%), DePIN (+5%), Cat Coins (+64%), Solana DeFi (+6%).
-
-Smart money signals: MNGO cluster buy (7 wallets, $1.24M), WIF whale accumulation ($4.22M), 
-IO smart money entry (5 wallets, $980K).`;
+Do not create market facts when live data is missing.`;
 
   // Fetch live GMGN trending tokens
   try {
-    const trending = await fetchTrending("1h", "volume", 5);
+    const trending = (await fetchTrending("1h", "volume", 5)) as any[];
     if (trending && trending.length > 0) {
       const trendingStr = trending
         .map((t, i) => `${i + 1}. ${t.symbol} — $${t.price?.toFixed(6) || "?"} (${t.price_change_24h >= 0 ? "+" : ""}${t.price_change_24h?.toFixed(1) || "?"}%) MC $${(t.market_cap / 1e6).toFixed(1)}M Vol $${(t.volume_24h / 1e3).toFixed(0)}K${t.smart_money_holders ? ` ${t.smart_money_holders} smart` : ""}`)
@@ -102,6 +99,9 @@ const HEURISTIC_RESPONSES: { keywords: string[]; response: string }[] = [
 ];
 
 function heuristicReply(userText: string): string {
+  // Never return fabricated balances, prices, PnL, or whale activity.
+  return "Live AI analysis is temporarily unavailable. I can still open the relevant Solana token, wallet, or signals view so you can inspect verified on-chain data.";
+
   const lower = userText.toLowerCase();
 
   const tokenMap: Record<string, string> = {
@@ -126,7 +126,7 @@ function heuristicReply(userText: string): string {
     }
   }
 
-  return "I can analyze tokens, summarize smart money flow, validate trade ideas, check your portfolio, or estimate taxes. Try asking about a specific token like $WIF or $JUP, or ask 'what's smart money doing?'";
+  return "Live AI analysis is temporarily unavailable. I can still open the relevant Solana token, wallet, or signals view so you can inspect verified on-chain data.";
 }
 
 function extractTokenSymbols(text: string): string[] {
@@ -142,38 +142,78 @@ function extractTokenSymbols(text: string): string[] {
 
 export async function POST(req: NextRequest) {
   try {
+    const limit = await rateLimit(req, {
+      windowMs: 60_000,
+      maxRequests: 20,
+      keyPrefix: "chat",
+    });
+    if (!limit.success) return limit.response!;
+
     const body = await req.json();
-    const messages = body.messages || [];
+    const messages = Array.isArray(body.messages)
+      ? body.messages
+          .filter((message: any) => message && (message.role === "user" || message.role === "assistant"))
+          .slice(-8)
+          .map((message: any) => ({
+            role: message.role,
+            content: String(message.content || "").slice(0, 4_000),
+          }))
+      : [];
     const lastMessage = messages[messages.length - 1]?.content || "";
 
-    // Try real LLM via z-ai-web-dev-sdk (dynamic import to avoid bundling issues)
+    // Try the configured NVIDIA NIM model server-side.
     // Build live context with GMGN trending + hot searches
-    const TOKEN_CONTEXT = await buildLiveContext();
+    const TOKEN_CONTEXT = await buildLiveContext(new URL(req.url).origin);
 
     try {
-      const ZAI = (await import("z-ai-web-dev-sdk")).default;
-      const zai = await ZAI.create();
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: "system", content: TOKEN_CONTEXT },
-          ...messages.map((m: any) => ({
-            role: m.role === "user" ? "user" : "assistant",
-            content: m.content,
-          })),
-        ],
-        thinking: { type: "disabled" },
+      const apiKey = process.env.NVIDA_NIM_API_KEY || process.env.NVIDIA_NIM_API_KEY;
+      if (!apiKey) {
+        throw new Error("NVIDIA NIM API key is not configured");
+      }
+
+      const model = process.env.NVIDA_NIM_MODE
+        || process.env.NVIDIA_NIM_MODEL
+        || "meta/llama-3.1-8b-instruct";
+      const baseUrl = (process.env.NVIDIA_NIM_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(/\/$/, "");
+      const nimResponse = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: TOKEN_CONTEXT },
+            ...messages
+            .slice(-8)
+            .map((m: any) => ({
+              role: m.role === "user" ? "user" : "assistant",
+              content: String(m.content || ""),
+            })),
+          ],
+          temperature: 0.2,
+          max_tokens: 500,
+          stream: false,
+        }),
       });
 
-      const reply = completion.choices[0]?.message?.content;
+      if (!nimResponse.ok) {
+        throw new Error(`NVIDIA NIM request failed (${nimResponse.status})`);
+      }
+
+      const completion = await nimResponse.json();
+      const reply = completion.choices?.[0]?.message?.content?.trim();
       if (reply && reply.length > 10) {
         return NextResponse.json({
           content: reply,
           source: "llm",
+          model,
           suggestedTokens: extractTokenSymbols(reply),
         });
       }
-    } catch {
-      // Fall through to heuristic
+    } catch (error) {
+      console.warn("[api/chat] NVIDIA NIM unavailable; using heuristic fallback", error instanceof Error ? error.message : error);
     }
 
     // Fallback: Heuristic response

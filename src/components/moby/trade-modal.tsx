@@ -48,6 +48,9 @@ export function TradeModal() {
   const [showSettings, setShowSettings] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  // Execution stays fail-closed until a real wallet-signing and confirmation
+  // path is wired. Quotes may be displayed, but swaps must never be simulated.
+  const liveTradingEnabled = false;
 
   // API quote state
   const [quote, setQuote] = useState<{
@@ -107,21 +110,7 @@ export function TradeModal() {
             quoteId: data.quoteId,
           });
         } catch {
-          // Fallback to local calculation
-          const usdIn = parseFloat(amount) || 0;
-          const refPrice = livePriceRef.current || token.price;
-          const baseOut = usdIn / refPrice;
-          const impact = Math.min(15, (usdIn / Math.max(1, token.liquidity)) * 100);
-          const afterImpact = baseOut * (1 - impact / 100);
-          const minRec = afterImpact * (1 - slippage / 100);
-          setQuote({
-            outAmount: afterImpact,
-            priceImpactPct: impact,
-            minReceived: minRec,
-            platformFeeUsd: usdIn * 0.0085,
-            route: ["USDC", token.symbol],
-            quoteId: `local_${Date.now()}`,
-          });
+          setQuote(null);
         } finally {
           // Defer to avoid synchronous setState in effect
           setTimeout(() => {
@@ -181,6 +170,16 @@ export function TradeModal() {
   const handleSubmit = () => {
     if (!wallet) {
       setWalletOpen(true);
+      return;
+    }
+    if (!liveTradingEnabled || !quote) {
+      useMoby.getState().pushToast({
+        title: "Live trading is unavailable",
+        description: !quote
+          ? "A fresh Jupiter quote is required before trading."
+          : "Live trading is disabled until wallet signing and confirmation are enabled.",
+        type: "warn",
+      });
       return;
     }
     setSubmitting(true);
@@ -350,7 +349,7 @@ export function TradeModal() {
                     <button
                       key={pct}
                       onClick={() =>
-                        setAmount(String(((wallet?.balanceUsd ?? 1000) * pct) / 100))
+            setAmount(String(((wallet?.balanceUsd ?? 0) * pct) / 100))
                       }
                       title={
                         wallet
@@ -467,7 +466,7 @@ export function TradeModal() {
               {/* Submit */}
               <button
                 onClick={handleSubmit}
-                disabled={!amount || parseFloat(amount) <= 0 || submitting || success}
+                disabled={!amount || parseFloat(amount) <= 0 || submitting || success || !quote || !liveTradingEnabled}
                 className={cn(
                   "w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50",
                   success
@@ -485,6 +484,10 @@ export function TradeModal() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" /> Signing transaction…
                   </>
+                ) : !liveTradingEnabled ? (
+                  "Live trading disabled"
+                ) : !quote ? (
+                  "Waiting for live quote"
                 ) : !wallet ? (
                   "Connect wallet to continue"
                 ) : (

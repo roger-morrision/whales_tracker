@@ -58,11 +58,11 @@ export async function GET(req: NextRequest) {
     // fall through
   }
 
-  const fallback = fallbackActivity(wallet, limit);
+  const fallback = [];
   return NextResponse.json({
     activity: fallback,
     count: fallback.length,
-    source: "simulated",
+    source: "error",
     wallet,
     chain,
     timestamp: Date.now(),

@@ -73,11 +73,11 @@ export async function GET(req: NextRequest) {
     // fall through
   }
 
-  const fallback = fallbackFeed(limit);
+  const fallback = [];
   return NextResponse.json({
     trades: fallback,
     count: fallback.length,
-    source: "simulated",
+    source: "error",
     chain,
     timestamp: Date.now(),
     note: "GMGN CLI unavailable — showing simulated KOL feed.",

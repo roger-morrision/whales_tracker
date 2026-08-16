@@ -59,11 +59,11 @@ export async function GET(req: NextRequest) {
     // fall through
   }
 
-  const fallback = fallbackActivity(address, limit);
+  const fallback = [];
   return NextResponse.json({
     activity: fallback,
     count: fallback.length,
-    source: "simulated",
+    source: "error",
     address,
     timestamp: Date.now(),
     note: "GMGN API unavailable — showing simulated smart money activity.",

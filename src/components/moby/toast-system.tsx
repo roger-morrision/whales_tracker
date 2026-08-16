@@ -126,6 +126,10 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
  * for new smart money entries and whale flows.
  */
 export function WhaleAlertPusher() {
+  // Production alerts must come from an observed server event. Do not invent
+  // whale activity on a client timer.
+  return null;
+
   const pushToast = useMoby((s) => s.pushToast);
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
 

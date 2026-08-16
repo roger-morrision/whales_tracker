@@ -250,7 +250,7 @@ export function ProfileView() {
 
 function CashbackTiersCard() {
   const wallet = useMoby((s) => s.wallet);
-  const volumeBase = wallet?.balanceUsd ?? 1675;
+  const volumeBase = wallet?.connected ? wallet.balanceUsd : 0;
   const mobyHeld = Math.max(241, Math.round(volumeBase / 6.9));
   const tiers = [
     { tier: 1, cashback: 12, target: 1_000 },

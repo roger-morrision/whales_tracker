@@ -23,11 +23,12 @@ export async function GET(req: NextRequest) {
     const solTokens = data.filter((t: any) => t.chainId === "solana").slice(0, limit * 3);
 
     const results: any[] = [];
-    for (const t of solTokens) {
+    const pairResults = await Promise.all(solTokens.map(async (t: any) => ({
+      t,
+      pairData: await fetchJson(`https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`, 4000),
+    })));
+    for (const { t, pairData } of pairResults) {
       if (results.length >= limit * 2) break;
-      const pairData = await fetchJson(
-        `https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`
-      );
       if (!pairData?.pairs?.length) continue;
       const solPairs = pairData.pairs.filter((p: any) => p.chainId === "solana");
       const p = (solPairs.length > 0 ? solPairs : pairData.pairs).sort(

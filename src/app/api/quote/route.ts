@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
  * GET /api/quote?inputMint=USDC&outputMint=SOL&amount=100&slippage=1
  *
  * Calls real Jupiter Ultra API for on-chain swap quotes on Solana.
- * Falls back to simulated data if Jupiter API is unavailable.
+ * Returns unavailable when Jupiter cannot provide a live quote.
  *
  * Solana-only. Uses verified mint addresses.
  */
@@ -48,7 +48,10 @@ export async function GET(req: NextRequest) {
   const inputSymbol = searchParams.get("inputMint") || "USDC";
   const outputSymbol = searchParams.get("outputMint") || "SOL";
   const amount = parseFloat(searchParams.get("amount") || "100");
-  const slippage = parseFloat(searchParams.get("slippage") || "1");
+  const slippageBpsParam = searchParams.get("slippageBps");
+  const slippage = slippageBpsParam
+    ? parseFloat(slippageBpsParam) / 100
+    : parseFloat(searchParams.get("slippage") || "1");
 
   const inKey = SYMBOL_TO_MINT[inputSymbol] || SYMBOL_TO_MINT["USDC"];
   const outKey = SYMBOL_TO_MINT[outputSymbol] || SYMBOL_TO_MINT["SOL"];
@@ -98,32 +101,9 @@ export async function GET(req: NextRequest) {
     // Fall through to simulated quote
   }
 
-  // Fallback: Simulated quote
-  const inputUsd = amount * inToken.price;
-  const baseOutput = inputUsd / outToken.price;
-  const impactPct = Math.min(15, (inputUsd / Math.max(1, outToken.liquidity)) * 100);
-  const afterImpact = baseOutput * (1 - impactPct / 100);
-  const minReceived = afterImpact * (1 - slippage / 100);
-  const platformFee = inputUsd * 0.0085;
-  const route = inToken.symbol === "USDC" ? [inToken.symbol, outToken.symbol] : [inToken.symbol, "USDC", outToken.symbol];
-
   return NextResponse.json({
-    inputMint: inKey,
-    outputMint: outKey,
-    inSymbol: inputSymbol,
-    outSymbol: outputSymbol,
-    inAmount: amount,
-    inUsd: Number(inputUsd.toFixed(2)),
-    outAmount: Number(afterImpact.toFixed(8)),
-    outUsd: Number((afterImpact * outToken.price).toFixed(2)),
-    priceImpactPct: Number(impactPct.toFixed(2)),
-    minReceived: Number(minReceived.toFixed(8)),
-    slippagePct: slippage,
-    platformFeeUsd: Number(platformFee.toFixed(4)),
-    route,
-    mevProtected: true,
-    quoteId: `q_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    timestamp: Date.now(),
-    source: "simulated",
-  });
+    error: "LIVE_QUOTE_UNAVAILABLE",
+    message: "Jupiter did not return a live Solana quote. Trading is blocked until a fresh quote is available.",
+    source: "error",
+  }, { status: 503 });
 }

@@ -29,6 +29,7 @@ export function BottomNav() {
     <nav
       className="sticky bottom-0 z-30 bg-background/95 backdrop-blur-xl border-t border-border"
       aria-label="Primary"
+      role="navigation"
     >
       <div className="grid grid-cols-4">
         {TABS.map((tab) => {

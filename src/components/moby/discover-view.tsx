@@ -85,7 +85,7 @@ export function DiscoverView() {
             <div className="text-sm font-medium text-muted-foreground">Wallet Balance</div>
             <div className="mt-2 flex items-center gap-2">
               <div className="text-[2.4rem] font-semibold tracking-tight text-white">
-                {fmtUsd(wallet?.balanceUsd ?? 65.03, { decimals: 2 })}
+              {wallet?.connected ? fmtUsd(wallet.balanceUsd, { decimals: 2 }) : "—"}
               </div>
               <ArrowUpRight className="h-5 w-5 text-white/80" />
             </div>
@@ -782,6 +782,7 @@ export function TokenRow({ token, rank }: { token: Token; rank?: number }) {
   return (
     <div
       onClick={() => openToken(token.id)}
+      data-testid="token-card"
       className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-2 cursor-pointer transition-colors"
     >
       <div className="w-5 text-center text-xs font-mono text-muted-foreground">
@@ -1134,6 +1135,7 @@ function RealTokenRow({ token, rank }: { token: any; rank?: number }) {
 
   return (
     <div
+      data-testid="token-card"
       onClick={() => {
         // Try to find in local TOKENS first, otherwise view as external token in-app
         const tk = TOKENS.find((t) => t.mint === token.address);

@@ -6,6 +6,8 @@ import {
   getQualityColor, 
   getQualityBg,
   formatAge,
+  shouldAutoRefresh,
+  getTimeSinceUpdate,
   StalenessBadgeProps 
 } from '@/lib/freshness';
 import { cn } from '@/lib/utils';
@@ -125,8 +127,6 @@ export function useStaleRefresh(
   onRefresh: () => void,
   intervalMs: number = 10000
 ) {
-  import { shouldAutoRefresh } from '@/lib/freshness';
-  
   React.useEffect(() => {
     const checkStaleness = () => {
       if (shouldAutoRefresh(timestamp, dataType)) {

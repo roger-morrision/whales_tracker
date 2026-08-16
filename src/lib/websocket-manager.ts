@@ -52,16 +52,20 @@ class WebSocketManager {
   }
 
   private getDefaultWSUrl(): string {
-    // Default to a WebSocket endpoint - would be configured per environment
-    if (typeof window !== 'undefined') {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${protocol}//${window.location.host}/api/ws`;
-    }
-    return 'wss://api.example.com/ws';
+    // The Next.js App Router does not own a WebSocket upgrade endpoint.
+    // Only connect when a real provider endpoint is explicitly configured.
+    return typeof window !== 'undefined'
+      ? process.env.NEXT_PUBLIC_WS_URL || ''
+      : process.env.WS_URL || '';
   }
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      if (!this.config.url) {
+        this.setState('closed');
+        reject(new Error('No WebSocket endpoint configured'));
+        return;
+      }
       if (this.ws?.readyState === WebSocket.OPEN) {
         resolve();
         return;
@@ -95,6 +99,9 @@ class WebSocketManager {
 
         this.ws.onerror = (error) => {
           console.error('[WS] Error:', error);
+          // An error event does not guarantee a close event in every browser.
+          // Explicitly close so reconnect state is restored consistently.
+          this.ws?.close();
           this.onErrorCallbacks.forEach(cb => cb(new Error('WebSocket error')));
           
           if (this.state === 'connecting') {
@@ -148,6 +155,10 @@ class WebSocketManager {
     };
   }
 
+  emitMessage(message: WSMessage): void {
+    this.onMessageCallbacks.forEach(cb => cb(message));
+  }
+
   onError(callback: (error: Error) => void): () => void {
     this.onErrorCallbacks.push(callback);
     return () => {
@@ -189,7 +200,7 @@ class WebSocketManager {
       }
 
       // Broadcast to general listeners
-      this.onMessageCallbacks.forEach(cb => cb(message));
+      this.emitMessage(message);
     } catch (error) {
       console.error('[WS] Message parse error:', error);
     }
@@ -456,7 +467,7 @@ export class RealtimeManager {
       
       manager.onMessage((message) => {
         // Re-broadcast to primary manager's listeners
-        this.primaryManager?.onMessage(message);
+        this.primaryManager?.emitMessage(message);
       });
     }
   }
@@ -466,7 +477,7 @@ export class RealtimeManager {
     const unsubscribers: Array<() => void> = [];
 
     // Try DexScreener first
-    const dexManager = this.managers.get('dexscreener');
+    const dexManager = this.managers.get('dexscreener') as DexScreenerWSManager | undefined;
     if (dexManager?.isConnected()) {
       for (const token of tokens) {
         const sub = dexManager.subscribeToToken(token, chain);
@@ -475,7 +486,7 @@ export class RealtimeManager {
     }
 
     // Fallback to Jupiter
-    const jupManager = this.managers.get('jupiter');
+    const jupManager = this.managers.get('jupiter') as JupiterWSManager | undefined;
     if (jupManager?.isConnected()) {
       const sub = jupManager.subscribeToPrice(tokens);
       unsubscribers.push(sub.unsubscribe);
@@ -509,7 +520,7 @@ export class RealtimeManager {
   subscribeToTrades(handler: (trade: any) => void): () => void {
     const unsubscribers: Array<() => void> = [];
 
-    const jupManager = this.managers.get('jupiter');
+    const jupManager = this.managers.get('jupiter') as JupiterWSManager | undefined;
     if (jupManager?.isConnected()) {
       const sub = jupManager.subscribeToSwaps();
       unsubscribers.push(sub.unsubscribe);

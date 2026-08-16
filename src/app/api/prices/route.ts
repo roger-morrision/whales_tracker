@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { liveMeta, unavailableMeta } from "@/lib/data-provenance";
 
 /**
  * GET /api/prices?symbols=SOL,WIF,JUP,BONK
@@ -86,12 +87,17 @@ export async function GET(req: NextRequest) {
         result[sym] = { ...dsPrices[sym], source: "dexscreener" };
       }
     }
-    return NextResponse.json({ prices: result, source: "dexscreener" });
+    return NextResponse.json({
+      prices: result,
+      source: "dexscreener",
+      meta: liveMeta("dexscreener", 30_000),
+    });
   }
 
   return NextResponse.json({
     prices: {},
     source: "error",
+    meta: unavailableMeta("dexscreener", "Live DexScreener Solana prices are currently unavailable."),
     note: "Live DexScreener Solana prices are currently unavailable.",
   }, { status: 503 });
 }

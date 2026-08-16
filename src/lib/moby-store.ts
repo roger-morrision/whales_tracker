@@ -337,7 +337,7 @@ interface MobyState {
   // ===== NEW: Wallet connect =====
   walletOpen: boolean;
   setWalletOpen: (open: boolean) => void;
-  wallet: { connected: boolean; address: string; label: string; balanceUsd: number } | null;
+  wallet: { connected: boolean; address: string; label: string; balanceUsd: number; balanceSol?: number } | null;
   connectWallet: (label: string, address?: string) => void;
   disconnectWallet: () => void;
 
@@ -1155,7 +1155,7 @@ export const useMoby = create<MobyState>()(
       address ||
       `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
     set({
-      wallet: { connected: true, address: addr, label, balanceUsd: 0 },
+      wallet: { connected: true, address: addr, label, balanceUsd: 0, balanceSol: 0 },
       walletOpen: false,
     });
     get().pushAlert({

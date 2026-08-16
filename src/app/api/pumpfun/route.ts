@@ -159,7 +159,18 @@ export async function GET(req: NextRequest) {
     // Fall through to simulation
   }
 
-  // Fallback: Simulated data
+  if (process.env.ALLOW_SIMULATED_DATA !== "true") {
+    return NextResponse.json({
+      type,
+      tokens: [],
+      count: 0,
+      source: "error",
+      note: "Pump.fun live data is unavailable; simulated data is disabled.",
+      timestamp: now,
+    }, { status: 503 });
+  }
+
+  // Development-only fallback: simulated data must be explicitly enabled.
   type PumpToken = {
     id: string;
     symbol: string;

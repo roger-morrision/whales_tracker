@@ -161,7 +161,7 @@ export function WalletButton({ className, ...props }: { className?: string } & R
   
   // Compute SOL balance for display
   const solPrice = prices.sol?.price ?? 0;
-  const balanceSol = mobyWallet?.connected && mobyWallet.address ? 1.03 : 0; // TODO: fetch real balance
+  const balanceSol = mobyWallet?.connected ? (mobyWallet.balanceSol ?? 0) : 0;
   const balanceUsd = balanceSol * solPrice;
 
   if (connected && publicKey) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchJson } from "@/lib/gmgn";
+import { liveMeta, unavailableMeta } from "@/lib/data-provenance";
 
 /**
  * GET /api/solana/trending?limit=20&sort=volume
@@ -16,7 +17,11 @@ export async function GET(req: NextRequest) {
     // Fetch top boosted tokens (community-financed visibility = strong signal)
     const boostsData = await fetchJson("https://api.dexscreener.com/token-boosts/top/v1");
     if (!Array.isArray(boostsData)) {
-      return NextResponse.json({ tokens: [], source: "error" });
+      return NextResponse.json({
+        tokens: [],
+        source: "error",
+        meta: unavailableMeta("dexscreener", "Trending data is unavailable."),
+      }, { status: 503 });
     }
 
     // Filter Solana only
@@ -24,11 +29,12 @@ export async function GET(req: NextRequest) {
 
     // For each, fetch the token pair data to get price/volume/liquidity
     const results: any[] = [];
-    for (const t of solTokens) {
+    const pairResults = await Promise.all(solTokens.map(async (t: any) => ({
+      t,
+      pairData: await fetchJson(`https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`, 4000),
+    })));
+    for (const { t, pairData } of pairResults) {
       if (results.length >= limit) break;
-      const pairData = await fetchJson(
-        `https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`
-      );
       if (!pairData?.pairs?.length) continue;
       const solPairs = pairData.pairs.filter((p: any) => p.chainId === "solana");
       const p = (solPairs.length > 0 ? solPairs : pairData.pairs).sort(
@@ -73,9 +79,15 @@ export async function GET(req: NextRequest) {
       count: results.length,
       sort,
       source: "dexscreener",
+      meta: liveMeta("dexscreener", 120_000),
       timestamp: Date.now(),
     });
   } catch {
-    return NextResponse.json({ tokens: [], count: 0, source: "error" });
+    return NextResponse.json({
+      tokens: [],
+      count: 0,
+      source: "error",
+      meta: unavailableMeta("dexscreener", "Trending data is unavailable."),
+    }, { status: 503 });
   }
 }

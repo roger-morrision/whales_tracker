@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { ENDPOINT_SCHEMAS } from '@/lib/api-contracts';
 
 // Test utilities
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3001';
 
 async function fetchEndpoint(path: string, params?: Record<string, string>) {
   const url = new URL(path, BASE_URL);

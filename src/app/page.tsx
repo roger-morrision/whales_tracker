@@ -72,7 +72,6 @@ const Batch8Modals = dynamic(() => import("@/components/moby/batch8-modals"), { 
 export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
   const activeTab = useMoby((s) => s.activeTab);
   const setActiveTab = useMoby((s) => s.setActiveTab);
-  const tickPrices = useMoby((s) => s.tickPrices);
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
   const setCopilotOpen = useMoby((s) => s.setCopilotOpen);
   const wallet = useMoby((s) => s.wallet);
@@ -139,6 +138,18 @@ export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
               useMoby.getState().setPrice(token.id, info.price);
             }
           });
+
+          // Evaluate price rules only against values observed from the live provider.
+          const state = useMoby.getState();
+          for (const alert of state.customAlerts) {
+            if (!alert.active || alert.triggered) continue;
+            const live = state.prices[alert.tokenId]?.price;
+            if (!live || live <= 0) continue;
+            if ((alert.condition === "price_above" && live >= alert.threshold) ||
+                (alert.condition === "price_below" && live <= alert.threshold)) {
+              state.triggerCustomAlert(alert.id);
+            }
+          }
         }
       } catch {
         // Silently fail — local tick continues
@@ -168,7 +179,7 @@ export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
         const gmgnData = await gmgnRes.json();
         if (gmgnData?.source === "gmgn" && gmgnData?.totalValue) {
           useMoby.setState((s) => ({
-            wallet: s.wallet ? { ...s.wallet, balanceUsd: gmgnData.totalValue } : null,
+            wallet: s.wallet ? { ...s.wallet, balanceUsd: gmgnData.totalValue, balanceSol: gmgnData.solBalance } : null,
           }));
           return;
         }
@@ -180,13 +191,13 @@ export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
           signal: controller.signal,
         });
         const data = await res.json();
-        if (data.totalUsd) {
+        if (data.totalUsd !== undefined) {
           useMoby.setState((s) => ({
-            wallet: s.wallet ? { ...s.wallet, balanceUsd: data.totalUsd } : null,
+            wallet: s.wallet ? { ...s.wallet, balanceUsd: data.totalUsd, balanceSol: data.solBalance } : null,
           }));
         }
       } catch {
-        // Keep default balance
+        // Keep the explicitly unavailable zero balance.
       }
     };
     fetchBalance();
@@ -260,7 +271,6 @@ export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
   useEffect(() => {
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
-      tickPrices();
       // ===== Enhancement: Real-time price alert checking =====
       // After each price tick, check all active, non-triggered custom alerts.
       const ts = useMoby.getState();
@@ -268,7 +278,7 @@ export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
       for (const alert of ts.customAlerts) {
         if (!alert.active || alert.triggered) continue;
         const live = ps[alert.tokenId]?.price;
-        if (!live || live <= 0) continue;
+        if (!live || live <= 0 || !ps[alert.tokenId]?.ts) continue;
         if (alert.condition === "price_above" && live >= alert.threshold) {
           ts.triggerCustomAlert(alert.id);
         } else if (alert.condition === "price_below" && live <= alert.threshold) {
@@ -285,7 +295,7 @@ export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
       for (const stop of state.trailingStops) {
         if (stop.triggered) continue;
         const live = prices[stop.tokenId]?.price;
-        if (!live || live <= 0) continue;
+        if (!live || live <= 0 || !prices[stop.tokenId]?.ts) continue;
         // Enforce minimum hold time — don't trigger within 30s of creation
         // (prevents instant fires on the same candle the user created it)
         const minHoldMs = stop.minHoldMs ?? 30_000;
@@ -303,7 +313,7 @@ export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
       }
     }, 2500);
     return () => clearInterval(interval);
-  }, [tickPrices]);
+  }, []);
 
   // ===== Enhancement #13: Snipe-bot background poller =====
   // Every 60s, fetches new pairs from GMGN and checks each enabled snipe rule.

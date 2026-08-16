@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api-client";
 
 /**
  * Generic GMGN fetch hook.
@@ -41,7 +42,6 @@ export function useGmgn<T>(url: string | null, opts?: { refreshMs?: number }): G
       return;
     }
     let cancelled = false;
-    const controller = new AbortController();
     // Defer setState calls to avoid the synchronous-setState-in-effect lint
       Promise.resolve().then(() => {
       if (cancelled) return;
@@ -49,10 +49,8 @@ export function useGmgn<T>(url: string | null, opts?: { refreshMs?: number }): G
       setError(null);
     });
 
-    fetch(url, { signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
+    apiFetch<T>(url)
+      .then((json) => {
         if (cancelled) return;
         setData(json);
         setSource(json.source ?? null);
@@ -72,7 +70,6 @@ export function useGmgn<T>(url: string | null, opts?: { refreshMs?: number }): G
 
     return () => {
       cancelled = true;
-      controller.abort();
     };
   }, [url, nonce]);
 

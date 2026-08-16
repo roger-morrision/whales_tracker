@@ -1,0 +1,55 @@
+name: Cloud Enhancement Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 2 * * 1"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  propose-enhancement:
+    name: Propose the next safe enhancement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify baseline
+        run: |
+          npm run lint
+          npm test -- --run
+          npm run test:contracts
+          npm run build
+
+      - name: Generate enhancement proposal
+        id: proposal
+        env:
+          NVIDA_NIM_API_KEY: ${{ secrets.NVIDA_NIM_API_KEY }}
+          NVIDA_NIM_MODE: ${{ vars.NVIDA_NIM_MODE }}
+          NVIDIA_NIM_BASE_URL: ${{ vars.NVIDIA_NIM_BASE_URL }}
+        run: |
+          title=$(node scripts/cloud-enhancement.mjs)
+          {
+            echo "title<<EOF"
+            echo "$title"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open GitHub enhancement issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_TITLE: ${{ steps.proposal.outputs.title }}
+        run: gh issue create --title "[Cloud audit] $ISSUE_TITLE" --body-file cloud-enhancement-issue.md

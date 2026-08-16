@@ -1,39 +1,17 @@
-import type { NextApiResponse, NextApiRequest } from 'next';
-import { WebSocketServer, WebSocket } from 'ws';
+import { NextResponse } from "next/server";
 
-let wss: WebSocketServer | null = null;
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-export default function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method === 'GET') {
-    const { socket, headers } = req;
-    socket.on('error', console.error);
-
-    if (!wss) {
-      wss = new WebSocketServer({ noServer: true });
-      wss.on('connection', (ws: WebSocket) => {
-        console.log('WebSocket client connected');
-        ws.on('message', (message: string) => {
-          console.log('Received: %s', message);
-          ws.send(`Hello! You sent -> ${message}`);
-        });
-        ws.send('Welcome to the WebSocket server!');
-      });
-    }
-
-    // Handle the WebSocket upgrade
-    wss.handleUpgrade(req, socket, Buffer.alloc(0), (ws) => {
-      wss.emit('connection', ws, req);
-    });
-  } else {
-    res.status(405).end(`Method ${req.method} Not Allowed`);
-  }
+/**
+ * WebSocket upgrades are not supported by a Next.js App Router route handler.
+ * Keep this endpoint explicit so clients do not mistake an HTTP route for a
+ * live socket. Configure NEXT_PUBLIC_WS_URL for a dedicated WS service.
+ */
+export async function GET() {
+  return NextResponse.json(
+    {
+      ok: false,
+      code: "WEBSOCKET_SERVICE_REQUIRED",
+      message: "Configure NEXT_PUBLIC_WS_URL for a dedicated WebSocket service.",
+    },
+    { status: 426 },
+  );
 }

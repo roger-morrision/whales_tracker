@@ -73,11 +73,11 @@ export async function GET(req: NextRequest) {
     // fall through
   }
 
-  const fallback = fallbackKols(address, limit);
+  const fallback: GmgnKolHolder[] = [];
   return NextResponse.json({
     kols: fallback,
     count: fallback.length,
-    source: "simulated",
+    source: "error",
     address,
     timestamp: Date.now(),
     note: "GMGN API unavailable — showing simulated KOL data.",

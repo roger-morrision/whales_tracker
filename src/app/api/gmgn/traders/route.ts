@@ -66,11 +66,11 @@ export async function GET(req: NextRequest) {
     // fall through
   }
 
-  const fallback = fallbackTraders(address, limit);
+  const fallback = [];
   return NextResponse.json({
     traders: fallback,
     count: fallback.length,
-    source: "simulated",
+    source: "error",
     address,
     timestamp: Date.now(),
     note: "GMGN API unavailable — showing simulated trader data.",

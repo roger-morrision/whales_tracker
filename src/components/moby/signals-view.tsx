@@ -122,7 +122,7 @@ function SignalCard({ signal }: { signal: SmartSignal }) {
     signal.confidence >= 85 ? "text-bull" : signal.confidence >= 70 ? "text-gold" : "text-muted-foreground";
 
   return (
-    <div className="rounded-xl border border-border p-3 hover:bg-surface-2 transition-colors">
+    <div data-testid="signal-card" className="rounded-xl border border-border p-3 hover:bg-surface-2 transition-colors">
       <div className="flex items-start gap-3">
         <div
           className={cn(
