@@ -5,6 +5,11 @@ const apiKey = process.env.NVIDA_NIM_API_KEY || process.env.NVIDIA_NIM_API_KEY;
 const model = process.env.NVIDA_NIM_MODE || process.env.NVIDIA_NIM_MODEL;
 const baseUrl = (process.env.NVIDIA_NIM_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(/\/$/, "");
 const job = process.argv[2];
+const allowedPatchRoots = ["src/", "tests/"];
+const forbiddenPatchPaths = [
+  /(^|\/)\.env(?:\.|$)/,
+  /(?:^|\/)(?:package-lock\.json|bun\.lock|yarn\.lock|pnpm-lock\.yaml)$/,
+];
 
 const jobs = {
   qa: {
@@ -88,6 +93,27 @@ const payload = await response.json();
 const content = payload.choices?.[0]?.message?.content?.trim();
 if (!content) throw new Error("NVIDIA NIM returned an empty response");
 
+function validatePatch(patch) {
+  if (!patch) return;
+
+  const paths = new Set();
+  for (const match of patch.matchAll(/^diff --git a\/(.+?) b\/(.+)$/gm)) {
+    const [, oldPath, newPath] = match;
+    for (const path of [oldPath, newPath]) {
+      if (!allowedPatchRoots.some((root) => path.startsWith(root))) {
+        throw new Error(`Generated patch targets a disallowed path: ${path}`);
+      }
+      if (forbiddenPatchPaths.some((pattern) => pattern.test(path))) {
+        throw new Error(`Generated patch targets a protected path: ${path}`);
+      }
+      paths.add(path);
+    }
+  }
+
+  if (paths.size === 0) throw new Error("Generated output is not a git unified diff");
+  if (paths.size > 8) throw new Error(`Generated patch touches ${paths.size} files; maximum is 8`);
+}
+
 await mkdir("auto-job-results", { recursive: true });
 if (job !== "dev") {
   await writeFile(`auto-job-results/${job}.md`, `# ${jobs[job].title}\n\n${content}\n`);
@@ -100,6 +126,7 @@ if (job !== "dev") {
     ? content.slice(bodyStart + 5, patchStart).trim()
     : "Implementation generated from the automated QA, UX, and product reviews.";
   const patch = content.slice(patchStart >= 0 ? patchStart : content.length).match(/```diff\s*([\s\S]*?)```/i)?.[1]?.trim() || "";
+  validatePatch(patch);
   await writeFile("auto-job-results/dev-title.txt", `${title}\n`);
   await writeFile("auto-job-results/dev-body.md", `${body}\n\n_Generated from the QC/QA, UI/UX, and PO auto-job reports using model \`${model}\`._\n`);
   await writeFile("auto-job-results/dev.patch", patch ? `${patch}\n` : "");
