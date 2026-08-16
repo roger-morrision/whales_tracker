@@ -1,55 +1,101 @@
-name: Cloud Enhancement Audit
+name: Hourly Cloud Maintenance
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 2 * * 1"
+    - cron: "0 * * * *"
+
+concurrency:
+  group: hourly-cloud-maintenance
+  cancel-in-progress: false
 
 permissions:
-  contents: read
-  issues: write
+  contents: write
+  pull-requests: write
 
 jobs:
-  propose-enhancement:
-    name: Propose the next safe enhancement
+  maintain:
+    name: Generate and validate one safe maintenance patch
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip when an automation PR is already open
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh pr list --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("automation/hourly-maintenance"))] | length')
+          echo "has_pr=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
+        if: steps.existing.outputs.has_pr != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
+        if: steps.existing.outputs.has_pr != 'true'
         run: npm ci
 
       - name: Verify baseline
+        if: steps.existing.outputs.has_pr != 'true'
         run: |
           npm run lint
           npm test -- --run
           npm run test:contracts
           npm run build
 
-      - name: Generate enhancement proposal
-        id: proposal
+      - name: Generate maintenance patch
+        if: steps.existing.outputs.has_pr != 'true'
         env:
           NVIDA_NIM_API_KEY: ${{ secrets.NVIDA_NIM_API_KEY }}
           NVIDA_NIM_MODE: ${{ vars.NVIDA_NIM_MODE }}
           NVIDIA_NIM_BASE_URL: ${{ vars.NVIDIA_NIM_BASE_URL }}
-        run: |
-          title=$(node scripts/cloud-enhancement.mjs)
-          {
-            echo "title<<EOF"
-            echo "$title"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+        run: node scripts/cloud-enhancement.mjs
 
-      - name: Open GitHub enhancement issue
+      - name: Stop when no safe patch was proposed
+        id: patch-check
+        if: steps.existing.outputs.has_pr != 'true'
+        run: |
+          if [ ! -s cloud-maintenance.patch ]; then
+            echo "No safe maintenance patch was proposed."
+            echo "has_patch=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_patch=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate and apply patch
+        if: steps.existing.outputs.has_pr != 'true' && steps.patch-check.outputs.has_patch == 'true'
+        run: |
+          git apply --check cloud-maintenance.patch
+          git apply cloud-maintenance.patch
+
+      - name: Validate generated change
+        if: steps.existing.outputs.has_pr != 'true' && steps.patch-check.outputs.has_patch == 'true'
+        run: |
+          npm run lint
+          npm test -- --run
+          npm run test:contracts
+          npm run build
+
+      - name: Create draft pull request
+        if: steps.existing.outputs.has_pr != 'true' && hashFiles('cloud-maintenance.patch') != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          ISSUE_TITLE: ${{ steps.proposal.outputs.title }}
-        run: gh issue create --title "[Cloud audit] $ISSUE_TITLE" --body-file cloud-enhancement-issue.md
+        run: |
+          branch="automation/hourly-maintenance-${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests
+          git commit -m "chore: hourly cloud maintenance"
+          git push --set-upstream origin "$branch"
+          gh pr create --draft --base main --head "$branch" \
+            --title "[Cloud maintenance] $(cat cloud-maintenance-title.txt)" \
+            --body-file cloud-maintenance.md
