@@ -63,7 +63,7 @@ test.describe('Moby App - Core Flows', () => {
 
   test('should open settings modal', async ({ page }) => {
     // Navigate to Profile tab
-    await page.getByRole('button', { name: 'Profile' }).click();
+    await page.getByRole('link', { name: 'Profile' }).click();
     
     // Click settings
     await page.getByRole('button', { name: /settings/i }).click();
@@ -119,6 +119,14 @@ test.describe('Moby App - Core Flows', () => {
     await expect(page.locator('[data-testid="trader-card"], [data-testid="trader-row"]').first()).toBeVisible({ timeout: 10000 });
   });
 
+  test('should redirect legacy route aliases', async ({ page }) => {
+    await page.goto('/whales');
+    await expect(page).toHaveURL(/\/feeds$/);
+
+    await page.goto('/portfolio');
+    await expect(page).toHaveURL(/\/leaderboard$/);
+  });
+
   test('should show signals view', async ({ page }) => {
     await page.goto('/signals');
     
@@ -127,14 +135,14 @@ test.describe('Moby App - Core Flows', () => {
   });
 
   test('should show portfolio view', async ({ page }) => {
-    await page.getByRole('button', { name: 'Leaderboard' }).click();
+    await page.getByRole('link', { name: 'Leaders' }).click();
     
     // Should show portfolio overview
-    await expect(page.getByText(/portfolio|holdings|balance/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/leaderboard|smart money/i).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should show profile view', async ({ page }) => {
-    await page.getByRole('button', { name: 'Profile' }).click();
+    await page.getByRole('link', { name: 'Profile' }).click();
     await page.waitForTimeout(250);
     
     // Should show profile content
