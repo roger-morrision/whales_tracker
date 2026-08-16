@@ -95,9 +95,9 @@ function TraderCard({ trader }: { trader: Trader }) {
   const toggleFollow = useMoby((s) => s.toggleFollow);
 
   return (
-    <div
-      onClick={() => openTrader(trader.id)}
-      className="rounded-xl border border-border p-3 hover:bg-surface-2 cursor-pointer transition-colors"
+    <article
+      data-testid="trader-card"
+      className="rounded-xl border border-border p-3 transition-colors hover:bg-surface-2"
     >
       <div className="flex items-start gap-3">
         <div className="relative">
@@ -117,7 +117,14 @@ function TraderCard({ trader }: { trader: Trader }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm truncate">{trader.displayName}</span>
+            <button
+              type="button"
+              onClick={() => openTrader(trader.id)}
+              className="min-h-11 truncate rounded-md text-left text-sm font-semibold hover:text-bull focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bull"
+              aria-label={`View ${trader.displayName} trader details`}
+            >
+              {trader.displayName}
+            </button>
             {trader.rank <= 3 && (
               <span className="text-[10px] font-bold text-gold bg-gold/15 px-1.5 py-0.5 rounded-md">
                 #{trader.rank}
@@ -134,6 +141,8 @@ function TraderCard({ trader }: { trader: Trader }) {
           </div>
         </div>
         <button
+          type="button"
+          aria-pressed={followed}
           onClick={(e) => {
             e.stopPropagation();
             toggleFollow(trader.id);
@@ -144,7 +153,7 @@ function TraderCard({ trader }: { trader: Trader }) {
             });
           }}
           className={cn(
-            "shrink-0 h-8 px-2.5 inline-flex items-center gap-1 rounded-lg text-xs font-semibold transition-colors",
+            "shrink-0 min-h-11 px-3 inline-flex items-center gap-1 rounded-lg text-xs font-semibold transition-colors",
             followed
               ? "bg-surface-3 text-foreground border border-border"
               : "bg-bull text-background hover:opacity-90"
@@ -162,7 +171,7 @@ function TraderCard({ trader }: { trader: Trader }) {
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 mt-3">
+      <div className="grid grid-cols-2 gap-2 mt-3 sm:grid-cols-4">
         <Stat label="Smart score" value={`${trader.smartScore}`} accent={trader.smartScore >= 90 ? "bull" : "default"} />
         <Stat label="Win rate" value={`${trader.winRate}%`} />
         <Stat
@@ -200,7 +209,7 @@ function TraderCard({ trader }: { trader: Trader }) {
           ))}
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
