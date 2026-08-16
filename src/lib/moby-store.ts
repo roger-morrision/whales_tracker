@@ -1,6 +1,7 @@
 // Moby global client state — Zustand store
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { tabHref } from "./moby-navigation";
 import {
   TOKENS,
   TRADERS,
@@ -836,7 +837,13 @@ export const useMoby = create<MobyState>()(
   persist(
     (set, get) => ({
   activeTab: "discover",
-  setActiveTab: (t) => set({ activeTab: t }),
+  setActiveTab: (t) => {
+    set({ activeTab: t });
+    if (typeof window !== "undefined") {
+      const href = tabHref(t);
+      if (window.location.pathname !== href) window.history.pushState(null, "", href);
+    }
+  },
 
   // ===== Enhancement #18: Chain switcher =====
   selectedChain: "sol",

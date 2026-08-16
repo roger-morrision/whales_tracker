@@ -1,0 +1,143 @@
+name: Automated Product Team
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 2 * * 1-5"
+
+concurrency:
+  group: automated-product-team
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  qa:
+    name: "1 · QC & QA"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Audit flows and functional gaps
+        env: &nim
+          NVIDA_NIM_API_KEY: ${{ secrets.NVIDA_NIM_API_KEY }}
+          NVIDA_NIM_MODE: ${{ vars.NVIDA_NIM_MODE }}
+          NVIDIA_NIM_BASE_URL: ${{ vars.NVIDIA_NIM_BASE_URL }}
+        run: node scripts/auto-product-job.mjs qa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qa-report
+          path: auto-job-results/qa.md
+          retention-days: 14
+
+  ux:
+    name: "2 · Mobile UI/UX"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Review mobile UX and flow simplicity
+        env: *nim
+        run: node scripts/auto-product-job.mjs ux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ux-report
+          path: auto-job-results/ux.md
+          retention-days: 14
+
+  po:
+    name: "3 · Product Owner"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Produce phased competitive roadmap
+        env: *nim
+        run: node scripts/auto-product-job.mjs po
+      - uses: actions/upload-artifact@v4
+        with:
+          name: po-report
+          path: auto-job-results/po.md
+          retention-days: 14
+
+  dev:
+    name: "4 · Developer"
+    needs: [qa, ux, po]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Skip when an automation PR is open
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh pr list --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("automation/product-team-"))] | length')
+          echo "has_pr=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        if: steps.existing.outputs.has_pr != 'true'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: oven-sh/setup-bun@v2
+        if: steps.existing.outputs.has_pr != 'true'
+      - uses: actions/download-artifact@v4
+        if: steps.existing.outputs.has_pr != 'true'
+        with:
+          pattern: "*-report"
+          path: auto-job-results
+          merge-multiple: true
+      - name: Implement prioritized review tasks
+        if: steps.existing.outputs.has_pr != 'true'
+        env: *nim
+        run: node scripts/auto-product-job.mjs dev
+      - name: Apply proposed patch
+        id: patch
+        if: steps.existing.outputs.has_pr != 'true'
+        run: |
+          if [ ! -s auto-job-results/dev.patch ]; then
+            echo "No safe implementation was proposed."
+            echo "has_patch=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git apply --check auto-job-results/dev.patch
+          git apply auto-job-results/dev.patch
+          echo "has_patch=true" >> "$GITHUB_OUTPUT"
+      - name: Install and validate
+        if: steps.patch.outputs.has_patch == 'true'
+        run: |
+          bun install --frozen-lockfile
+          bun run lint
+          bun test
+          bun run test:contracts
+          bun run build
+      - name: Create draft pull request
+        if: steps.patch.outputs.has_patch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="automation/product-team-${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests
+          git commit -m "chore: implement automated product review"
+          git push --set-upstream origin "$branch"
+          gh pr create --draft --base main --head "$branch" \
+            --title "[Product team] $(cat auto-job-results/dev-title.txt)" \
+            --body-file auto-job-results/dev-body.md

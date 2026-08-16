@@ -70,13 +70,13 @@ const Batch7Modals = dynamic(() => import("@/components/moby/batch7-modals"), { 
 const Batch8Modals = dynamic(() => import("@/components/moby/batch8-modals"), { ssr: false, loading: () => null });
 
 export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
-  const activeTab = useMoby((s) => s.activeTab);
   const setActiveTab = useMoby((s) => s.setActiveTab);
   const refreshFeeds = useMoby((s) => s.refreshFeeds);
   const setCopilotOpen = useMoby((s) => s.setCopilotOpen);
   const wallet = useMoby((s) => s.wallet);
   const theme = useMoby((s) => s.theme);
   const pathname = usePathname();
+  const activeTab = forcedTab ?? tabFromPathname(pathname);
 
   useEffect(() => {
     setActiveTab(forcedTab ?? tabFromPathname(pathname));
@@ -645,19 +645,19 @@ export function MobyApp({ forcedTab }: { forcedTab?: TabKey }) {
 }
 
 export default function Home() {
-  return <MobyApp forcedTab="discover" />;
+  return <MobyApp />;
 }
 
 function DesktopRail() {
   const alertsCount = useMoby((s) => s.alerts.length);
   const wallet = useMoby((s) => s.wallet);
-  const activeTab = useMoby((s) => s.activeTab);
+  const activeTab = tabFromPathname(usePathname());
 
   const shortcuts: { tab: TabKey; label: string; note: string }[] = [
     { tab: "discover", label: "Discover", note: "Live discovery and market focus" },
     { tab: "whales", label: "Whales", note: "Wallet flows and trader rankings" },
     { tab: "signals", label: "Signals", note: "Actionable entries and alerts" },
-    { tab: "portfolio", label: "Portfolio", note: "Holdings, PnL, and allocation" },
+    { tab: "portfolio", label: "Leaderboard", note: "Ranked smart-money performance" },
     { tab: "profile", label: "Profile", note: "Settings, achievements, and account" },
   ];
 
